@@ -168,7 +168,7 @@
             app:cornerRadius="12dp"
             android:backgroundTint="#21A038"
             android:textColor="#FFFFFF"
-            android:layout_marginEnd="6dp" />
+            android:layout_marginEnd="4dp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/checkButton"
@@ -176,13 +176,14 @@
             android:layout_height="52dp"
             android:layout_weight="1"
             android:text="ПРОВЕРИТЬ"
-            android:textSize="13sp"
+            android:textSize="11sp"
             android:textStyle="bold"
             app:cornerRadius="12dp"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:textColor="#21A038"
             app:strokeColor="#21A038"
-            android:layout_marginEnd="6dp" />
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/capsuleButton"
@@ -193,10 +194,9 @@
             android:textSize="11sp"
             android:textStyle="bold"
             app:cornerRadius="12dp"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:textColor="#FF8800"
-            app:strokeColor="#FF8800"
-            android:layout_marginStart="6dp" />
+            android:backgroundTint="#21A038"
+            android:textColor="#FFFFFF"
+            android:layout_marginStart="4dp" />
     </LinearLayout>
 
     <LinearLayout
