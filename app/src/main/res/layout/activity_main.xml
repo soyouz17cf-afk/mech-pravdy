@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#1A1A1A"
+    android:background="#0A2A0A"
     android:padding="4dp">
 
     <LinearLayout
@@ -209,23 +209,35 @@
                 android:textColor="#888888" />
         </LinearLayout>
 
-        <ScrollView
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1"
-            android:background="#FFFFFF"
-            android:padding="6dp">
+            android:layout_weight="1">
 
-            <TextView
-                android:id="@+id/chatOutput"
+            <com.mechpravdy.neo.MatrixChatBackground
+                android:id="@+id/matrixChatBg"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Mech Pravdy v1.0\nPowered by GigaChat API\n\nВставьте Authorization Key и нажмите «ТОКЕН».\nЗатем напишите «Связность» или нажмите 🎤."
-                android:textSize="11sp"
-                android:textColor="#333333"
-                android:fontFamily="monospace"
-                android:lineSpacingExtra="2dp" />
-        </ScrollView>
+                android:layout_height="match_parent" />
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:padding="6dp">
+
+                <TextView
+                    android:id="@+id/chatOutput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Mech Pravdy v1.0\nPowered by GigaChat API\n\nВставьте Authorization Key и нажмите «ТОКЕН».\nЗатем напишите «Связность» или нажмите 🎤."
+                    android:textSize="11sp"
+                    android:textColor="#FFFFFF"
+                    android:fontFamily="monospace"
+                    android:lineSpacingExtra="2dp"
+                    android:background="#CC0A0A0A"
+                    android:padding="4dp" />
+            </ScrollView>
+
+        </FrameLayout>
 
         <TextView
             android:layout_width="match_parent"
