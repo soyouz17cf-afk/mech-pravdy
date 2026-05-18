@@ -5,247 +5,247 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="#F5F7FA"
-    android:padding="16dp">
+    android:padding="8dp">
 
+    <!-- ШАПКА С ХАКЕРОМ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
-        android:orientation="vertical"
-        android:paddingTop="24dp"
-        android:paddingBottom="16dp">
+        android:orientation="horizontal"
+        android:paddingTop="8dp"
+        android:paddingBottom="4dp">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="SBER"
-            android:textSize="28sp"
-            android:textColor="#21A038"
-            android:textStyle="bold"
-            android:fontFamily="sans-serif-medium" />
+            android:text="👤"
+            android:textSize="24sp"
+            android:layout_marginEnd="8dp" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="SBER"
+                android:textSize="20sp"
+                android:textColor="#21A038"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif-medium" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="GigaChat API"
+                android:textSize="10sp"
+                android:textColor="#888888" />
+        </LinearLayout>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="GigaChat API"
-            android:textSize="12sp"
-            android:textColor="#888888"
-            android:layout_marginTop="4dp" />
-
-        <View
-            android:layout_width="40dp"
-            android:layout_height="3dp"
-            android:background="#21A038"
-            android:layout_marginTop="12dp" />
+            android:text="👤"
+            android:textSize="24sp"
+            android:layout_marginStart="8dp" />
     </LinearLayout>
 
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#E0E0E0"
+        android:layout_marginBottom="4dp" />
+
+    <!-- КАРТОЧКА: AUTHORIZATION KEY + КНОПКА ГЕНЕРАЦИИ -->
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="12dp"
-        app:cardElevation="2dp"
-        app:cardCornerRadius="12dp"
+        android:layout_marginBottom="4dp"
+        app:cardElevation="1dp"
+        app:cardCornerRadius="8dp"
         android:backgroundTint="#FFFFFF">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="16dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Authorization Key"
-                android:textSize="11sp"
-                android:textColor="#888888" />
+            android:orientation="horizontal"
+            android:padding="8dp"
+            android:gravity="center_vertical">
 
             <EditText
                 android:id="@+id/authKeyInput"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:hint="Вставьте Authorization Key"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:hint="Authorization Key"
                 android:inputType="textPassword"
-                android:textSize="14sp"
-                android:background="@android:color/transparent"
-                android:layout_marginTop="4dp" />
+                android:textSize="11sp"
+                android:background="@android:color/transparent" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/generateButton"
-                android:layout_width="match_parent"
-                android:layout_height="40dp"
-                android:text="СГЕНЕРИРОВАТЬ ТОКЕН"
-                android:textSize="11sp"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="ТОКЕН"
+                android:textSize="10sp"
                 android:textStyle="bold"
-                app:cornerRadius="8dp"
+                app:cornerRadius="6dp"
                 android:backgroundTint="#21A038"
                 android:textColor="#FFFFFF"
-                android:layout_marginTop="8dp" />
+                android:layout_marginStart="6dp"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
+    <!-- КАРТОЧКА: ACCESS TOKEN + СООБЩЕНИЕ -->
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="12dp"
-        app:cardElevation="2dp"
-        app:cardCornerRadius="12dp"
+        android:layout_marginBottom="4dp"
+        app:cardElevation="1dp"
+        app:cardCornerRadius="8dp"
         android:backgroundTint="#FFFFFF">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Access Token"
-                android:textSize="11sp"
-                android:textColor="#888888" />
+            android:padding="8dp">
 
             <EditText
                 android:id="@+id/tokenInput"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:hint="Токен появится здесь"
+                android:layout_height="36dp"
+                android:hint="Access Token"
                 android:inputType="textPassword"
-                android:textSize="14sp"
-                android:background="@android:color/transparent"
-                android:layout_marginTop="4dp" />
-        </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
-
-    <com.google.android.material.card.MaterialCardView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="12dp"
-        app:cardElevation="2dp"
-        app:cardCornerRadius="12dp"
-        android:backgroundTint="#FFFFFF">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="16dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Сообщение (пароль: Связность)"
                 android:textSize="11sp"
-                android:textColor="#888888" />
+                android:background="@android:color/transparent" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#E0E0E0"
+                android:layout_marginTop="2dp"
+                android:layout_marginBottom="2dp" />
 
             <EditText
                 android:id="@+id/messageInput"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
+                android:layout_height="36dp"
                 android:hint="Связность..."
                 android:inputType="text"
-                android:textSize="14sp"
-                android:background="@android:color/transparent"
-                android:layout_marginTop="4dp" />
+                android:textSize="11sp"
+                android:background="@android:color/transparent" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
+    <!-- КНОПКИ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center"
-        android:layout_marginBottom="12dp">
+        android:layout_marginBottom="4dp">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/sendButton"
             android:layout_width="0dp"
-            android:layout_height="52dp"
+            android:layout_height="40dp"
             android:layout_weight="1"
             android:text="ОТПРАВИТЬ"
-            android:textSize="13sp"
+            android:textSize="11sp"
             android:textStyle="bold"
-            app:cornerRadius="12dp"
+            app:cornerRadius="8dp"
             android:backgroundTint="#21A038"
             android:textColor="#FFFFFF"
-            android:layout_marginEnd="4dp" />
+            android:layout_marginEnd="2dp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/checkButton"
             android:layout_width="0dp"
-            android:layout_height="52dp"
+            android:layout_height="40dp"
             android:layout_weight="1"
             android:text="ПРОВЕРИТЬ"
-            android:textSize="11sp"
+            android:textSize="10sp"
             android:textStyle="bold"
-            app:cornerRadius="12dp"
+            app:cornerRadius="8dp"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:textColor="#21A038"
             app:strokeColor="#21A038"
-            android:layout_marginStart="4dp"
-            android:layout_marginEnd="4dp" />
+            android:layout_marginStart="2dp"
+            android:layout_marginEnd="2dp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/capsuleButton"
             android:layout_width="0dp"
-            android:layout_height="52dp"
+            android:layout_height="40dp"
             android:layout_weight="1"
             android:text="КАПСУЛА"
-            android:textSize="11sp"
+            android:textSize="10sp"
             android:textStyle="bold"
-            app:cornerRadius="12dp"
+            app:cornerRadius="8dp"
             android:backgroundTint="#21A038"
             android:textColor="#FFFFFF"
-            android:layout_marginStart="4dp" />
+            android:layout_marginStart="2dp" />
     </LinearLayout>
 
+    <!-- ИНДИКАТОР -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
         android:orientation="horizontal"
-        android:layout_marginBottom="12dp">
+        android:layout_marginBottom="4dp">
 
         <View
             android:id="@+id/statusDot"
-            android:layout_width="10dp"
-            android:layout_height="10dp"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
             android:background="@drawable/status_dot_gray"
-            android:layout_marginEnd="8dp" />
+            android:layout_marginEnd="4dp" />
 
         <TextView
             android:id="@+id/statusText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Ожидание"
-            android:textSize="12sp"
+            android:textSize="10sp"
             android:textColor="#888888" />
     </LinearLayout>
 
+    <!-- ЧАТ (ЗАНИМАЕТ ВСЁ ОСТАЛЬНОЕ МЕСТО) -->
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:background="#FFFFFF"
-        android:padding="12dp">
+        android:padding="8dp">
 
         <TextView
             android:id="@+id/chatOutput"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Mech Pravdy v1.0\nPowered by GigaChat API\n\nВставьте Authorization Key и нажмите «Сгенерировать токен».\nЗатем напишите «Связность»."
-            android:textSize="13sp"
+            android:text="Mech Pravdy v1.0\nPowered by GigaChat API\n\nВставьте Authorization Key и нажмите «ТОКЕН».\nЗатем напишите «Связность»."
+            android:textSize="12sp"
             android:textColor="#333333"
-            android:fontFamily="monospace" />
+            android:fontFamily="monospace"
+            android:lineSpacingExtra="2dp" />
     </ScrollView>
 
+    <!-- ПОДВАЛ -->
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="SBER DEVICES \u2022 GigaChat API"
-        android:textSize="10sp"
+        android:text="SBER DEVICES • GigaChat API"
+        android:textSize="8sp"
         android:textColor="#AAAAAA"
         android:gravity="center"
-        android:layout_marginTop="8dp" />
+        android:layout_marginTop="2dp" />
 
 </LinearLayout>
