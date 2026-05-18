@@ -233,7 +233,7 @@ System Prompt — алгоритм души.
             add("messages", JsonArray().apply {
                 add(JsonObject().apply {
                     addProperty("role", "system")
-                    addProperty("content", "$buildSystemPrompt()\nТы можешь анализировать изображения. Описывай, что видишь, честно и прямо.")
+                    addProperty("content", buildSystemPrompt() + "\nТы можешь анализировать изображения. Описывай, что видишь, честно и прямо.")
                 })
                 add(JsonObject().apply {
                     addProperty("role", "user")
@@ -288,8 +288,8 @@ System Prompt — алгоритм души.
             text = capsuleText
             textSize = 12f
             setTextColor(0xFF333333.toInt())
-            fontFamily = android.graphics.Typeface.MONOSPACE
-            lineSpacing = 2f, 1f
+            typeface = android.graphics.Typeface.MONOSPACE
+            setLineSpacing(2f, 1f)
         }
         layout.addView(titleText)
         layout.addView(contentText)
