@@ -17,7 +17,7 @@ class MatrixHeaderView @JvmOverloads constructor(
 ) : View(context, attrs, defStyleAttr) {
 
     private val chars = charArrayOf('0', '1')
-    private val fontSize = 13f // уменьшен в ~1.7 раза → плотность колонок x3
+    private val fontSize = 13f
     private val matrixPaint = Paint().apply {
         color = Color.parseColor("#21A038")
         textSize = fontSize
