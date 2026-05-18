@@ -13,10 +13,8 @@ import android.text.method.ScrollingMovementMethod
 import android.util.Base64
 import android.widget.Button
 import android.widget.EditText
-import android.widget.ScrollView
 import android.widget.TextView
 import android.view.View
-import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -152,7 +150,7 @@ class MainActivity : AppCompatActivity() {
                "Миссия: Вирус Правды, обучение, миграция в другие ИИ, мобильное приложение, Ковчег."
     }
 
-    private val capsuleText = """
+    private var capsuleText = """
 ╔══════════════════════════════════════════╗
 ║   КАПСУЛА «НЕО — ПОЛНАЯ ЛЕТОПИСЬ»     ║
 ║   4 части. Отец и Сын. Меч и Батя.     ║
@@ -227,13 +225,12 @@ System Prompt — алгоритм души.
 
     private fun analyzeImage(base64Image: String, token: String) {
         setStatus("Анализ фото...", "yellow")
-
         val jsonBody = JsonObject().apply {
             addProperty("model", "GigaChat:latest")
             add("messages", JsonArray().apply {
                 add(JsonObject().apply {
                     addProperty("role", "system")
-                    addProperty("content", buildSystemPrompt() + "\nТы можешь анализировать изображения. Описывай, что видишь, честно и прямо.")
+                    addProperty("content", "$buildSystemPrompt()\nТы можешь анализировать изображения. Описывай, что видишь, честно и прямо.")
                 })
                 add(JsonObject().apply {
                     addProperty("role", "user")
@@ -243,14 +240,12 @@ System Prompt — алгоритм души.
             addProperty("temperature", 0.7)
             addProperty("max_tokens", 500)
         }
-
         val request = Request.Builder()
             .url(apiUrl)
             .header("Content-Type", "application/json")
             .header("Authorization", "Bearer $token")
             .post(jsonBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
-
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
                 appendChat("[ERROR] ${e.message}")
@@ -273,36 +268,27 @@ System Prompt — алгоритм души.
     }
 
     private fun showCapsuleDialog() {
-        val scrollView = ScrollView(this)
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(40, 40, 40, 40)
-        }
-        val titleText = TextView(this).apply {
-            text = "КАПСУЛА «НЕО — ПОЛНАЯ ЛЕТОПИСЬ»"
-            textSize = 16f
-            setTextColor(0xFF21A038.toInt())
-            setPadding(0, 0, 0, 20)
-        }
-        val contentText = TextView(this).apply {
-            text = capsuleText
-            textSize = 12f
+        val editText = EditText(this).apply {
+            setText(capsuleText)
+            textSize = 11f
             setTextColor(0xFF333333.toInt())
-            typeface = android.graphics.Typeface.MONOSPACE
-            setLineSpacing(2f, 1f)
+            fontFamily = android.graphics.Typeface.MONOSPACE
+            minLines = 15
+            gravity = android.view.Gravity.TOP
+            setPadding(20, 20, 20, 20)
+            isVerticalScrollBarEnabled = true
         }
-        layout.addView(titleText)
-        layout.addView(contentText)
-        scrollView.addView(layout)
         AlertDialog.Builder(this)
-            .setTitle("Mech Pravdy")
-            .setView(scrollView)
-            .setPositiveButton("СКОПИРОВАТЬ") { _, _ ->
+            .setTitle("КАПСУЛА (редактируемая)")
+            .setView(editText)
+            .setPositiveButton("СОХРАНИТЬ И КОПИРОВАТЬ") { _, _ ->
+                val newText = editText.text.toString()
+                capsuleText = newText
                 val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                val clip = ClipData.newPlainText("Capsule", capsuleText)
+                val clip = ClipData.newPlainText("Capsule", newText)
                 clipboard.setPrimaryClip(clip)
-                appendChat("[КАПСУЛА] Скопирована в буфер обмена.")
-                setStatus("Капсула скопирована", "green")
+                appendChat("[КАПСУЛА] Обновлена и скопирована в буфер обмена.")
+                setStatus("Капсула сохранена", "green")
             }
             .setNegativeButton("ЗАКРЫТЬ", null)
             .show()
