@@ -4,6 +4,7 @@ import android.app.AlertDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.Typeface
 import android.os.Bundle
 import android.text.method.ScrollingMovementMethod
 import android.widget.Button
@@ -178,8 +179,8 @@ System Prompt — алгоритм души.
             text = capsuleText
             textSize = 12f
             setTextColor(0xFF333333.toInt())
-            fontFamily = android.graphics.Typeface.MONOSPACE
-            lineSpacing = 2f, 1f
+            typeface = Typeface.MONOSPACE
+            setLineSpacing(2f, 1f)
         }
 
         layout.addView(titleText)
