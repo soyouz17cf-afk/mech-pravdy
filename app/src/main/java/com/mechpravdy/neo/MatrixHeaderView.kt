@@ -17,33 +17,33 @@ class MatrixHeaderView @JvmOverloads constructor(
 
     private val chars = "アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789"
     private val fontSize = 18f
-    private val paint = Paint().apply {
-        color = Color.parseColor("#009900")
+    private val matrixPaint = Paint().apply {
+        color = Color.parseColor("#21A038")
         textSize = fontSize
         typeface = Typeface.MONOSPACE
         isAntiAlias = true
+        alpha = 60
     }
     private val titlePaint = Paint().apply {
         color = Color.parseColor("#21A038")
-        textSize = 36f
+        textSize = 50f
         typeface = Typeface.DEFAULT_BOLD
         isAntiAlias = true
         textAlign = Paint.Align.CENTER
     }
     private val subtitlePaint = Paint().apply {
-        color = Color.parseColor("#888888")
-        textSize = 18f
+        color = Color.parseColor("#555555")
+        textSize = 22f
         typeface = Typeface.DEFAULT
         isAntiAlias = true
         textAlign = Paint.Align.CENTER
     }
     private val bgPaint = Paint().apply {
-        color = Color.parseColor("#0A0A0A")
+        color = Color.WHITE
     }
 
     private var columns = 0
     private lateinit var drops: IntArray
-    private var frame = 0
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -56,37 +56,34 @@ class MatrixHeaderView @JvmOverloads constructor(
         val w = width.toFloat()
         val h = height.toFloat()
 
-        // Фон
+        // Белый фон
         canvas.drawRect(0f, 0f, w, h, bgPaint)
 
-        // Падающие символы
+        // Падающие символы (едва заметные, светло-зелёные)
         for (i in 0 until columns) {
             val char = chars[Random.nextInt(chars.length)]
             val x = i * fontSize
             val y = drops[i] * fontSize
-            val alpha = if (y > h * 0.6f && Random.nextFloat() > 0.95f) 255 else 150
-            paint.alpha = alpha
-            canvas.drawText(char.toString(), x, y, paint)
+            canvas.drawText(char.toString(), x, y, matrixPaint)
             if (y > h && Random.nextFloat() > 0.975f) {
                 drops[i] = 0
             }
             drops[i]++
         }
 
-        // Полупрозрачная плашка под текст
-        val textBgPaint = Paint().apply {
-            color = Color.parseColor("#CC0A0A0A")
+        // Полупрозрачная белая плашка под текст (чтоб символы не мешали читать)
+        val overlayPaint = Paint().apply {
+            color = Color.parseColor("#DDFFFFFF")
         }
-        canvas.drawRect(0f, h * 0.15f, w, h * 0.85f, textBgPaint)
+        canvas.drawRect(0f, h * 0.1f, w, h * 0.9f, overlayPaint)
 
-        // Заголовок SBER
-        canvas.drawText("SBER", w / 2, h * 0.52f, titlePaint)
+        // Заголовок SBER (увеличен на 40% — был 36sp, стал 50sp)
+        canvas.drawText("SBER", w / 2, h * 0.55f, titlePaint)
 
-        // Подзаголовок GigaChat API
-        canvas.drawText("GigaChat API", w / 2, h * 0.78f, subtitlePaint)
+        // Подзаголовок GigaChat API (увеличен пропорционально — был 18sp, стал 22sp)
+        canvas.drawText("GigaChat API", w / 2, h * 0.82f, subtitlePaint)
 
         // Перерисовка каждые 80 мс
-        frame++
         postInvalidateDelayed(80)
     }
 }
