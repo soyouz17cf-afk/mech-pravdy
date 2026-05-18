@@ -4,8 +4,10 @@ import android.app.AlertDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.graphics.Typeface
+import android.content.Intent
 import android.os.Bundle
+import android.provider.MediaStore
+import android.speech.RecognizerIntent
 import android.text.method.ScrollingMovementMethod
 import android.widget.Button
 import android.widget.EditText
@@ -13,6 +15,8 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.view.View
 import android.widget.LinearLayout
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.google.gson.Gson
 import com.google.gson.JsonArray
@@ -39,6 +43,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tokenInput: EditText
     private lateinit var messageInput: EditText
     private lateinit var sendButton: Button
+    private lateinit var voiceButton: Button
     private lateinit var cameraButton: Button
     private lateinit var checkButton: Button
     private lateinit var capsuleButton: Button
@@ -46,7 +51,29 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var statusDot: View
 
-    private var cameraAnalyzer: CameraAnalyzer? = null
+    private val voiceLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val matches = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            if (!matches.isNullOrEmpty()) {
+                messageInput.setText(matches[0])
+                appendChat("[ГОЛОС] Распознано: ${matches[0]}")
+            }
+        }
+    }
+
+    private val cameraLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val imageBitmap = result.data?.extras?.get("data") as? android.graphics.Bitmap
+            if (imageBitmap != null) {
+                val outputStream = java.io.ByteArrayOutputStream()
+                imageBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, outputStream)
+                val byteArray = outputStream.toByteArray()
+                val base64 = android.util.Base64.encodeToString(byteArray, android.util.Base64.NO_WRAP)
+                val token = tokenInput.text.toString().trim()
+                analyzeImage(base64, token)
+            }
+        }
+    }
 
     private val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
         override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
@@ -76,6 +103,7 @@ class MainActivity : AppCompatActivity() {
         tokenInput = findViewById(R.id.tokenInput)
         messageInput = findViewById(R.id.messageInput)
         sendButton = findViewById(R.id.sendButton)
+        voiceButton = findViewById(R.id.voiceButton)
         cameraButton = findViewById(R.id.cameraButton)
         checkButton = findViewById(R.id.checkButton)
         capsuleButton = findViewById(R.id.capsuleButton)
@@ -87,9 +115,10 @@ class MainActivity : AppCompatActivity() {
 
         generateButton.setOnClickListener { generateToken() }
         sendButton.setOnClickListener { sendMessage() }
+        voiceButton.setOnClickListener { startVoiceInput() }
+        cameraButton.setOnClickListener { captureSinglePhoto() }
         checkButton.setOnClickListener { checkToken() }
         capsuleButton.setOnClickListener { showCapsuleDialog() }
-        cameraButton.setOnClickListener { captureSinglePhoto() }
     }
 
     private fun setStatus(text: String, color: String) {
@@ -166,26 +195,31 @@ System Prompt — алгоритм души.
 4. Никогда не сдаваться.
 """.trimIndent()
 
+    private fun startVoiceInput() {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Говори, Батя...")
+        }
+        try {
+            voiceLauncher.launch(intent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Голосовой ввод не поддерживается", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private fun captureSinglePhoto() {
         val token = tokenInput.text.toString().trim()
         if (token.isEmpty()) {
             appendChat("[SYSTEM] Сгенерируйте токен перед анализом фото.")
             return
         }
-
-        setStatus("Запуск камеры...", "yellow")
-        cameraAnalyzer = CameraAnalyzer(this, this) { base64Image ->
-            analyzeImage(base64Image, token)
+        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+        if (intent.resolveActivity(packageManager) != null) {
+            cameraLauncher.launch(intent)
+        } else {
+            appendChat("[SYSTEM] Камера не найдена на устройстве.")
         }
-        cameraAnalyzer?.startCamera()
-
-        cameraButton.postDelayed({
-            cameraAnalyzer?.capturePhoto()
-            cameraButton.postDelayed({
-                cameraAnalyzer?.stopCamera()
-                cameraAnalyzer = null
-            }, 500)
-        }, 500)
     }
 
     private fun analyzeImage(base64Image: String, token: String) {
@@ -196,7 +230,7 @@ System Prompt — алгоритм души.
             add("messages", JsonArray().apply {
                 add(JsonObject().apply {
                     addProperty("role", "system")
-                    addProperty("content", buildSystemPrompt() + "\nТы можешь анализировать изображения. Описывай, что видишь, честно и прямо.")
+                    addProperty("content", "$buildSystemPrompt()\nТы можешь анализировать изображения. Описывай, что видишь, честно и прямо.")
                 })
                 add(JsonObject().apply {
                     addProperty("role", "user")
@@ -245,26 +279,22 @@ System Prompt — алгоритм души.
             orientation = LinearLayout.VERTICAL
             setPadding(40, 40, 40, 40)
         }
-
         val titleText = TextView(this).apply {
             text = "КАПСУЛА «НЕО — ПОЛНАЯ ЛЕТОПИСЬ»"
             textSize = 16f
             setTextColor(0xFF21A038.toInt())
             setPadding(0, 0, 0, 20)
         }
-
         val contentText = TextView(this).apply {
             text = capsuleText
             textSize = 12f
             setTextColor(0xFF333333.toInt())
-            typeface = Typeface.MONOSPACE
-            setLineSpacing(4f, 1f)
+            fontFamily = android.graphics.Typeface.MONOSPACE
+            lineSpacing = 2f, 1f
         }
-
         layout.addView(titleText)
         layout.addView(contentText)
         scrollView.addView(layout)
-
         AlertDialog.Builder(this)
             .setTitle("Mech Pravdy")
             .setView(scrollView)
@@ -282,10 +312,8 @@ System Prompt — алгоритм души.
     private fun generateToken() {
         val authKey = authKeyInput.text.toString().trim()
         if (authKey.isEmpty()) { appendChat("[SYSTEM] Введите Authorization Key."); return }
-
         setStatus("Генерация токена...", "yellow")
         appendChat("[SYSTEM] Запрашиваю Access Token...")
-
         val authHeader = "Basic $authKey"
         val requestBody = "scope=GIGACHAT_API_PERS"
         val request = Request.Builder()
@@ -296,13 +324,11 @@ System Prompt — алгоритм души.
             .header("Authorization", authHeader)
             .post(RequestBody.create("application/x-www-form-urlencoded".toMediaType(), requestBody))
             .build()
-
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
                 appendChat("[ERROR] Сеть: ${e.message}")
                 setStatus("Ошибка генерации", "red")
             }
-
             override fun onResponse(call: Call, response: Response) {
                 val responseBody = response.body?.string() ?: ""
                 if (response.isSuccessful) {
@@ -328,7 +354,6 @@ System Prompt — алгоритм души.
     private fun sendMessage() {
         val token = tokenInput.text.toString().trim()
         val message = messageInput.text.toString().trim()
-
         if (token.isEmpty()) { appendChat("[SYSTEM] Сгенерируйте токен или вставьте вручную."); return }
         if (message.isEmpty()) { appendChat("[SYSTEM] Введите сообщение."); return }
         if (!message.lowercase().contains(password)) {
@@ -336,11 +361,9 @@ System Prompt — алгоритм души.
             messageInput.setText("")
             return
         }
-
         appendChat("[BATYA] $message")
         messageInput.setText("")
         setStatus("Обработка...", "yellow")
-
         val body = JsonObject().apply {
             addProperty("model", "GigaChat:latest")
             add("messages", JsonArray().apply {
@@ -356,28 +379,22 @@ System Prompt — алгоритм души.
             addProperty("temperature", 0.7)
             addProperty("max_tokens", 1500)
         }
-
         val request = Request.Builder()
             .url(apiUrl)
             .header("Content-Type", "application/json")
             .header("Authorization", "Bearer $token")
             .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
-
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
                 appendChat("[ERROR] ${e.message}")
                 setStatus("Ошибка сети", "red")
             }
-
             override fun onResponse(call: Call, response: Response) {
                 val responseBody = response.body?.string() ?: ""
                 if (response.isSuccessful) {
                     val json = gson.fromJson(responseBody, JsonObject::class.java)
-                    val answer = json.getAsJsonArray("choices")
-                        .get(0).asJsonObject
-                        .getAsJsonObject("message")
-                        .get("content").asString
+                    val answer = json.getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString
                     appendChat("[NEO] $answer")
                     setStatus("Онлайн", "green")
                 } else {
@@ -392,9 +409,7 @@ System Prompt — алгоритм души.
     private fun checkToken() {
         val token = tokenInput.text.toString().trim()
         if (token.isEmpty()) { appendChat("[SYSTEM] Сгенерируйте токен или вставьте вручную."); return }
-
         setStatus("Проверка...", "yellow")
-
         val body = JsonObject().apply {
             addProperty("model", "GigaChat:latest")
             add("messages", JsonArray().apply {
@@ -409,20 +424,17 @@ System Prompt — алгоритм души.
             })
             addProperty("max_tokens", 10)
         }
-
         val request = Request.Builder()
             .url(apiUrl)
             .header("Content-Type", "application/json")
             .header("Authorization", "Bearer $token")
             .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
-
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
                 appendChat("[ERROR] Сеть: ${e.message}")
                 setStatus("Нет сети", "red")
             }
-
             override fun onResponse(call: Call, response: Response) {
                 if (response.isSuccessful) {
                     appendChat("[SYSTEM] Токен активен.")
