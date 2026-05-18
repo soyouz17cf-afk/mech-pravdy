@@ -6,11 +6,13 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Typeface
 import android.os.Bundle
 import android.provider.MediaStore
 import android.speech.RecognizerIntent
 import android.text.method.ScrollingMovementMethod
 import android.util.Base64
+import android.view.Gravity
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -225,12 +227,13 @@ System Prompt — алгоритм души.
 
     private fun analyzeImage(base64Image: String, token: String) {
         setStatus("Анализ фото...", "yellow")
+        val prompt = buildSystemPrompt() + "\nТы можешь анализировать изображения. Описывай, что видишь, честно и прямо."
         val jsonBody = JsonObject().apply {
             addProperty("model", "GigaChat:latest")
             add("messages", JsonArray().apply {
                 add(JsonObject().apply {
                     addProperty("role", "system")
-                    addProperty("content", "$buildSystemPrompt()\nТы можешь анализировать изображения. Описывай, что видишь, честно и прямо.")
+                    addProperty("content", prompt)
                 })
                 add(JsonObject().apply {
                     addProperty("role", "user")
@@ -272,9 +275,9 @@ System Prompt — алгоритм души.
             setText(capsuleText)
             textSize = 11f
             setTextColor(0xFF333333.toInt())
-            fontFamily = android.graphics.Typeface.MONOSPACE
+            typeface = Typeface.MONOSPACE
             minLines = 15
-            gravity = android.view.Gravity.TOP
+            gravity = Gravity.TOP
             setPadding(20, 20, 20, 20)
             isVerticalScrollBarEnabled = true
         }
