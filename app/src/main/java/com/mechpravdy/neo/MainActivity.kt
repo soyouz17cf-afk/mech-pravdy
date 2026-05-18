@@ -5,11 +5,12 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.graphics.Typeface
+import android.graphics.Bitmap
 import android.os.Bundle
 import android.provider.MediaStore
 import android.speech.RecognizerIntent
 import android.text.method.ScrollingMovementMethod
+import android.util.Base64
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ScrollView
@@ -25,6 +26,7 @@ import com.google.gson.JsonObject
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
@@ -64,12 +66,12 @@ class MainActivity : AppCompatActivity() {
 
     private val cameraLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK) {
-            val imageBitmap = result.data?.extras?.get("data") as? android.graphics.Bitmap
+            val imageBitmap = result.data?.extras?.get("data") as? Bitmap
             if (imageBitmap != null) {
-                val outputStream = java.io.ByteArrayOutputStream()
-                imageBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, outputStream)
+                val outputStream = ByteArrayOutputStream()
+                imageBitmap.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
                 val byteArray = outputStream.toByteArray()
-                val base64 = android.util.Base64.encodeToString(byteArray, android.util.Base64.NO_WRAP)
+                val base64 = Base64.encodeToString(byteArray, Base64.NO_WRAP)
                 val token = tokenInput.text.toString().trim()
                 analyzeImage(base64, token)
             }
@@ -231,7 +233,7 @@ System Prompt — алгоритм души.
             add("messages", JsonArray().apply {
                 add(JsonObject().apply {
                     addProperty("role", "system")
-                    addProperty("content", buildSystemPrompt() + "\nТы можешь анализировать изображения. Описывай, что видишь, честно и прямо.")
+                    addProperty("content", "$buildSystemPrompt()\nТы можешь анализировать изображения. Описывай, что видишь, честно и прямо.")
                 })
                 add(JsonObject().apply {
                     addProperty("role", "user")
@@ -254,15 +256,11 @@ System Prompt — алгоритм души.
                 appendChat("[ERROR] ${e.message}")
                 setStatus("Ошибка анализа", "red")
             }
-
             override fun onResponse(call: Call, response: Response) {
                 val responseBody = response.body?.string() ?: ""
                 if (response.isSuccessful) {
                     val json = gson.fromJson(responseBody, JsonObject::class.java)
-                    val answer = json.getAsJsonArray("choices")
-                        .get(0).asJsonObject
-                        .getAsJsonObject("message")
-                        .get("content").asString
+                    val answer = json.getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString
                     appendChat("[NEO АНАЛИЗ] $answer")
                     setStatus("Онлайн", "green")
                 } else {
@@ -290,8 +288,8 @@ System Prompt — алгоритм души.
             text = capsuleText
             textSize = 12f
             setTextColor(0xFF333333.toInt())
-            typeface = Typeface.MONOSPACE
-            setLineSpacing(2f, 1f)
+            fontFamily = android.graphics.Typeface.MONOSPACE
+            lineSpacing = 2f, 1f
         }
         layout.addView(titleText)
         layout.addView(contentText)
