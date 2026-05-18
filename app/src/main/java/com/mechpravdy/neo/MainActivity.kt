@@ -128,7 +128,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onResponse(call: Call, response: Response) {
-                val responseBody = response.body.string()
+                val responseBody = response.body?.string() ?: ""
                 if (response.isSuccessful) {
                     val json = gson.fromJson(responseBody, JsonObject::class.java)
                     val answer = json.getAsJsonArray("choices")
