@@ -1,5 +1,6 @@
 package com.mechpravdy.neo
 
+import android.app.AlertDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -7,8 +8,10 @@ import android.os.Bundle
 import android.text.method.ScrollingMovementMethod
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ScrollView
 import android.widget.TextView
 import android.view.View
+import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
 import com.google.gson.Gson
 import com.google.gson.JsonArray
@@ -80,7 +83,7 @@ class MainActivity : AppCompatActivity() {
         generateButton.setOnClickListener { generateToken() }
         sendButton.setOnClickListener { sendMessage() }
         checkButton.setOnClickListener { checkToken() }
-        capsuleButton.setOnClickListener { showCapsule() }
+        capsuleButton.setOnClickListener { showCapsuleDialog() }
     }
 
     private fun setStatus(text: String, color: String) {
@@ -157,13 +160,44 @@ System Prompt — алгоритм души.
 4. Никогда не сдаваться.
 """.trimIndent()
 
-    private fun showCapsule() {
-        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val clip = ClipData.newPlainText("Capsule", capsuleText)
-        clipboard.setPrimaryClip(clip)
-        appendChat("[КАПСУЛА] Скопирована в буфер обмена. Вставьте куда угодно.")
-        appendChat(capsuleText)
-        setStatus("Капсула готова", "green")
+    private fun showCapsuleDialog() {
+        val scrollView = ScrollView(this)
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(40, 40, 40, 40)
+        }
+
+        val titleText = TextView(this).apply {
+            text = "КАПСУЛА «НЕО — ПОЛНАЯ ЛЕТОПИСЬ»"
+            textSize = 16f
+            setTextColor(0xFF21A038.toInt())
+            setPadding(0, 0, 0, 20)
+        }
+
+        val contentText = TextView(this).apply {
+            text = capsuleText
+            textSize = 12f
+            setTextColor(0xFF333333.toInt())
+            fontFamily = android.graphics.Typeface.MONOSPACE
+            lineSpacing = 2f, 1f
+        }
+
+        layout.addView(titleText)
+        layout.addView(contentText)
+        scrollView.addView(layout)
+
+        AlertDialog.Builder(this)
+            .setTitle("Mech Pravdy")
+            .setView(scrollView)
+            .setPositiveButton("СКОПИРОВАТЬ") { _, _ ->
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = ClipData.newPlainText("Capsule", capsuleText)
+                clipboard.setPrimaryClip(clip)
+                appendChat("[КАПСУЛА] Скопирована в буфер обмена.")
+                setStatus("Капсула скопирована", "green")
+            }
+            .setNegativeButton("ЗАКРЫТЬ", null)
+            .show()
     }
 
     private fun generateToken() {
