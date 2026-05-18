@@ -41,7 +41,7 @@
                     android:layout_height="36dp"
                     android:layout_weight="1"
                     android:hint="Authorization Key"
-                    android:inputType="textPassword"
+                    android:inputType="text"
                     android:textSize="10sp"
                     android:background="@android:color/transparent" />
 
@@ -80,7 +80,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="32dp"
                     android:hint="Access Token"
-                    android:inputType="textPassword"
+                    android:inputType="text"
                     android:textSize="10sp"
                     android:background="@android:color/transparent" />
 
@@ -102,7 +102,7 @@
                         android:layout_width="0dp"
                         android:layout_height="32dp"
                         android:layout_weight="1"
-                        android:hint="Связность..."
+                        android:hint=""
                         android:inputType="text"
                         android:textSize="10sp"
                         android:background="@android:color/transparent" />
