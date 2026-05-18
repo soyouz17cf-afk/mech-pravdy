@@ -127,8 +127,8 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onResponse(call: Call, response: Response) {
-                val responseBody = response.body()?.string() ?: ""
-                if (response.isSuccessful()) {
+                val responseBody = response.body()!!.string()
+                if (response.isSuccessful) {
                     val json = gson.fromJson(responseBody, JsonObject::class.java)
                     val answer = json.getAsJsonArray("choices")
                         .get(0).asJsonObject
@@ -180,7 +180,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onResponse(call: Call, response: Response) {
-                if (response.isSuccessful()) {
+                if (response.isSuccessful) {
                     appendChat("[SYSTEM] Токен активен.")
                     setStatus("Онлайн", "green")
                 } else {
