@@ -4,6 +4,7 @@ import android.app.AlertDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.Typeface
 import android.os.Bundle
 import android.text.method.ScrollingMovementMethod
 import android.widget.Button
@@ -178,10 +179,8 @@ System Prompt — алгоритм души.
         }
         cameraAnalyzer?.startCamera()
 
-        // Даём камере 500 мс на инициализацию, затем делаем один снимок
         cameraButton.postDelayed({
             cameraAnalyzer?.capturePhoto()
-            // Ещё через 500 мс выключаем камеру
             cameraButton.postDelayed({
                 cameraAnalyzer?.stopCamera()
                 cameraAnalyzer = null
@@ -197,7 +196,7 @@ System Prompt — алгоритм души.
             add("messages", JsonArray().apply {
                 add(JsonObject().apply {
                     addProperty("role", "system")
-                    addProperty("content", "$buildSystemPrompt()\nТы можешь анализировать изображения. Описывай, что видишь, честно и прямо.")
+                    addProperty("content", buildSystemPrompt() + "\nТы можешь анализировать изображения. Описывай, что видишь, честно и прямо.")
                 })
                 add(JsonObject().apply {
                     addProperty("role", "user")
@@ -258,8 +257,8 @@ System Prompt — алгоритм души.
             text = capsuleText
             textSize = 12f
             setTextColor(0xFF333333.toInt())
-            fontFamily = android.graphics.Typeface.MONOSPACE
-            lineSpacing = 2f, 1f
+            typeface = Typeface.MONOSPACE
+            setLineSpacing(4f, 1f)
         }
 
         layout.addView(titleText)
