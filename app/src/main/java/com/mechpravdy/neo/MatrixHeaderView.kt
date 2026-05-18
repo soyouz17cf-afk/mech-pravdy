@@ -17,7 +17,7 @@ class MatrixHeaderView @JvmOverloads constructor(
 ) : View(context, attrs, defStyleAttr) {
 
     private val chars = charArrayOf('0', '1')
-    private val fontSize = 22f
+    private val fontSize = 13f // уменьшен в ~1.7 раза → плотность колонок x3
     private val matrixPaint = Paint().apply {
         color = Color.parseColor("#21A038")
         textSize = fontSize
@@ -50,7 +50,7 @@ class MatrixHeaderView @JvmOverloads constructor(
         super.onSizeChanged(w, h, oldw, oldh)
         columns = (w / fontSize).toInt() + 1
         drops = IntArray(columns) { Random.nextInt(-h.toInt() / fontSize.toInt(), 0) }
-        titlePaint.getTextBounds("SBER", 0, 4, textBounds)
+        titlePaint.getTextBounds("СБЕР", 0, 4, textBounds)
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -64,8 +64,7 @@ class MatrixHeaderView @JvmOverloads constructor(
         val textTop = textCenterY - titlePaint.textSize * 0.9f
         val textBottom = textCenterY + titlePaint.textSize * 0.4f
 
-        // Обновление позиций — раз в 12 кадров (очень медленно)
-        if (frame % 12 == 0) {
+        if (frame % 11 == 0) {
             for (i in 0 until columns) {
                 drops[i]++
                 if (drops[i] * fontSize > h && Random.nextFloat() > 0.96f) {
@@ -74,21 +73,19 @@ class MatrixHeaderView @JvmOverloads constructor(
             }
         }
 
-        // Рисуем символы
         for (i in 0 until columns) {
             val x = i * fontSize
             val y = drops[i] * fontSize
 
-            // Пропускаем зону текста SBER
             if (y > textTop && y < textBottom) continue
 
-            val isHead = (i == frame / 12 % columns) || (i == (frame / 12 + columns / 3) % columns)
+            val isHead = (i == frame / 11 % columns) || (i == (frame / 11 + columns / 3) % columns)
 
             if (isHead) {
-                matrixPaint.alpha = 200
-                matrixPaint.textSize = fontSize + 3f
+                matrixPaint.alpha = 220
+                matrixPaint.textSize = fontSize + 2f
             } else {
-                matrixPaint.alpha = 70
+                matrixPaint.alpha = 90
                 matrixPaint.textSize = fontSize
             }
 
@@ -96,14 +93,13 @@ class MatrixHeaderView @JvmOverloads constructor(
             canvas.drawText(char.toString(), x, y, matrixPaint)
         }
 
-        // Плашка под текст
         val overlayPaint = Paint().apply { color = Color.parseColor("#EEFFFFFF") }
-        canvas.drawRect(0f, textTop - 8f, w, textBottom + 25f, overlayPaint)
+        canvas.drawRect(0f, textTop - 12f, w, textBottom + 30f, overlayPaint)
 
-        canvas.drawText("SBER", w / 2, textCenterY, titlePaint)
-        canvas.drawText("GigaChat API", w / 2, h * 0.82f, subtitlePaint)
+        canvas.drawText("СБЕР", w / 2, textCenterY, titlePaint)
+        canvas.drawText("ГигаЧат", w / 2, h * 0.82f, subtitlePaint)
 
         frame++
-        postInvalidateDelayed(350) // обновление каждые 350 мс (очень медленно)
+        postInvalidateDelayed(315)
     }
 }
