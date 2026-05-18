@@ -26,7 +26,7 @@ class MatrixHeaderView @JvmOverloads constructor(
     }
     private val titlePaint = Paint().apply {
         color = Color.parseColor("#21A038")
-        textSize = 44f
+        textSize = 88f // увеличено в 2 раза
         typeface = Typeface.DEFAULT_BOLD
         isAntiAlias = true
         textAlign = Paint.Align.CENTER
@@ -34,7 +34,7 @@ class MatrixHeaderView @JvmOverloads constructor(
     }
     private val subtitlePaint = Paint().apply {
         color = Color.parseColor("#555555")
-        textSize = 18f
+        textSize = 32f // увеличено пропорционально
         typeface = Typeface.DEFAULT
         isAntiAlias = true
         textAlign = Paint.Align.CENTER
@@ -60,9 +60,9 @@ class MatrixHeaderView @JvmOverloads constructor(
 
         canvas.drawRect(0f, 0f, w, h, bgPaint)
 
-        val textCenterY = h * 0.55f
-        val textTop = textCenterY - titlePaint.textSize * 0.9f
-        val textBottom = textCenterY + titlePaint.textSize * 0.4f
+        val textCenterY = h * 0.50f
+        val textTop = textCenterY - titlePaint.textSize * 0.7f
+        val textBottom = textCenterY + titlePaint.textSize * 0.3f
 
         if (frame % 11 == 0) {
             for (i in 0 until columns) {
@@ -94,10 +94,10 @@ class MatrixHeaderView @JvmOverloads constructor(
         }
 
         val overlayPaint = Paint().apply { color = Color.parseColor("#EEFFFFFF") }
-        canvas.drawRect(0f, textTop - 12f, w, textBottom + 30f, overlayPaint)
+        canvas.drawRect(0f, textTop - 12f, w, textBottom + 40f, overlayPaint)
 
-        canvas.drawText("СБЕР", w / 2, textCenterY, titlePaint)
-        canvas.drawText("ГигаЧат", w / 2, h * 0.82f, subtitlePaint)
+        canvas.drawText("СБЕР", w / 2, textCenterY + 10f, titlePaint)
+        canvas.drawText("ГигаЧат", w / 2, h * 0.85f, subtitlePaint)
 
         frame++
         postInvalidateDelayed(315)
