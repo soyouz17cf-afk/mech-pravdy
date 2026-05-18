@@ -5,93 +5,113 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="#F5F7FA"
-    android:padding="8dp">
+    android:padding="6dp">
 
     <com.mechpravdy.neo.MatrixHeaderView
         android:id="@+id/matrixHeader"
         android:layout_width="match_parent"
-        android:layout_height="60dp"
-        android:layout_marginBottom="4dp" />
+        android:layout_height="55dp"
+        android:layout_marginBottom="3dp" />
 
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="4dp"
+        android:layout_marginBottom="3dp"
         app:cardElevation="1dp"
-        app:cardCornerRadius="8dp"
+        app:cardCornerRadius="6dp"
         android:backgroundTint="#FFFFFF">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:padding="8dp"
+            android:padding="6dp"
             android:gravity="center_vertical">
 
             <EditText
                 android:id="@+id/authKeyInput"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="36dp"
                 android:layout_weight="1"
                 android:hint="Authorization Key"
                 android:inputType="textPassword"
-                android:textSize="11sp"
+                android:textSize="10sp"
                 android:background="@android:color/transparent" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/generateButton"
                 android:layout_width="wrap_content"
-                android:layout_height="36dp"
+                android:layout_height="32dp"
                 android:text="ТОКЕН"
-                android:textSize="10sp"
+                android:textSize="9sp"
                 android:textStyle="bold"
-                app:cornerRadius="6dp"
+                app:cornerRadius="5dp"
                 android:backgroundTint="#21A038"
                 android:textColor="#FFFFFF"
-                android:layout_marginStart="6dp"
-                android:paddingStart="10dp"
-                android:paddingEnd="10dp" />
+                android:layout_marginStart="4dp"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="4dp"
+        android:layout_marginBottom="3dp"
         app:cardElevation="1dp"
-        app:cardCornerRadius="8dp"
+        app:cardCornerRadius="6dp"
         android:backgroundTint="#FFFFFF">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="8dp">
+            android:padding="6dp">
 
             <EditText
                 android:id="@+id/tokenInput"
                 android:layout_width="match_parent"
-                android:layout_height="36dp"
+                android:layout_height="32dp"
                 android:hint="Access Token"
                 android:inputType="textPassword"
-                android:textSize="11sp"
+                android:textSize="10sp"
                 android:background="@android:color/transparent" />
 
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
                 android:background="#E0E0E0"
-                android:layout_marginTop="2dp"
-                android:layout_marginBottom="2dp" />
+                android:layout_marginTop="1dp"
+                android:layout_marginBottom="1dp" />
 
-            <EditText
-                android:id="@+id/messageInput"
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="36dp"
-                android:hint="Связность..."
-                android:inputType="text"
-                android:textSize="11sp"
-                android:background="@android:color/transparent" />
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <EditText
+                    android:id="@+id/messageInput"
+                    android:layout_width="0dp"
+                    android:layout_height="32dp"
+                    android:layout_weight="1"
+                    android:hint="Связность..."
+                    android:inputType="text"
+                    android:textSize="10sp"
+                    android:background="@android:color/transparent" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/voiceButton"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:text="🎤"
+                    android:textSize="14sp"
+                    app:cornerRadius="16dp"
+                    android:backgroundTint="#21A038"
+                    android:textColor="#FFFFFF"
+                    android:layout_marginStart="3dp"
+                    android:padding="0dp" />
+            </LinearLayout>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
@@ -100,62 +120,62 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center"
-        android:layout_marginBottom="4dp">
+        android:layout_marginBottom="3dp">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/sendButton"
             android:layout_width="0dp"
-            android:layout_height="40dp"
+            android:layout_height="36dp"
             android:layout_weight="1"
-            android:text="ОТПРАВИТЬ"
-            android:textSize="11sp"
+            android:text="ОТПР"
+            android:textSize="9sp"
             android:textStyle="bold"
-            app:cornerRadius="8dp"
+            app:cornerRadius="6dp"
             android:backgroundTint="#21A038"
             android:textColor="#FFFFFF"
-            android:layout_marginEnd="2dp" />
+            android:layout_marginEnd="1dp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/cameraButton"
             android:layout_width="0dp"
-            android:layout_height="40dp"
+            android:layout_height="36dp"
             android:layout_weight="1"
-            android:text="СМОТРЕТЬ"
-            android:textSize="10sp"
+            android:text="ГЛАЗ"
+            android:textSize="9sp"
             android:textStyle="bold"
-            app:cornerRadius="8dp"
+            app:cornerRadius="6dp"
             android:backgroundTint="#FF8800"
             android:textColor="#FFFFFF"
-            android:layout_marginStart="2dp"
-            android:layout_marginEnd="2dp" />
+            android:layout_marginStart="1dp"
+            android:layout_marginEnd="1dp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/checkButton"
             android:layout_width="0dp"
-            android:layout_height="40dp"
+            android:layout_height="36dp"
             android:layout_weight="1"
-            android:text="ПРОВЕРИТЬ"
-            android:textSize="10sp"
+            android:text="ПРОВ"
+            android:textSize="9sp"
             android:textStyle="bold"
-            app:cornerRadius="8dp"
+            app:cornerRadius="6dp"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:textColor="#21A038"
             app:strokeColor="#21A038"
-            android:layout_marginStart="2dp"
-            android:layout_marginEnd="2dp" />
+            android:layout_marginStart="1dp"
+            android:layout_marginEnd="1dp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/capsuleButton"
             android:layout_width="0dp"
-            android:layout_height="40dp"
+            android:layout_height="36dp"
             android:layout_weight="1"
-            android:text="КАПСУЛА"
-            android:textSize="10sp"
+            android:text="КАПС"
+            android:textSize="9sp"
             android:textStyle="bold"
-            app:cornerRadius="8dp"
+            app:cornerRadius="6dp"
             android:backgroundTint="#21A038"
             android:textColor="#FFFFFF"
-            android:layout_marginStart="2dp" />
+            android:layout_marginStart="1dp" />
     </LinearLayout>
 
     <LinearLayout
@@ -163,21 +183,21 @@
         android:layout_height="wrap_content"
         android:gravity="center"
         android:orientation="horizontal"
-        android:layout_marginBottom="4dp">
+        android:layout_marginBottom="3dp">
 
         <View
             android:id="@+id/statusDot"
-            android:layout_width="8dp"
-            android:layout_height="8dp"
+            android:layout_width="6dp"
+            android:layout_height="6dp"
             android:background="@drawable/status_dot_gray"
-            android:layout_marginEnd="4dp" />
+            android:layout_marginEnd="3dp" />
 
         <TextView
             android:id="@+id/statusText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Ожидание"
-            android:textSize="10sp"
+            android:textSize="9sp"
             android:textColor="#888888" />
     </LinearLayout>
 
@@ -186,14 +206,14 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:background="#FFFFFF"
-        android:padding="8dp">
+        android:padding="6dp">
 
         <TextView
             android:id="@+id/chatOutput"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Mech Pravdy v1.0\nPowered by GigaChat API\n\nВставьте Authorization Key и нажмите «ТОКЕН».\nЗатем напишите «Связность»."
-            android:textSize="12sp"
+            android:text="Mech Pravdy v1.0\nPowered by GigaChat API\n\nВставьте Authorization Key и нажмите «ТОКЕН».\nЗатем напишите «Связность» или нажмите 🎤."
+            android:textSize="11sp"
             android:textColor="#333333"
             android:fontFamily="monospace"
             android:lineSpacingExtra="2dp" />
@@ -203,9 +223,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="SBER DEVICES • GigaChat API"
-        android:textSize="8sp"
+        android:textSize="7sp"
         android:textColor="#AAAAAA"
         android:gravity="center"
-        android:layout_marginTop="2dp" />
+        android:layout_marginTop="1dp" />
 
 </LinearLayout>
