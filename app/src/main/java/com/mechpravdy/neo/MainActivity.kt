@@ -11,6 +11,8 @@ import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
@@ -18,7 +20,6 @@ class MainActivity : AppCompatActivity() {
 
     private val apiUrl = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
     private val password = "связность"
-    private val JSON = MediaType.get("application/json; charset=utf-8")
 
     private lateinit var tokenInput: EditText
     private lateinit var messageInput: EditText
@@ -117,7 +118,7 @@ class MainActivity : AppCompatActivity() {
             .url(apiUrl)
             .header("Content-Type", "application/json")
             .header("Authorization", "Bearer $token")
-            .post(RequestBody.create(JSON, body.toString()))
+            .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
 
         client.newCall(request).enqueue(object : Callback {
@@ -127,7 +128,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onResponse(call: Call, response: Response) {
-                val responseBody = response.body()!!.string()
+                val responseBody = response.body.string()
                 if (response.isSuccessful) {
                     val json = gson.fromJson(responseBody, JsonObject::class.java)
                     val answer = json.getAsJsonArray("choices")
@@ -137,7 +138,7 @@ class MainActivity : AppCompatActivity() {
                     appendChat("[NEO] $answer")
                     setStatus("Онлайн", "green")
                 } else {
-                    appendChat("[ERROR] HTTP ${response.code()}: $responseBody")
+                    appendChat("[ERROR] HTTP ${response.code}: $responseBody")
                     setStatus("Ошибка API", "red")
                 }
                 response.close()
@@ -170,7 +171,7 @@ class MainActivity : AppCompatActivity() {
             .url(apiUrl)
             .header("Content-Type", "application/json")
             .header("Authorization", "Bearer $token")
-            .post(RequestBody.create(JSON, body.toString()))
+            .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
 
         client.newCall(request).enqueue(object : Callback {
@@ -184,7 +185,7 @@ class MainActivity : AppCompatActivity() {
                     appendChat("[SYSTEM] Токен активен.")
                     setStatus("Онлайн", "green")
                 } else {
-                    appendChat("[ERROR] Токен мёртв. HTTP ${response.code()}")
+                    appendChat("[ERROR] Токен мёртв. HTTP ${response.code}")
                     setStatus("Токен истёк", "red")
                 }
                 response.close()
