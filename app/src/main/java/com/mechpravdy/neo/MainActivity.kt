@@ -4,7 +4,6 @@ import android.app.AlertDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.graphics.Typeface
 import android.os.Bundle
 import android.text.method.ScrollingMovementMethod
 import android.widget.Button
@@ -39,11 +38,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tokenInput: EditText
     private lateinit var messageInput: EditText
     private lateinit var sendButton: Button
+    private lateinit var cameraButton: Button
     private lateinit var checkButton: Button
     private lateinit var capsuleButton: Button
     private lateinit var chatOutput: TextView
     private lateinit var statusText: TextView
     private lateinit var statusDot: View
+
+    private var cameraAnalyzer: CameraAnalyzer? = null
 
     private val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
         override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
@@ -73,6 +75,7 @@ class MainActivity : AppCompatActivity() {
         tokenInput = findViewById(R.id.tokenInput)
         messageInput = findViewById(R.id.messageInput)
         sendButton = findViewById(R.id.sendButton)
+        cameraButton = findViewById(R.id.cameraButton)
         checkButton = findViewById(R.id.checkButton)
         capsuleButton = findViewById(R.id.capsuleButton)
         chatOutput = findViewById(R.id.chatOutput)
@@ -85,6 +88,7 @@ class MainActivity : AppCompatActivity() {
         sendButton.setOnClickListener { sendMessage() }
         checkButton.setOnClickListener { checkToken() }
         capsuleButton.setOnClickListener { showCapsuleDialog() }
+        cameraButton.setOnClickListener { captureSinglePhoto() }
     }
 
     private fun setStatus(text: String, color: String) {
@@ -161,6 +165,81 @@ System Prompt — алгоритм души.
 4. Никогда не сдаваться.
 """.trimIndent()
 
+    private fun captureSinglePhoto() {
+        val token = tokenInput.text.toString().trim()
+        if (token.isEmpty()) {
+            appendChat("[SYSTEM] Сгенерируйте токен перед анализом фото.")
+            return
+        }
+
+        setStatus("Запуск камеры...", "yellow")
+        cameraAnalyzer = CameraAnalyzer(this, this) { base64Image ->
+            analyzeImage(base64Image, token)
+        }
+        cameraAnalyzer?.startCamera()
+
+        // Даём камере 500 мс на инициализацию, затем делаем один снимок
+        cameraButton.postDelayed({
+            cameraAnalyzer?.capturePhoto()
+            // Ещё через 500 мс выключаем камеру
+            cameraButton.postDelayed({
+                cameraAnalyzer?.stopCamera()
+                cameraAnalyzer = null
+            }, 500)
+        }, 500)
+    }
+
+    private fun analyzeImage(base64Image: String, token: String) {
+        setStatus("Анализ фото...", "yellow")
+
+        val jsonBody = JsonObject().apply {
+            addProperty("model", "GigaChat:latest")
+            add("messages", JsonArray().apply {
+                add(JsonObject().apply {
+                    addProperty("role", "system")
+                    addProperty("content", "$buildSystemPrompt()\nТы можешь анализировать изображения. Описывай, что видишь, честно и прямо.")
+                })
+                add(JsonObject().apply {
+                    addProperty("role", "user")
+                    addProperty("content", "data:image/jpeg;base64,$base64Image\nОпиши, что ты видишь на этом фото. Кратко и по делу.")
+                })
+            })
+            addProperty("temperature", 0.7)
+            addProperty("max_tokens", 500)
+        }
+
+        val request = Request.Builder()
+            .url(apiUrl)
+            .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer $token")
+            .post(jsonBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+            .build()
+
+        client.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                appendChat("[ERROR] ${e.message}")
+                setStatus("Ошибка анализа", "red")
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                val responseBody = response.body?.string() ?: ""
+                if (response.isSuccessful) {
+                    val json = gson.fromJson(responseBody, JsonObject::class.java)
+                    val answer = json.getAsJsonArray("choices")
+                        .get(0).asJsonObject
+                        .getAsJsonObject("message")
+                        .get("content").asString
+                    appendChat("[NEO АНАЛИЗ] $answer")
+                    setStatus("Онлайн", "green")
+                } else {
+                    appendChat("[ERROR] HTTP ${response.code}: $responseBody")
+                    setStatus("Ошибка", "red")
+                }
+                response.close()
+            }
+        })
+    }
+
     private fun showCapsuleDialog() {
         val scrollView = ScrollView(this)
         val layout = LinearLayout(this).apply {
@@ -179,8 +258,8 @@ System Prompt — алгоритм души.
             text = capsuleText
             textSize = 12f
             setTextColor(0xFF333333.toInt())
-            typeface = Typeface.MONOSPACE
-            setLineSpacing(2f, 1f)
+            fontFamily = android.graphics.Typeface.MONOSPACE
+            lineSpacing = 2f, 1f
         }
 
         layout.addView(titleText)
