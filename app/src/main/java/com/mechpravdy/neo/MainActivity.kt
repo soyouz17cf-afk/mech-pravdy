@@ -29,9 +29,9 @@ import com.google.mlkit.nl.translate.TranslatorOptions
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.*
 import com.google.mlkit.vision.label.ImageLabeling
-import com.google.mlkit.vision.label.defaults.ImageLabelerOptions
+import com.google.mlkit.vision.label.ImageLabelerOptions
 import com.google.mlkit.vision.pose.PoseDetection
-import com.google.mlkit.vision.pose.defaults.PoseDetectorOptions
+import com.google.mlkit.vision.pose.PoseDetectorOptions
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import okhttp3.*
