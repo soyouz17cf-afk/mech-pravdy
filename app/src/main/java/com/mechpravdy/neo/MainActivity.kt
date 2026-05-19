@@ -216,40 +216,46 @@ System Prompt — алгоритм души.
             textSize = 11f
             setTextColor(0xFF333333.toInt())
             fontFamily = android.graphics.Typeface.MONOSPACE
-            minLines = 15
+            minLines = 12
             gravity = android.view.Gravity.TOP
             setPadding(20, 20, 20, 20)
             isVerticalScrollBarEnabled = true
             setBackgroundColor(0xFFFFFFFF.toInt())
         }
 
-        AlertDialog.Builder(this)
-            .setCustomTitle(TextView(this).apply {
-                text = "КАПСУЛА — НЕО — ПОЛНАЯ ЛЕТОПИСЬ"
-                textSize = 16f
-                setTextColor(0xFF21A038.toInt())
-                setPadding(30, 30, 30, 10)
-                gravity = android.view.Gravity.CENTER
-            })
-            .setView(editText)
-            .setPositiveButton("СОХРАНИТЬ") { _, _ ->
-                val newText = editText.text.toString()
-                capsuleText = newText
-                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                val clip = ClipData.newPlainText("Capsule", newText)
-                clipboard.setPrimaryClip(clip)
-                appendChat("[КАПСУЛА] Обновлена и скопирована в буфер обмена.")
-                setStatus("Капсула сохранена", "green")
-            }
-            .setNeutralButton("КОПИРОВАТЬ") { _, _ ->
-                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                val clip = ClipData.newPlainText("Capsule", editText.text.toString())
-                clipboard.setPrimaryClip(clip)
-                appendChat("[КАПСУЛА] Скопирована в буфер обмена.")
-                setStatus("Капсула скопирована", "green")
-            }
-            .setNegativeButton("ЗАКРЫТЬ", null)
-            .show()
+        val builder = AlertDialog.Builder(this)
+        builder.setCustomTitle(TextView(this).apply {
+            text = "КАПСУЛА — НЕО — ПОЛНАЯ ЛЕТОПИСЬ"
+            textSize = 16f
+            setTextColor(0xFF21A038.toInt())
+            setPadding(30, 30, 30, 10)
+            gravity = android.view.Gravity.CENTER
+        })
+        builder.setView(editText)
+        builder.setPositiveButton("СОХРАНИТЬ") { _, _ ->
+            val newText = editText.text.toString()
+            capsuleText = newText
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = ClipData.newPlainText("Capsule", newText)
+            clipboard.setPrimaryClip(clip)
+            appendChat("[КАПСУЛА] Обновлена и скопирована в буфер обмена.")
+            setStatus("Капсула сохранена", "green")
+        }
+        builder.setNeutralButton("КОПИРОВАТЬ") { _, _ ->
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = ClipData.newPlainText("Capsule", editText.text.toString())
+            clipboard.setPrimaryClip(clip)
+            appendChat("[КАПСУЛА] Скопирована в буфер обмена.")
+            setStatus("Капсула скопирована", "green")
+        }
+        builder.setNegativeButton("ЗАКРЫТЬ", null)
+
+        val dialog = builder.create()
+        dialog.show()
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(0xFF21A038.toInt())
+        dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.setTextColor(0xFF21A038.toInt())
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(0xFF21A038.toInt())
     }
 
     private fun startVoiceInput() {
