@@ -58,24 +58,19 @@ class MatrixHeaderView @JvmOverloads constructor(
     private val logoBgPaint = Paint().apply { color = Color.parseColor("#1A8A2E") }
 
     private var columns = 0
-    private var rows = 0
-    private lateinit var lines: Array<String>
-    private lateinit var lineY: FloatArray
-    private lateinit var speeds: FloatArray
-    private lateinit var printedCount: IntArray
-    private var frame = 0
+    // Одна активная строка
+    private var activeLine: String = ""
+    private var activeLineY: Float = 0f
+    private var printedCount = 0
+    private var isPrinting = true
+    private var floatSpeed = 0f
 
     private var logoRect = RectF()
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         columns = (w / fontSize).toInt() + 1
-        rows = (h / lineHeight).toInt() + 2
-        lines = Array(rows) { generateLine() }
-        lineY = FloatArray(rows) { i -> i * lineHeight }
-        speeds = FloatArray(rows) { 0.3f + Random.nextFloat() * 0.5f }
-        printedCount = IntArray(rows) { 0 }
-
+        spawnNewLine(h)
         val logoWidth = w * 0.55f
         val logoHeight = h * 0.75f
         val left = (w - logoWidth) / 2f
@@ -85,8 +80,8 @@ class MatrixHeaderView @JvmOverloads constructor(
         logoRect = RectF(left, top, right, bottom)
     }
 
-    private fun generateLine(): String {
-        return if (Random.nextFloat() < 0.2f) {
+    private fun spawnNewLine(h: Float) {
+        activeLine = if (Random.nextFloat() < 0.2f) {
             val word = easterEggs[Random.nextInt(easterEggs.size)]
             val prefixLen = Random.nextInt(0, columns - word.length).coerceAtLeast(0)
             val prefix = CharArray(prefixLen) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
@@ -96,6 +91,10 @@ class MatrixHeaderView @JvmOverloads constructor(
         } else {
             CharArray(columns) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
         }
+        activeLineY = h + lineHeight
+        printedCount = 0
+        isPrinting = true
+        floatSpeed = 0.3f + Random.nextFloat() * 0.5f
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -105,41 +104,32 @@ class MatrixHeaderView @JvmOverloads constructor(
 
         canvas.drawRect(0f, 0f, w, h, bgPaint)
 
-        for (r in 0 until rows) {
-            lineY[r] -= speeds[r]
-            if (lineY[r] < -lineHeight) {
-                lineY[r] = h + lineHeight
-                lines[r] = generateLine()
-                speeds[r] = 0.3f + Random.nextFloat() * 0.5f
-                printedCount[r] = 0
+        if (isPrinting) {
+            // Печатаем по одному символу
+            printedCount++
+            if (printedCount >= activeLine.length) {
+                isPrinting = false
+            }
+        } else {
+            // Строка напечатана — ползёт вверх
+            activeLineY -= floatSpeed
+            if (activeLineY < -lineHeight) {
+                spawnNewLine(h)
             }
         }
 
-        if (frame % 3 == 0) {
-            for (r in 0 until rows) {
-                if (printedCount[r] < lines[r].length) {
-                    printedCount[r]++
-                }
-            }
-        }
-
-        for (r in 0 until rows) {
-            val y = lineY[r]
-            if (y > h || y < -lineHeight) continue
-
-            val line = lines[r]
-            for (c in 0 until printedCount[r].coerceAtMost(line.length)) {
-                val x = c * fontSize
-                if (x >= logoRect.left && x <= logoRect.right && y >= logoRect.top && y <= logoRect.bottom) continue
-                canvas.drawText(line[c].toString(), x, y, matrixPaint)
-            }
+        // Рисуем напечатанную часть строки
+        val y = activeLineY
+        for (c in 0 until printedCount.coerceAtMost(activeLine.length)) {
+            val x = c * fontSize
+            if (x >= logoRect.left && x <= logoRect.right && y >= logoRect.top && y <= logoRect.bottom) continue
+            canvas.drawText(activeLine[c].toString(), x, y, matrixPaint)
         }
 
         canvas.drawRoundRect(logoRect, 16f, 16f, logoBgPaint)
         canvas.drawText("СБЕР", w / 2, logoRect.top + logoRect.height() * 0.45f, titlePaint)
         canvas.drawText("ГигаЧат", w / 2, logoRect.top + logoRect.height() * 0.75f, subtitlePaint)
 
-        frame++
         postInvalidateDelayed(50)
     }
 }
