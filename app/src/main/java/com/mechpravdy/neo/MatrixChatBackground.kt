@@ -15,7 +15,7 @@ class MatrixChatBackground @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
-    private val fontSize = 16f
+    private val fontSize = 18f
     private val lineHeight = fontSize * 1.2f
 
     private val paint = Paint().apply {
@@ -31,6 +31,7 @@ class MatrixChatBackground @JvmOverloads constructor(
     private lateinit var lines: Array<CharArray>
     private lateinit var lineY: FloatArray
     private lateinit var speeds: FloatArray
+    private lateinit var printedCount: IntArray
     private var frame = 0
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -40,6 +41,7 @@ class MatrixChatBackground @JvmOverloads constructor(
         lines = Array(rows) { CharArray(columns) { if (Random.nextFloat() > 0.5f) '0' else '1' } }
         lineY = FloatArray(rows) { i -> i * lineHeight }
         speeds = FloatArray(rows) { 0.15f + Random.nextFloat() * 0.3f }
+        printedCount = IntArray(rows) { 0 }
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -57,6 +59,16 @@ class MatrixChatBackground @JvmOverloads constructor(
                     lines[r][c] = if (Random.nextFloat() > 0.5f) '0' else '1'
                 }
                 speeds[r] = 0.15f + Random.nextFloat() * 0.3f
+                printedCount[r] = 0
+            }
+        }
+
+        // Эффект печати: каждые 4 кадра добавляем символ
+        if (frame % 4 == 0) {
+            for (r in 0 until rows) {
+                if (printedCount[r] < columns) {
+                    printedCount[r]++
+                }
             }
         }
 
@@ -64,6 +76,7 @@ class MatrixChatBackground @JvmOverloads constructor(
             val y = lineY[r]
             if (y > h || y < -lineHeight) continue
             for (c in 0 until columns) {
+                if (c >= printedCount[r]) continue
                 val x = c * fontSize
                 paint.alpha = 45
                 canvas.drawText(lines[r][c].toString(), x, y, paint)
