@@ -15,7 +15,7 @@ class MatrixChatBackground @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
-    private val fontSize = 20f
+    private val fontSize = 40f
     private val lineHeight = fontSize * 1.2f
 
     private val easterEggs = arrayOf(
@@ -30,18 +30,11 @@ class MatrixChatBackground @JvmOverloads constructor(
         "Нео"
     )
 
-    private val matrixPaint = Paint().apply {
+    private val paint = Paint().apply {
         color = Color.parseColor("#21A038")
         textSize = fontSize
         typeface = Typeface.MONOSPACE
         isAntiAlias = true
-    }
-    private val easterPaint = Paint().apply {
-        color = Color.parseColor("#FFFFFF")
-        textSize = fontSize
-        typeface = Typeface.MONOSPACE
-        isAntiAlias = true
-        alpha = 180
     }
     private val bgPaint = Paint().apply { color = Color.WHITE }
 
@@ -107,10 +100,8 @@ class MatrixChatBackground @JvmOverloads constructor(
             val line = lines[r]
             for (c in 0 until printedCount[r].coerceAtMost(line.length)) {
                 val x = c * fontSize
-                val ch = line[c]
-                val paint = if (ch == '0' || ch == '1') matrixPaint else easterPaint
-                paint.alpha = if (ch == '0' || ch == '1') 45 else 180
-                canvas.drawText(ch.toString(), x, y, paint)
+                paint.alpha = 45
+                canvas.drawText(line[c].toString(), x, y, paint)
             }
         }
 
