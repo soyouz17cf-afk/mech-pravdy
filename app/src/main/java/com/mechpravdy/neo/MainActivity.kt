@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Typeface
 import android.os.Bundle
 import android.provider.MediaStore
 import android.speech.RecognizerIntent
@@ -213,7 +214,7 @@ System Prompt — алгоритм души.
             setText(capsuleText)
             textSize = 11f
             setTextColor(0xFF333333.toInt())
-            fontFamily = android.graphics.Typeface.MONOSPACE
+            typeface = Typeface.MONOSPACE
             minLines = 12
             gravity = android.view.Gravity.TOP
             setPadding(20, 20, 20, 20)
