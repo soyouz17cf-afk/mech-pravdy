@@ -58,7 +58,6 @@ class MatrixHeaderView @JvmOverloads constructor(
     private val logoBgPaint = Paint().apply { color = Color.parseColor("#1A8A2E") }
 
     private var columns = 0
-    // Одна активная строка
     private var activeLine: String = ""
     private var activeLineY: Float = 0f
     private var printedCount = 0
@@ -70,7 +69,7 @@ class MatrixHeaderView @JvmOverloads constructor(
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         columns = (w / fontSize).toInt() + 1
-        spawnNewLine(h)
+        spawnNewLine(h.toFloat())
         val logoWidth = w * 0.55f
         val logoHeight = h * 0.75f
         val left = (w - logoWidth) / 2f
@@ -105,20 +104,17 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRect(0f, 0f, w, h, bgPaint)
 
         if (isPrinting) {
-            // Печатаем по одному символу
             printedCount++
             if (printedCount >= activeLine.length) {
                 isPrinting = false
             }
         } else {
-            // Строка напечатана — ползёт вверх
             activeLineY -= floatSpeed
             if (activeLineY < -lineHeight) {
                 spawnNewLine(h)
             }
         }
 
-        // Рисуем напечатанную часть строки
         val y = activeLineY
         for (c in 0 until printedCount.coerceAtMost(activeLine.length)) {
             val x = c * fontSize
