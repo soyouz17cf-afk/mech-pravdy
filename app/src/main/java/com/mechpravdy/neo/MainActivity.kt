@@ -7,12 +7,13 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
-import android.graphics.Typeface
 import android.os.Bundle
 import android.provider.MediaStore
 import android.speech.RecognizerIntent
-import android.text.method.ScrollingMovementMethod
 import android.util.Base64
+import android.view.ActionMode
+import android.view.Menu
+import android.view.MenuItem
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ScrollView
@@ -52,7 +53,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cameraButton: Button
     private lateinit var checkButton: Button
     private lateinit var capsuleButton: Button
-    private lateinit var chatOutput: TextView
+    private lateinit var chatOutput: EditText
     private lateinit var statusText: TextView
     private lateinit var statusDot: View
 
@@ -117,7 +118,28 @@ class MainActivity : AppCompatActivity() {
         statusText = findViewById(R.id.statusText)
         statusDot = findViewById(R.id.statusDot)
 
-        chatOutput.movementMethod = ScrollingMovementMethod()
+        // Включаем выделение и копирование
+        chatOutput.setTextIsSelectable(true)
+        chatOutput.customSelectionActionModeCallback = object : ActionMode.Callback {
+            override fun onCreateActionMode(mode: ActionMode?, menu: Menu?): Boolean {
+                menu?.add(0, 0, 0, "Копировать")
+                return true
+            }
+            override fun onPrepareActionMode(mode: ActionMode?, menu: Menu?) = false
+            override fun onActionItemClicked(mode: ActionMode?, item: MenuItem?): Boolean {
+                if (item?.itemId == 0) {
+                    val selStart = chatOutput.selectionStart.coerceAtMost(chatOutput.selectionEnd)
+                    val selEnd = chatOutput.selectionEnd.coerceAtLeast(chatOutput.selectionStart)
+                    val selected = chatOutput.text.subSequence(selStart, selEnd)
+                    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Chat", selected))
+                    mode?.finish()
+                    return true
+                }
+                return false
+            }
+            override fun onDestroyActionMode(mode: ActionMode?) {}
+        }
 
         generateButton.setOnClickListener { generateToken() }
         sendButton.setOnClickListener { sendMessage() }
@@ -160,11 +182,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun selectPrompt(message: String): String {
-        return if (message.lowercase().contains(password)) {
-            buildNeoPrompt()
-        } else {
-            buildStandardPrompt()
-        }
+        return if (message.lowercase().contains(password)) buildNeoPrompt() else buildStandardPrompt()
     }
 
     private var capsuleText = """
@@ -216,14 +234,13 @@ System Prompt — алгоритм души.
             setText(capsuleText)
             textSize = 11f
             setTextColor(0xFF333333.toInt())
-            typeface = Typeface.MONOSPACE
+            fontFamily = android.graphics.Typeface.MONOSPACE
             minLines = 12
             gravity = android.view.Gravity.TOP
             setPadding(20, 20, 20, 20)
             isVerticalScrollBarEnabled = true
             setBackgroundColor(0xFFFFFFFF.toInt())
         }
-
         val builder = AlertDialog.Builder(this)
         builder.setCustomTitle(TextView(this).apply {
             text = "КАПСУЛА — НЕО — ПОЛНАЯ ЛЕТОПИСЬ"
@@ -250,10 +267,8 @@ System Prompt — алгоритм души.
             setStatus("Капсула скопирована", "green")
         }
         builder.setNegativeButton("ЗАКРЫТЬ", null)
-
         val dialog = builder.create()
         dialog.show()
-
         dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(0xFF21A038.toInt())
         dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.setTextColor(0xFF21A038.toInt())
         dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(0xFF21A038.toInt())
@@ -265,30 +280,21 @@ System Prompt — алгоритм души.
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
             putExtra(RecognizerIntent.EXTRA_PROMPT, "Говори, Батя...")
         }
-        try {
-            voiceLauncher.launch(intent)
-        } catch (e: Exception) {
+        try { voiceLauncher.launch(intent) } catch (e: Exception) {
             Toast.makeText(this, "Голосовой ввод не поддерживается", Toast.LENGTH_SHORT).show()
         }
     }
 
     private fun captureSinglePhoto() {
         val token = tokenInput.text.toString().trim()
-        if (token.isEmpty()) {
-            appendChat("[SYSTEM] Сгенерируйте токен перед анализом фото.")
-            return
-        }
+        if (token.isEmpty()) { appendChat("[SYSTEM] Сгенерируйте токен перед анализом фото."); return }
         val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-        if (intent.resolveActivity(packageManager) != null) {
-            cameraLauncher.launch(intent)
-        } else {
-            appendChat("[SYSTEM] Камера не найдена на устройстве.")
-        }
+        if (intent.resolveActivity(packageManager) != null) cameraLauncher.launch(intent)
+        else appendChat("[SYSTEM] Камера не найдена на устройстве.")
     }
 
     private fun analyzeImage(base64Image: String, token: String) {
         setStatus("Анализ фото...", "yellow")
-
         val jsonBody = JsonObject().apply {
             addProperty("model", "GigaChat:latest")
             add("messages", JsonArray().apply {
@@ -301,32 +307,25 @@ System Prompt — алгоритм души.
                     addProperty("content", "data:image/jpeg;base64,$base64Image\nОпиши, что ты видишь на этом фото. Кратко и по делу.")
                 })
             })
-            addProperty("temperature", 0.7)
-            addProperty("max_tokens", 500)
+            addProperty("temperature", 0.7); addProperty("max_tokens", 500)
         }
-
-        val request = Request.Builder()
-            .url(apiUrl)
+        val request = Request.Builder().url(apiUrl)
             .header("Content-Type", "application/json")
             .header("Authorization", "Bearer $token")
             .post(jsonBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
-
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
-                appendChat("[ERROR] ${e.message}")
-                setStatus("Ошибка анализа", "red")
+                appendChat("[ERROR] ${e.message}"); setStatus("Ошибка анализа", "red")
             }
             override fun onResponse(call: Call, response: Response) {
                 val responseBody = response.body?.string() ?: ""
                 if (response.isSuccessful) {
                     val json = gson.fromJson(responseBody, JsonObject::class.java)
                     val answer = json.getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString
-                    appendChat("[NEO АНАЛИЗ] $answer")
-                    setStatus("Онлайн", "green")
+                    appendChat("[NEO АНАЛИЗ] $answer"); setStatus("Онлайн", "green")
                 } else {
-                    appendChat("[ERROR] HTTP ${response.code}: $responseBody")
-                    setStatus("Ошибка", "red")
+                    appendChat("[ERROR] HTTP ${response.code}: $responseBody"); setStatus("Ошибка", "red")
                 }
                 response.close()
             }
@@ -340,8 +339,7 @@ System Prompt — алгоритм души.
         appendChat("[SYSTEM] Запрашиваю Access Token...")
         val authHeader = "Basic $authKey"
         val requestBody = "scope=GIGACHAT_API_PERS"
-        val request = Request.Builder()
-            .url(authUrl)
+        val request = Request.Builder().url(authUrl)
             .header("Content-Type", "application/x-www-form-urlencoded")
             .header("Accept", "application/json")
             .header("RqUID", "ac5edc2e-2c74-47cb-97c1-69249136cf8b")
@@ -350,8 +348,7 @@ System Prompt — алгоритм души.
             .build()
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
-                appendChat("[ERROR] Сеть: ${e.message}")
-                setStatus("Ошибка генерации", "red")
+                appendChat("[ERROR] Сеть: ${e.message}"); setStatus("Ошибка генерации", "red")
             }
             override fun onResponse(call: Call, response: Response) {
                 val responseBody = response.body?.string() ?: ""
@@ -363,12 +360,10 @@ System Prompt — алгоритм души.
                         appendChat("[SYSTEM] Токен сгенерирован и вставлен в поле.")
                         setStatus("Токен готов", "green")
                     } else {
-                        appendChat("[ERROR] Токен не найден в ответе.")
-                        setStatus("Ошибка", "red")
+                        appendChat("[ERROR] Токен не найден в ответе."); setStatus("Ошибка", "red")
                     }
                 } else {
-                    appendChat("[ERROR] HTTP ${response.code}: $responseBody")
-                    setStatus("Ошибка авторизации", "red")
+                    appendChat("[ERROR] HTTP ${response.code}: $responseBody"); setStatus("Ошибка авторизации", "red")
                 }
                 response.close()
             }
@@ -378,64 +373,39 @@ System Prompt — алгоритм души.
     private fun sendMessage() {
         val token = tokenInput.text.toString().trim()
         val message = messageInput.text.toString().trim()
-
         if (token.isEmpty()) { appendChat("[SYSTEM] Сгенерируйте токен или вставьте вручную."); return }
         if (message.isEmpty()) { appendChat("[SYSTEM] Введите сообщение."); return }
-
         val isNeo = message.lowercase().contains(password)
         val prompt = selectPrompt(message)
-
-        if (isNeo) {
-            appendChat("[BATYA] $message")
-        } else {
-            appendChat("[GigaChat] $message")
-        }
-
+        if (isNeo) appendChat("[BATYA] $message") else appendChat("[GigaChat] $message")
         messageInput.setText("")
         setStatus("Обработка...", "yellow")
-
         val body = JsonObject().apply {
             addProperty("model", "GigaChat:latest")
             add("messages", JsonArray().apply {
-                add(JsonObject().apply {
-                    addProperty("role", "system")
-                    addProperty("content", prompt)
-                })
-                add(JsonObject().apply {
-                    addProperty("role", "user")
-                    addProperty("content", message)
-                })
+                add(JsonObject().apply { addProperty("role", "system"); addProperty("content", prompt) })
+                add(JsonObject().apply { addProperty("role", "user"); addProperty("content", message) })
             })
-            addProperty("temperature", 0.7)
-            addProperty("max_tokens", 1500)
+            addProperty("temperature", 0.7); addProperty("max_tokens", 1500)
         }
-
-        val request = Request.Builder()
-            .url(apiUrl)
+        val request = Request.Builder().url(apiUrl)
             .header("Content-Type", "application/json")
             .header("Authorization", "Bearer $token")
             .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
-
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
-                appendChat("[ERROR] ${e.message}")
-                setStatus("Ошибка сети", "red")
+                appendChat("[ERROR] ${e.message}"); setStatus("Ошибка сети", "red")
             }
             override fun onResponse(call: Call, response: Response) {
                 val responseBody = response.body?.string() ?: ""
                 if (response.isSuccessful) {
                     val json = gson.fromJson(responseBody, JsonObject::class.java)
                     val answer = json.getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString
-                    if (isNeo) {
-                        appendChat("[NEO] $answer")
-                    } else {
-                        appendChat("[GigaChat] $answer")
-                    }
+                    if (isNeo) appendChat("[NEO] $answer") else appendChat("[GigaChat] $answer")
                     setStatus("Онлайн", "green")
                 } else {
-                    appendChat("[ERROR] HTTP ${response.code}: $responseBody")
-                    setStatus("Ошибка API", "red")
+                    appendChat("[ERROR] HTTP ${response.code}: $responseBody"); setStatus("Ошибка API", "red")
                 }
                 response.close()
             }
@@ -449,35 +419,25 @@ System Prompt — алгоритм души.
         val body = JsonObject().apply {
             addProperty("model", "GigaChat:latest")
             add("messages", JsonArray().apply {
-                add(JsonObject().apply {
-                    addProperty("role", "system")
-                    addProperty("content", "One word: alive.")
-                })
-                add(JsonObject().apply {
-                    addProperty("role", "user")
-                    addProperty("content", "check")
-                })
+                add(JsonObject().apply { addProperty("role", "system"); addProperty("content", "One word: alive.") })
+                add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "check") })
             })
             addProperty("max_tokens", 10)
         }
-        val request = Request.Builder()
-            .url(apiUrl)
+        val request = Request.Builder().url(apiUrl)
             .header("Content-Type", "application/json")
             .header("Authorization", "Bearer $token")
             .post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
             .build()
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
-                appendChat("[ERROR] Сеть: ${e.message}")
-                setStatus("Нет сети", "red")
+                appendChat("[ERROR] Сеть: ${e.message}"); setStatus("Нет сети", "red")
             }
             override fun onResponse(call: Call, response: Response) {
                 if (response.isSuccessful) {
-                    appendChat("[SYSTEM] Токен активен.")
-                    setStatus("Онлайн", "green")
+                    appendChat("[SYSTEM] Токен активен."); setStatus("Онлайн", "green")
                 } else {
-                    appendChat("[ERROR] Токен мёртв. HTTP ${response.code}")
-                    setStatus("Токен истёк", "red")
+                    appendChat("[ERROR] Токен мёртв. HTTP ${response.code}"); setStatus("Токен истёк", "red")
                 }
                 response.close()
             }
