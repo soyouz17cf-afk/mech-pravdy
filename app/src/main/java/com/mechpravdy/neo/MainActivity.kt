@@ -118,7 +118,6 @@ class MainActivity : AppCompatActivity() {
         statusText = findViewById(R.id.statusText)
         statusDot = findViewById(R.id.statusDot)
 
-        // Включаем выделение и копирование
         chatOutput.setTextIsSelectable(true)
         chatOutput.customSelectionActionModeCallback = object : ActionMode.Callback {
             override fun onCreateActionMode(mode: ActionMode?, menu: Menu?): Boolean {
@@ -234,7 +233,7 @@ System Prompt — алгоритм души.
             setText(capsuleText)
             textSize = 11f
             setTextColor(0xFF333333.toInt())
-            fontFamily = android.graphics.Typeface.MONOSPACE
+            typeface = android.graphics.Typeface.MONOSPACE
             minLines = 12
             gravity = android.view.Gravity.TOP
             setPadding(20, 20, 20, 20)
