@@ -16,8 +16,9 @@ class MatrixHeaderView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
-    private val chars = charArrayOf('0', '1')
-    private val fontSize = 13f
+    private val fontSize = 11f
+    private val lineHeight = fontSize * 1.2f
+
     private val matrixPaint = Paint().apply {
         color = Color.parseColor("#21A038")
         textSize = fontSize
@@ -26,7 +27,7 @@ class MatrixHeaderView @JvmOverloads constructor(
     }
     private val titlePaint = Paint().apply {
         color = Color.parseColor("#21A038")
-        textSize = 88f // увеличено в 2 раза
+        textSize = 88f
         typeface = Typeface.DEFAULT_BOLD
         isAntiAlias = true
         textAlign = Paint.Align.CENTER
@@ -34,7 +35,7 @@ class MatrixHeaderView @JvmOverloads constructor(
     }
     private val subtitlePaint = Paint().apply {
         color = Color.parseColor("#555555")
-        textSize = 32f // увеличено пропорционально
+        textSize = 32f
         typeface = Typeface.DEFAULT
         isAntiAlias = true
         textAlign = Paint.Align.CENTER
@@ -42,15 +43,22 @@ class MatrixHeaderView @JvmOverloads constructor(
     private val bgPaint = Paint().apply { color = Color.WHITE }
 
     private var columns = 0
-    private lateinit var drops: IntArray
+    private var rows = 0
+    // Массив строк: каждая строка — массив символов
+    private lateinit var lines: Array<CharArray>
+    // Позиция каждой строки по Y (сдвиг вверх)
+    private lateinit var lineY: FloatArray
+    // Скорость подъёма каждой строки
+    private lateinit var speeds: FloatArray
     private var frame = 0
-    private val textBounds = Rect()
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         columns = (w / fontSize).toInt() + 1
-        drops = IntArray(columns) { Random.nextInt(-h.toInt() / fontSize.toInt(), 0) }
-        titlePaint.getTextBounds("СБЕР", 0, 4, textBounds)
+        rows = (h / lineHeight).toInt() + 2
+        lines = Array(rows) { CharArray(columns) { if (Random.nextFloat() > 0.5f) '0' else '1' } }
+        lineY = FloatArray(rows) { i -> i * lineHeight }
+        speeds = FloatArray(rows) { 0.3f + Random.nextFloat() * 0.5f }
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -64,35 +72,36 @@ class MatrixHeaderView @JvmOverloads constructor(
         val textTop = textCenterY - titlePaint.textSize * 0.7f
         val textBottom = textCenterY + titlePaint.textSize * 0.3f
 
-        if (frame % 11 == 0) {
-            for (i in 0 until columns) {
-                drops[i]++
-                if (drops[i] * fontSize > h && Random.nextFloat() > 0.96f) {
-                    drops[i] = 0
+        // Двигаем строки вверх
+        for (r in 0 until rows) {
+            lineY[r] -= speeds[r]
+            // Если строка ушла за верх — сбрасываем вниз и генерим новые символы
+            if (lineY[r] < -lineHeight) {
+                lineY[r] = h + lineHeight
+                for (c in 0 until columns) {
+                    lines[r][c] = if (Random.nextFloat() > 0.5f) '0' else '1'
                 }
+                speeds[r] = 0.3f + Random.nextFloat() * 0.5f
             }
         }
 
-        for (i in 0 until columns) {
-            val x = i * fontSize
-            val y = drops[i] * fontSize
+        // Рисуем строки
+        for (r in 0 until rows) {
+            val y = lineY[r]
+            if (y > h || y < -lineHeight) continue
 
+            // Пропускаем зону текста СБЕР
             if (y > textTop && y < textBottom) continue
 
-            val isHead = (i == frame / 11 % columns) || (i == (frame / 11 + columns / 3) % columns)
-
-            if (isHead) {
-                matrixPaint.alpha = 220
-                matrixPaint.textSize = fontSize + 2f
-            } else {
-                matrixPaint.alpha = 90
+            for (c in 0 until columns) {
+                val x = c * fontSize
+                matrixPaint.alpha = 110
                 matrixPaint.textSize = fontSize
+                canvas.drawText(lines[r][c].toString(), x, y, matrixPaint)
             }
-
-            val char = chars[Random.nextInt(2)]
-            canvas.drawText(char.toString(), x, y, matrixPaint)
         }
 
+        // Плашка под текст
         val overlayPaint = Paint().apply { color = Color.parseColor("#EEFFFFFF") }
         canvas.drawRect(0f, textTop - 12f, w, textBottom + 40f, overlayPaint)
 
@@ -100,6 +109,6 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawText("ГигаЧат", w / 2, h * 0.85f, subtitlePaint)
 
         frame++
-        postInvalidateDelayed(315)
+        postInvalidateDelayed(50) // быстрое обновление для плавного подъёма
     }
 }
