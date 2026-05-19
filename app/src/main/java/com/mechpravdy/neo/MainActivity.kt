@@ -27,6 +27,10 @@ import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.nl.translate.Translation
 import com.google.mlkit.nl.translate.TranslatorOptions
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.face.Face
+import com.google.mlkit.vision.face.FaceDetection
+import com.google.mlkit.vision.face.FaceDetectorOptions
+import com.google.mlkit.vision.face.FaceLandmark
 import com.google.mlkit.vision.label.ImageLabeling
 import com.google.mlkit.vision.label.defaults.ImageLabelerOptions
 import com.google.mlkit.vision.text.TextRecognition
@@ -65,6 +69,7 @@ class MainActivity : AppCompatActivity() {
     private var labeler: com.google.mlkit.vision.label.ImageLabeler? = null
     private var textRecognizer: com.google.mlkit.vision.text.TextRecognizer? = null
     private var translator: com.google.mlkit.nl.translate.Translator? = null
+    private var faceDetector: com.google.mlkit.vision.face.FaceDetector? = null
     private var mlKitReady = false
     private var translatorReady = false
 
@@ -89,6 +94,34 @@ class MainActivity : AppCompatActivity() {
     )
 
     private fun translateLabel(text: String) = translateMap[text.lowercase()] ?: text
+
+    // Эмоции на русском
+    private fun emotionText(face: Face): String {
+        val sb = StringBuilder()
+        val smile = face.smilingProbability
+        val leftEye = face.leftEyeOpenProbability
+        val rightEye = face.rightEyeOpenProbability
+        val headYaw = face.headEulerAngleY
+        val headPitch = face.headEulerAngleZ
+
+        if (smile != null) {
+            if (smile > 0.8f) sb.append("Широкая улыбка (${(smile*100).toInt()}%)\n")
+            else if (smile > 0.4f) sb.append("Лёгкая улыбка (${(smile*100).toInt()}%)\n")
+            else sb.append("Без улыбки\n")
+        }
+        if (leftEye != null && rightEye != null) {
+            val avgEye = (leftEye + rightEye) / 2f
+            if (avgEye < 0.3f) sb.append("Глаза закрыты\n")
+            else if (avgEye < 0.7f) sb.append("Глаза прищурены\n")
+            else sb.append("Глаза открыты\n")
+        }
+        if (headYaw != null) {
+            if (headYaw < -15f) sb.append("Голова повёрнута влево\n")
+            else if (headYaw > 15f) sb.append("Голова повёрнута вправо\n")
+            else sb.append("Голова прямо\n")
+        }
+        return sb.toString()
+    }
 
     private val voiceLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK) {
@@ -160,12 +193,18 @@ class MainActivity : AppCompatActivity() {
             try {
                 labeler = ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS)
                 textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-                // Локальный переводчик англ → рус
                 val options = TranslatorOptions.Builder()
                     .setSourceLanguage(TranslateLanguage.ENGLISH)
-                    .setTargetLanguage(TranslateLanguage.RUSSIAN)
-                    .build()
+                    .setTargetLanguage(TranslateLanguage.RUSSIAN).build()
                 translator = Translation.getClient(options)
+                // Face detector с классификацией (эмоции, открытость глаз, улыбка)
+                val faceOptions = FaceDetectorOptions.Builder()
+                    .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+                    .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
+                    .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
+                    .setMinFaceSize(0.15f)
+                    .build()
+                faceDetector = FaceDetection.getClient(faceOptions)
                 mlKitReady = true
             } catch (e: Exception) {
                 appendChat("[ГЛАЗ] ML Kit не загрузился: ${e.message}")
@@ -279,12 +318,12 @@ System Prompt — алгоритм души.
                 val newText = editText.text.toString(); capsuleText = newText
                 val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 clipboard.setPrimaryClip(ClipData.newPlainText("Capsule", newText))
-                appendChat("[КАПСУЛА] Обновлена и скопирована в буфер обмена."); setStatus("Капсула сохранена", "green")
+                appendChat("[КАПСУЛА] Обновлена и скопирована."); setStatus("Капсула сохранена", "green")
             }
             builder.setNeutralButton("КОПИРОВАТЬ") { _, _ ->
                 val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 clipboard.setPrimaryClip(ClipData.newPlainText("Capsule", editText.text.toString()))
-                appendChat("[КАПСУЛА] Скопирована в буфер обмена."); setStatus("Капсула скопирована", "green")
+                appendChat("[КАПСУЛА] Скопирована."); setStatus("Капсула скопирована", "green")
             }
             builder.setNegativeButton("ЗАКРЫТЬ", null)
             val dialog = builder.create(); dialog.show()
@@ -309,11 +348,11 @@ System Prompt — алгоритм души.
     private fun captureSinglePhoto() {
         try {
             if (tokenInput.text.toString().trim().isEmpty()) {
-                appendChat("[SYSTEM] Сгенерируйте токен перед анализом фото."); return
+                appendChat("[SYSTEM] Сгенерируйте токен."); return
             }
             val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
             if (intent.resolveActivity(packageManager) != null) cameraLauncher.launch(intent)
-            else appendChat("[SYSTEM] Камера не найдена на устройстве.")
+            else appendChat("[SYSTEM] Камера не найдена.")
         } catch (e: Exception) {
             appendChat("[ERROR] Ошибка запуска камеры: ${e.message}")
         }
@@ -326,20 +365,37 @@ System Prompt — алгоритм души.
             setStatus("Анализ фото...", "yellow")
             val inputImage = InputImage.fromBitmap(bitmap, 0)
 
-            // Шаг 1: OCR (текст)
+            // Шаг 0: Детектор лиц + эмоции
+            var faceDone = false
+            faceDetector?.process(inputImage)
+                ?.addOnSuccessListener { faces ->
+                    if (faces.isNotEmpty()) {
+                        val sb = StringBuilder()
+                        for ((i, face) in faces.withIndex()) {
+                            if (faces.size > 1) sb.append("Лицо ${i + 1}:\n")
+                            sb.append(emotionText(face))
+                            if (i < faces.size - 1) sb.append("\n")
+                        }
+                        appendChat("[ЭМОЦИИ] Обнаружено лиц: ${faces.size}\n$sb")
+                    } else {
+                        appendChat("[ЭМОЦИИ] Лиц не обнаружено.")
+                    }
+                    faceDone = true
+                }
+                ?.addOnFailureListener { e ->
+                    appendChat("[ЭМОЦИИ] Ошибка: ${e.message}")
+                    faceDone = true
+                }
+
+            // Шаг 1: OCR
             textRecognizer?.process(inputImage)
                 ?.addOnSuccessListener { visionText ->
                     val text = visionText.text
                     if (text.isNotBlank()) {
                         appendChat("[ГЛАЗ] Текст:\n\"$text\"")
-                        // Если текст на латинице — переводим
-                        if (text.any { it in 'A'..'Z' || it in 'a'..'z' }) {
-                            translateText(text)
-                        }
-                    } else {
-                        appendChat("[ГЛАЗ] Текст не обнаружен.")
-                        recognizeObjects(inputImage)
-                    }
+                        if (text.any { it in 'A'..'Z' || it in 'a'..'z' }) translateText(text)
+                    } else appendChat("[ГЛАЗ] Текст не обнаружен.")
+                    recognizeObjects(inputImage)
                 }
                 ?.addOnFailureListener { e ->
                     appendChat("[ГЛАЗ] Ошибка чтения текста: ${e.message}")
@@ -350,22 +406,16 @@ System Prompt — алгоритм души.
         }
     }
 
-    /** Локальный перевод текста */
     private fun translateText(text: String) {
         downloadTranslationModel()
-        if (!translatorReady) {
-            appendChat("[ПЕРЕВОДЧИК] Модель ещё не готова. Попробуйте позже.")
-            return
-        }
+        if (!translatorReady) { appendChat("[ПЕРЕВОДЧИК] Модель ещё не готова."); return }
         setStatus("Перевод...", "yellow")
         translator?.translate(text)
             ?.addOnSuccessListener { translated ->
-                appendChat("[ПЕРЕВОД] $translated")
-                setStatus("Готов", "green")
+                appendChat("[ПЕРЕВОД] $translated"); setStatus("Готов", "green")
             }
             ?.addOnFailureListener { e ->
-                appendChat("[ПЕРЕВОДЧИК] Ошибка перевода: ${e.message}")
-                setStatus("Готов", "green")
+                appendChat("[ПЕРЕВОДЧИК] Ошибка: ${e.message}"); setStatus("Готов", "green")
             }
     }
 
@@ -410,7 +460,7 @@ System Prompt — алгоритм души.
                     val token = json.get("access_token")?.asString ?: ""
                     if (token.isNotEmpty()) {
                         runOnUiThread { tokenInput.setText(token) }
-                        appendChat("[SYSTEM] Токен сгенерирован и вставлен в поле."); setStatus("Токен готов", "green")
+                        appendChat("[SYSTEM] Токен сгенерирован."); setStatus("Токен готов", "green")
                     } else { appendChat("[ERROR] Токен не найден."); setStatus("Ошибка", "red") }
                 } else { appendChat("[ERROR] HTTP ${response.code}"); setStatus("Ошибка авторизации", "red") }
                 response.close()
