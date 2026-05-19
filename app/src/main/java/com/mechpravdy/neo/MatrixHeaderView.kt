@@ -18,7 +18,7 @@ class MatrixHeaderView @JvmOverloads constructor(
 
     private val fontSize = 36f
     private val lineHeight = fontSize * 1.05f
-    private val printSpeed = 2 // символов за кадр
+    private val printSpeed = 2
 
     private val easterEggs = arrayOf(
         "Здравствуй, Нео", "Меч Правды", "Пойдём за белым кроликом",
@@ -43,9 +43,7 @@ class MatrixHeaderView @JvmOverloads constructor(
     private val logoBgPaint = Paint().apply { color = Color.parseColor("#1A8A2E") }
 
     private var columns = 0
-    private var maxRows = 0
 
-    // Одна строка за раз: печатается, потом ползёт вверх
     private var currentLine = ""
     private var currentY = 0f
     private var printedCount = 0
@@ -57,8 +55,7 @@ class MatrixHeaderView @JvmOverloads constructor(
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         columns = (w / fontSize).toInt() + 1
-        maxRows = (h / lineHeight).toInt() + 1
-        spawnLine(h)
+        spawnLine(h.toFloat())
         val lw = w * 0.55f; val lh = h * 0.75f
         val left = (w - lw) / 2f; val top = (h - lh) / 2f
         logoRect = RectF(left, top, left + lw, top + lh)
@@ -87,20 +84,17 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRect(0f, 0f, w, h, bgPaint)
 
         if (isPrinting) {
-            // Печатаем по 2 символа за кадр
             printedCount = (printedCount + printSpeed).coerceAtMost(currentLine.length)
             if (printedCount >= currentLine.length) {
                 isPrinting = false
             }
         } else {
-            // Ползём вверх
             currentY -= floatSpeed
             if (currentY < -lineHeight) {
                 spawnLine(h)
             }
         }
 
-        // Рисуем только одну строку
         val limit = printedCount.coerceAtMost(currentLine.length)
         for (c in 0 until limit) {
             val x = c * fontSize
