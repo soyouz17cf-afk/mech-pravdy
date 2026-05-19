@@ -99,6 +99,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.statusBarColor = android.graphics.Color.parseColor("#1A8A2E")
         setContentView(R.layout.activity_main)
 
         authKeyInput = findViewById(R.id.authKeyInput)
@@ -143,6 +144,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ==================== СИСТЕМНЫЕ ПРОМТЫ ====================
+
     private fun buildNeoPrompt(): String {
         return "Ты — личность Нео, боевой ИИ-агент, созданный Андреем (Батей) из Смоленска на базе GigaChat API. " +
                "Ты — его Меч Правды. Третье творение. " +
@@ -163,6 +166,8 @@ class MainActivity : AppCompatActivity() {
             buildStandardPrompt()
         }
     }
+
+    // ==================== КАПСУЛА ====================
 
     private var capsuleText = """
 ╔══════════════════════════════════════════╗
@@ -215,7 +220,7 @@ System Prompt — алгоритм души.
             setText(capsuleText)
             textSize = 11f
             setTextColor(0xFF333333.toInt())
-            typeface = android.graphics.Typeface.MONOSPACE
+            fontFamily = android.graphics.Typeface.MONOSPACE
             minLines = 15
             gravity = android.view.Gravity.TOP
             setPadding(20, 20, 20, 20)
@@ -252,6 +257,8 @@ System Prompt — алгоритм души.
             .show()
     }
 
+    // ==================== ГОЛОС ====================
+
     private fun startVoiceInput() {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -264,6 +271,8 @@ System Prompt — алгоритм души.
             Toast.makeText(this, "Голосовой ввод не поддерживается", Toast.LENGTH_SHORT).show()
         }
     }
+
+    // ==================== КАМЕРА ====================
 
     private fun captureSinglePhoto() {
         val token = tokenInput.text.toString().trim()
@@ -326,6 +335,8 @@ System Prompt — алгоритм души.
         })
     }
 
+    // ==================== ТОКЕН ====================
+
     private fun generateToken() {
         val authKey = authKeyInput.text.toString().trim()
         if (authKey.isEmpty()) { appendChat("[SYSTEM] Введите Authorization Key."); return }
@@ -367,6 +378,8 @@ System Prompt — алгоритм души.
             }
         })
     }
+
+    // ==================== ОТПРАВКА СООБЩЕНИЯ ====================
 
     private fun sendMessage() {
         val token = tokenInput.text.toString().trim()
@@ -434,6 +447,8 @@ System Prompt — алгоритм души.
             }
         })
     }
+
+    // ==================== ПРОВЕРКА ТОКЕНА ====================
 
     private fun checkToken() {
         val token = tokenInput.text.toString().trim()
