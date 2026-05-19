@@ -48,18 +48,17 @@ class MatrixHeaderView @JvmOverloads constructor(
     private var logoRect = RectF()
     private var screenH = 0f
     private var frame = 0
-    private var nextLineY = 0f
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         screenH = h.toFloat()
         columns = (w / fontSize).toInt() + 1
+        // Равномерно распределяем строки по экрану снизу вверх
         for (i in 0 until maxLines) {
             lines[i] = generateLine()
             lineY[i] = screenH + i * lineHeight
             printed[i] = 0
         }
-        nextLineY = screenH + maxLines * lineHeight
         val logoW = w * 0.55f; val logoH = h * 0.75f
         logoRect = RectF((w - logoW) / 2f, (h - logoH) / 2f, (w + logoW) / 2f, (h + logoH) / 2f)
     }
@@ -77,33 +76,27 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawColor(Color.WHITE)
         frame++
 
-        // Печать и движение
         for (i in 0 until maxLines) {
             val line = lines[i] ?: continue
-            // Печать
             if (frame % 2 == 0 && printed[i] < line.length) {
                 printed[i] += 2
             }
-            // Движение
             lineY[i] -= speed
         }
 
-        // Если самая нижняя строка поднялась на lineHeight — рождаем новую снизу
-        val bottomIdx = maxLines - 1
-        if (lineY[bottomIdx] <= screenH) {
-            // Сдвигаем массив: строка 0 уходит, остальные сдвигаются
+        // Если верхняя строка ушла за экран — сдвигаем всё вверх и рождаем новую снизу
+        if (lineY[0] < -lineHeight) {
             for (i in 0 until maxLines - 1) {
                 lines[i] = lines[i + 1]
                 lineY[i] = lineY[i + 1]
                 printed[i] = printed[i + 1]
             }
-            lines[bottomIdx] = generateLine()
-            lineY[bottomIdx] = nextLineY
-            printed[bottomIdx] = 0
-            nextLineY += lineHeight
+            lines[maxLines - 1] = generateLine()
+            // Новая строка рождается ровно под последней видимой строкой
+            lineY[maxLines - 1] = lineY[maxLines - 2] + lineHeight
+            printed[maxLines - 1] = 0
         }
 
-        // Рисуем
         for (i in 0 until maxLines) {
             val line = lines[i] ?: continue
             val y = lineY[i]
