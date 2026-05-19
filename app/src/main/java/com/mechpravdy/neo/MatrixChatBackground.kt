@@ -35,6 +35,7 @@ class MatrixChatBackground @JvmOverloads constructor(
     private lateinit var lineY: FloatArray
     private lateinit var printedCount: IntArray
     private lateinit var speeds: FloatArray
+    private lateinit var cooldown: IntArray
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -44,6 +45,7 @@ class MatrixChatBackground @JvmOverloads constructor(
         lineY = FloatArray(maxRows) { i -> h + i * lineHeight }
         printedCount = IntArray(maxRows) { 0 }
         speeds = FloatArray(maxRows) { 4.0f + Random.nextFloat() * 4.0f }
+        cooldown = IntArray(maxRows) { 0 }
     }
 
     private fun generateLine() = if (Random.nextFloat() < 0.15f) {
@@ -61,18 +63,21 @@ class MatrixChatBackground @JvmOverloads constructor(
         canvas.drawRect(0f, 0f, w, h, bgPaint)
 
         for (i in 0 until maxRows) {
-            val speed = speeds[i]
-            val charsToAdd = speed.toInt().coerceAtLeast(4)
             if (printedCount[i] < lines[i].length) {
-                printedCount[i] = (printedCount[i] + charsToAdd).coerceAtMost(lines[i].length)
+                printedCount[i] = (printedCount[i] + 2).coerceAtMost(lines[i].length)
             }
-            lineY[i] -= speed
+            lineY[i] -= speeds[i]
 
             if (lineY[i] < -lineHeight && printedCount[i] >= lines[i].length) {
-                lines[i] = generateLine()
-                lineY[i] = h + lineHeight
-                printedCount[i] = 0
-                speeds[i] = 4.0f + Random.nextFloat() * 4.0f
+                if (cooldown[i] > 0) {
+                    cooldown[i]--
+                } else {
+                    lines[i] = generateLine()
+                    lineY[i] = h + lineHeight
+                    printedCount[i] = 0
+                    speeds[i] = 4.0f + Random.nextFloat() * 4.0f
+                    cooldown[i] = Random.nextInt(5, 15)
+                }
             }
         }
 
