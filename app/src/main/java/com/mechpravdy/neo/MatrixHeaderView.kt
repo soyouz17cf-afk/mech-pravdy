@@ -16,7 +16,7 @@ class MatrixHeaderView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
-    private val fontSize = 15f
+    private val fontSize = 18f
     private val lineHeight = fontSize * 1.15f
 
     private val matrixPaint = Paint().apply {
@@ -24,6 +24,7 @@ class MatrixHeaderView @JvmOverloads constructor(
         textSize = fontSize
         typeface = Typeface.MONOSPACE
         isAntiAlias = true
+        alpha = 120
     }
     private val titlePaint = Paint().apply {
         color = Color.parseColor("#21A038")
@@ -40,7 +41,7 @@ class MatrixHeaderView @JvmOverloads constructor(
         isAntiAlias = true
         textAlign = Paint.Align.CENTER
     }
-    private val bgPaint = Paint().apply { color = Color.parseColor("#0A0A0A") }
+    private val bgPaint = Paint().apply { color = Color.WHITE }
 
     private var columns = 0
     private var rows = 0
@@ -49,6 +50,12 @@ class MatrixHeaderView @JvmOverloads constructor(
     private lateinit var speeds: FloatArray
     private var frame = 0
 
+    // Границы текста (обтекаем их)
+    private var textLeft = 0f
+    private var textTop = 0f
+    private var textRight = 0f
+    private var textBottom = 0f
+
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         columns = (w / fontSize).toInt() + 1
@@ -56,6 +63,15 @@ class MatrixHeaderView @JvmOverloads constructor(
         lines = Array(rows) { CharArray(columns) { if (Random.nextFloat() > 0.5f) '0' else '1' } }
         lineY = FloatArray(rows) { i -> i * lineHeight }
         speeds = FloatArray(rows) { 0.3f + Random.nextFloat() * 0.5f }
+
+        // Считаем границы текста «СБЕР» с запасом
+        val rect = Rect()
+        titlePaint.getTextBounds("СБЕР", 0, 4, rect)
+        val textCenterY = h * 0.50f
+        textLeft = w / 2f - rect.width() / 2f - 30f
+        textTop = textCenterY - titlePaint.textSize * 0.7f - 10f
+        textRight = w / 2f + rect.width() / 2f + 30f
+        textBottom = textCenterY + titlePaint.textSize * 0.3f + 40f
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -63,12 +79,7 @@ class MatrixHeaderView @JvmOverloads constructor(
         val w = width.toFloat()
         val h = height.toFloat()
 
-        // Чёрный фон на весь холст
         canvas.drawRect(0f, 0f, w, h, bgPaint)
-
-        val textCenterY = h * 0.50f
-        val textTop = textCenterY - titlePaint.textSize * 0.7f
-        val textBottom = textCenterY + titlePaint.textSize * 0.3f
 
         // Двигаем строки вверх
         for (r in 0 until rows) {
@@ -82,26 +93,26 @@ class MatrixHeaderView @JvmOverloads constructor(
             }
         }
 
-        // Рисуем строки
+        // Рисуем строки, обтекая текст со всех сторон
         for (r in 0 until rows) {
             val y = lineY[r]
             if (y > h || y < -lineHeight) continue
 
-            // Пропускаем зону текста
-            if (y > textTop - 10f && y < textBottom + 10f) continue
-
             for (c in 0 until columns) {
                 val x = c * fontSize
-                matrixPaint.alpha = 140
-                matrixPaint.textSize = fontSize
+
+                // Пропускаем зону текста (прямоугольник вокруг «СБЕР ГигаЧат»)
+                if (x >= textLeft && x <= textRight && y >= textTop && y <= textBottom) continue
+
                 canvas.drawText(lines[r][c].toString(), x, y, matrixPaint)
             }
         }
 
-        // Полупрозрачная плашка под текст
-        val overlayPaint = Paint().apply { color = Color.parseColor("#CC000000") }
-        canvas.drawRect(0f, textTop - 15f, w, textBottom + 45f, overlayPaint)
+        // Полупрозрачная белая плашка под текст
+        val overlayPaint = Paint().apply { color = Color.parseColor("#DDFFFFFF") }
+        canvas.drawRect(textLeft - 5f, textTop - 5f, textRight + 5f, textBottom + 5f, overlayPaint)
 
+        val textCenterY = h * 0.50f
         canvas.drawText("СБЕР", w / 2, textCenterY + 10f, titlePaint)
         canvas.drawText("ГигаЧат", w / 2, h * 0.85f, subtitlePaint)
 
