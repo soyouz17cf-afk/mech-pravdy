@@ -91,7 +91,6 @@ class MainActivity : AppCompatActivity() {
         "building" to "Здание", "chair" to "Стул", "table" to "Стол"
     )
 
-    // Названия цветов на русском
     private val colorNames = mapOf(
         intArrayOf(255,0,0) to "Красный", intArrayOf(0,255,0) to "Зелёный", intArrayOf(0,0,255) to "Синий",
         intArrayOf(255,255,0) to "Жёлтый", intArrayOf(0,255,255) to "Голубой", intArrayOf(255,0,255) to "Фиолетовый",
@@ -110,8 +109,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun analyzeColors(bitmap: Bitmap): String {
-        val w = bitmap.width; val h = bitmap.height
-        val step = 10
+        val w = bitmap.width; val h = bitmap.height; val step = 10
         val colorCounts = mutableMapOf<String, Int>()
         for (y in 0 until h step step) for (x in 0 until w step step) {
             val pixel = bitmap.getPixel(x, y)
@@ -216,19 +214,26 @@ class MainActivity : AppCompatActivity() {
     private fun captureSinglePhoto() = try { cameraLauncher.launch(Intent(MediaStore.ACTION_IMAGE_CAPTURE)) } catch (e: Exception) { appendChat("[ERROR] ${e.message}") }
 
     private fun enhanceBrightness(bitmap: Bitmap): Bitmap {
-        val w = bitmap.width; val h = bitmap.height; var total = 0L; val pixels = IntArray(w*h); bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
+        val w = bitmap.width; val h = bitmap.height; var total = 0L
+        val pixels = IntArray(w * h); bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
         for (p in pixels) { total += Color.red(p) + Color.green(p) + Color.blue(p) }
         if (total / (pixels.size * 3) > 100) return bitmap
-        val out = Bitmap.createBitmap(w, h, bitmap.config!!); val factor = 1.5f
-        for (y in 0 until h) for (x in 0 until w) { val c = pixels[y*w+x]; pixels[y*w+x] = Color.rgb((Color.red(c)*factor).toInt().coerceIn(0,255), (Color.green(c)*factor).toInt().coerceIn(0,255), (Color.blue(c)*factor).toInt().coerceIn(0,255)) }
-        out.setPixels(pixels, 0, w, 0, 0, w, h); return out
+        val out = Bitmap.createBitmap(w, h, bitmap.config!!)
+        val factor = 1.5f
+        for (i in pixels.indices) {
+            val c = pixels[i]
+            val r = (Color.red(c) * factor).toInt().coerceIn(0, 255)
+            val g = (Color.green(c) * factor).toInt().coerceIn(0, 255)
+            val b = (Color.blue(c) * factor).toInt().coerceIn(0, 255)
+            pixels[i] = Color.rgb(r, g, b)
+        }
+        out.setPixels(pixels, 0, w, 0, 0, w, h)
+        return out
     }
 
-    /** Собирает все данные в осмысленное описание сцены */
     private fun buildSceneDescription(faces: Int, objects: List<String>, textFound: Boolean, colors: String, poseFound: Boolean): String {
         val parts = mutableListOf<String>()
-        if (faces == 1) parts.add("В кадре один человек")
-        else if (faces > 1) parts.add("В кадре $faces человек")
+        if (faces == 1) parts.add("В кадре один человек") else if (faces > 1) parts.add("В кадре $faces человек")
         if (poseFound && faces == 0) parts.add("В кадре человек")
         if (objects.isNotEmpty()) parts.add("Обнаружены: ${objects.joinToString(", ")}")
         if (textFound) parts.add("Присутствует текст")
