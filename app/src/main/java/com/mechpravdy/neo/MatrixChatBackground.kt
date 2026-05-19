@@ -16,7 +16,7 @@ class MatrixChatBackground @JvmOverloads constructor(
 ) : View(context, attrs, defStyleAttr) {
 
     private val fontSize = 40f
-    private val lineHeight = fontSize * 1.05f
+    private val lineHeight = fontSize * 1.1f
 
     private val easterEggs = arrayOf(
         "Здравствуй, Нео", "Меч Правды", "Пойдём за белым кроликом",
@@ -24,72 +24,55 @@ class MatrixChatBackground @JvmOverloads constructor(
     )
 
     private val paint = Paint().apply {
-        color = Color.parseColor("#21A038")
-        textSize = fontSize; typeface = Typeface.MONOSPACE; isAntiAlias = true
+        color = Color.parseColor("#21A038"); textSize = fontSize
+        typeface = Typeface.MONOSPACE; isAntiAlias = true; alpha = 45
     }
-    private val bgPaint = Paint().apply { color = Color.WHITE }
 
     private var columns = 0
-    private var maxRows = 0
-    private lateinit var lines: Array<String>
-    private lateinit var lineY: FloatArray
-    private lateinit var printedCount: IntArray
-    private lateinit var speeds: FloatArray
-    private lateinit var cooldown: IntArray
+    private var currentLine = ""
+    private var cursorY = 0f
+    private var printed = 0
+    private var floatSpeed = 0f
+    private var state = 0
+    private var h = 0f
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
+        this.h = h
         columns = (w / fontSize).toInt() + 1
-        maxRows = (h / lineHeight).toInt() + 2
-        lines = Array(maxRows) { generateLine() }
-        lineY = FloatArray(maxRows) { i -> h + i * lineHeight }
-        printedCount = IntArray(maxRows) { 0 }
-        speeds = FloatArray(maxRows) { 4.0f + Random.nextFloat() * 4.0f }
-        cooldown = IntArray(maxRows) { 0 }
+        spawnLine()
     }
 
-    private fun generateLine() = if (Random.nextFloat() < 0.15f) {
-        val word = easterEggs[Random.nextInt(easterEggs.size)]
-        val pre = CharArray(Random.nextInt(0, columns - word.length).coerceAtLeast(0)) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
-        val suf = CharArray((columns - pre.length - word.length).coerceAtLeast(0)) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
-        pre + word + suf
-    } else {
-        CharArray(columns) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
+    private fun spawnLine() {
+        currentLine = if (Random.nextFloat() < 0.15f) {
+            val w = easterEggs[Random.nextInt(easterEggs.size)]
+            val pre = CharArray(Random.nextInt(0, columns - w.length).coerceAtLeast(0)) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
+            val suf = CharArray((columns - pre.length - w.length).coerceAtLeast(0)) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
+            pre + w + suf
+        } else CharArray(columns) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
+        cursorY = h + lineHeight
+        printed = 0
+        state = 0
+        floatSpeed = 8f + Random.nextFloat() * 6f
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        val w = width.toFloat(); val h = height.toFloat()
-        canvas.drawRect(0f, 0f, w, h, bgPaint)
+        canvas.drawColor(Color.WHITE)
 
-        for (i in 0 until maxRows) {
-            if (printedCount[i] < lines[i].length) {
-                printedCount[i] = (printedCount[i] + 2).coerceAtMost(lines[i].length)
+        when (state) {
+            0 -> {
+                printed += 2
+                if (printed >= currentLine.length) state = 1
             }
-            lineY[i] -= speeds[i]
-
-            if (lineY[i] < -lineHeight && printedCount[i] >= lines[i].length) {
-                if (cooldown[i] > 0) {
-                    cooldown[i]--
-                } else {
-                    lines[i] = generateLine()
-                    lineY[i] = h + lineHeight
-                    printedCount[i] = 0
-                    speeds[i] = 4.0f + Random.nextFloat() * 4.0f
-                    cooldown[i] = Random.nextInt(5, 15)
-                }
+            1 -> {
+                cursorY -= floatSpeed
+                if (cursorY < -lineHeight) spawnLine()
             }
         }
 
-        for (i in 0 until maxRows) {
-            val y = lineY[i]
-            if (y > h + lineHeight || y < -lineHeight) continue
-            paint.alpha = 45
-            val limit = printedCount[i].coerceAtMost(lines[i].length)
-            for (c in 0 until limit) {
-                val x = c * fontSize
-                canvas.drawText(lines[i][c].toString(), x, y, paint)
-            }
+        for (c in 0 until printed.coerceAtMost(currentLine.length)) {
+            canvas.drawText(currentLine[c].toString(), c * fontSize, cursorY, paint)
         }
         postInvalidateDelayed(60)
     }
