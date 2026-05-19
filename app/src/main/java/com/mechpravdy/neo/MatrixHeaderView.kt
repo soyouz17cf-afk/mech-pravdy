@@ -17,7 +17,7 @@ class MatrixHeaderView @JvmOverloads constructor(
 ) : View(context, attrs, defStyleAttr) {
 
     private val fontSize = 36f
-    private val lineHeight = fontSize * 1.15f
+    private val lineHeight = fontSize * 1.05f // меньше расстояние между строками
 
     private val easterEggs = arrayOf(
         "Здравствуй, Нео",
@@ -93,7 +93,7 @@ class MatrixHeaderView @JvmOverloads constructor(
         activeLineY = h + lineHeight
         printedCount = 0
         isPrinting = true
-        floatSpeed = 0.3f + Random.nextFloat() * 0.5f
+        floatSpeed = 0.6f + Random.nextFloat() * 0.8f // быстрее плывёт
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -104,14 +104,16 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRect(0f, 0f, w, h, bgPaint)
 
         if (isPrinting) {
-            printedCount++
+            // Печатаем быстрее — по 4 символа за кадр
+            printedCount += 4
             if (printedCount >= activeLine.length) {
                 isPrinting = false
             }
         } else {
             activeLineY -= floatSpeed
             if (activeLineY < -lineHeight) {
-                spawnNewLine(h)
+                // Новая строка рождается сразу, без паузы
+                spawnNewLine(h + lineHeight)
             }
         }
 
