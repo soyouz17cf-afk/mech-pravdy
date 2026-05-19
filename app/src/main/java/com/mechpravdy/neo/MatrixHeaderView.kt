@@ -47,6 +47,7 @@ class MatrixHeaderView @JvmOverloads constructor(
     private lateinit var lineY: FloatArray
     private lateinit var printedCount: IntArray
     private lateinit var speeds: FloatArray
+    private lateinit var cooldown: IntArray
 
     private var logoRect = RectF()
 
@@ -58,6 +59,7 @@ class MatrixHeaderView @JvmOverloads constructor(
         lineY = FloatArray(maxRows) { i -> h + i * lineHeight }
         printedCount = IntArray(maxRows) { 0 }
         speeds = FloatArray(maxRows) { 4.0f + Random.nextFloat() * 4.0f }
+        cooldown = IntArray(maxRows) { 0 }
 
         val logoWidth = w * 0.55f; val logoHeight = h * 0.75f
         val left = (w - logoWidth) / 2f; val top = (h - logoHeight) / 2f
@@ -79,18 +81,24 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRect(0f, 0f, w, h, bgPaint)
 
         for (i in 0 until maxRows) {
-            val speed = speeds[i]
-            val charsToAdd = speed.toInt().coerceAtLeast(4)
+            // Печать: медленно, по 2 символа за кадр
             if (printedCount[i] < lines[i].length) {
-                printedCount[i] = (printedCount[i] + charsToAdd).coerceAtMost(lines[i].length)
+                printedCount[i] = (printedCount[i] + 2).coerceAtMost(lines[i].length)
             }
-            lineY[i] -= speed
+            // Движение вверх: быстро
+            lineY[i] -= speeds[i]
 
+            // Перезапуск строки: только когда ушла за экран, напечатана полностью, и прошёл cooldown
             if (lineY[i] < -lineHeight && printedCount[i] >= lines[i].length) {
-                lines[i] = generateLine()
-                lineY[i] = h + lineHeight
-                printedCount[i] = 0
-                speeds[i] = 4.0f + Random.nextFloat() * 4.0f
+                if (cooldown[i] > 0) {
+                    cooldown[i]--
+                } else {
+                    lines[i] = generateLine()
+                    lineY[i] = h + lineHeight
+                    printedCount[i] = 0
+                    speeds[i] = 4.0f + Random.nextFloat() * 4.0f
+                    cooldown[i] = Random.nextInt(5, 15)
+                }
             }
         }
 
