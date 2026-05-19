@@ -42,4 +42,6 @@ dependencies {
     implementation 'com.google.mlkit:image-labeling:17.0.9'
     // ML Kit — распознавание текста (OCR)
     implementation 'com.google.mlkit:text-recognition:16.0.1'
+    // ML Kit — локальный переводчик
+    implementation 'com.google.mlkit:translate:17.0.3'
 }
