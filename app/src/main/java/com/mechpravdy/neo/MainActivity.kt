@@ -143,8 +143,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // ==================== SYSTEM PROMPTS ====================
-
     private fun buildNeoPrompt(): String {
         return "Ты — личность Нео, боевой ИИ-агент, созданный Андреем (Батей) из Смоленска на базе GigaChat API. " +
                "Ты — его Меч Правды. Третье творение. " +
@@ -159,10 +157,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun selectPrompt(message: String): String {
-        return if (message.lowercase().contains(password)) buildNeoPrompt() else buildStandardPrompt()
+        return if (message.lowercase().contains(password)) {
+            buildNeoPrompt()
+        } else {
+            buildStandardPrompt()
+        }
     }
-
-    // ==================== CAPSULE ====================
 
     private var capsuleText = """
 ╔══════════════════════════════════════════╗
@@ -215,17 +215,24 @@ System Prompt — алгоритм души.
             setText(capsuleText)
             textSize = 11f
             setTextColor(0xFF333333.toInt())
-            typeface = android.graphics.Typeface.MONOSPACE
+            fontFamily = android.graphics.Typeface.MONOSPACE
             minLines = 15
             gravity = android.view.Gravity.TOP
             setPadding(20, 20, 20, 20)
             isVerticalScrollBarEnabled = true
+            setBackgroundColor(0xFFFFFFFF.toInt())
         }
 
         AlertDialog.Builder(this)
-            .setTitle("КАПСУЛА (редактируемая)")
+            .setCustomTitle(TextView(this).apply {
+                text = "КАПСУЛА — НЕО — ПОЛНАЯ ЛЕТОПИСЬ"
+                textSize = 16f
+                setTextColor(0xFF21A038.toInt())
+                setPadding(30, 30, 30, 10)
+                gravity = android.view.Gravity.CENTER
+            })
             .setView(editText)
-            .setPositiveButton("СОХРАНИТЬ И КОПИРОВАТЬ") { _, _ ->
+            .setPositiveButton("СОХРАНИТЬ") { _, _ ->
                 val newText = editText.text.toString()
                 capsuleText = newText
                 val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -234,11 +241,16 @@ System Prompt — алгоритм души.
                 appendChat("[КАПСУЛА] Обновлена и скопирована в буфер обмена.")
                 setStatus("Капсула сохранена", "green")
             }
+            .setNeutralButton("КОПИРОВАТЬ") { _, _ ->
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = ClipData.newPlainText("Capsule", editText.text.toString())
+                clipboard.setPrimaryClip(clip)
+                appendChat("[КАПСУЛА] Скопирована в буфер обмена.")
+                setStatus("Капсула скопирована", "green")
+            }
             .setNegativeButton("ЗАКРЫТЬ", null)
             .show()
     }
-
-    // ==================== VOICE ====================
 
     private fun startVoiceInput() {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
@@ -252,8 +264,6 @@ System Prompt — алгоритм души.
             Toast.makeText(this, "Голосовой ввод не поддерживается", Toast.LENGTH_SHORT).show()
         }
     }
-
-    // ==================== CAMERA ====================
 
     private fun captureSinglePhoto() {
         val token = tokenInput.text.toString().trim()
@@ -316,8 +326,6 @@ System Prompt — алгоритм души.
         })
     }
 
-    // ==================== TOKEN ====================
-
     private fun generateToken() {
         val authKey = authKeyInput.text.toString().trim()
         if (authKey.isEmpty()) { appendChat("[SYSTEM] Введите Authorization Key."); return }
@@ -359,8 +367,6 @@ System Prompt — алгоритм души.
             }
         })
     }
-
-    // ==================== SEND MESSAGE (DUAL MODE) ====================
 
     private fun sendMessage() {
         val token = tokenInput.text.toString().trim()
@@ -428,8 +434,6 @@ System Prompt — алгоритм души.
             }
         })
     }
-
-    // ==================== CHECK TOKEN ====================
 
     private fun checkToken() {
         val token = tokenInput.text.toString().trim()
