@@ -43,7 +43,7 @@ class MatrixChatBackground @JvmOverloads constructor(
         lines = Array(maxRows) { generateLine() }
         lineY = FloatArray(maxRows) { i -> h + i * lineHeight }
         printedCount = IntArray(maxRows) { 0 }
-        speeds = FloatArray(maxRows) { 0.6f + Random.nextFloat() * 0.8f }
+        speeds = FloatArray(maxRows) { 2.0f + Random.nextFloat() * 2.0f }
     }
 
     private fun generateLine() = if (Random.nextFloat() < 0.15f) {
@@ -62,7 +62,7 @@ class MatrixChatBackground @JvmOverloads constructor(
 
         for (i in 0 until maxRows) {
             val speed = speeds[i]
-            val charsToAdd = speed.toInt().coerceAtLeast(1)
+            val charsToAdd = speed.toInt().coerceAtLeast(2)
             if (printedCount[i] < lines[i].length) {
                 printedCount[i] = (printedCount[i] + charsToAdd).coerceAtMost(lines[i].length)
             }
@@ -72,7 +72,7 @@ class MatrixChatBackground @JvmOverloads constructor(
                 lines[i] = generateLine()
                 lineY[i] = h + lineHeight
                 printedCount[i] = 0
-                speeds[i] = 0.6f + Random.nextFloat() * 0.8f
+                speeds[i] = 2.0f + Random.nextFloat() * 2.0f
             }
         }
 
