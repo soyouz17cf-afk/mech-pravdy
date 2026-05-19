@@ -36,7 +36,6 @@ class MatrixChatBackground @JvmOverloads constructor(
     private val printed = IntArray(maxLines)
     private var screenH = 0f
     private var frame = 0
-    private var nextLineY = 0f
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -47,7 +46,6 @@ class MatrixChatBackground @JvmOverloads constructor(
             lineY[i] = screenH + i * lineHeight
             printed[i] = 0
         }
-        nextLineY = screenH + maxLines * lineHeight
     }
 
     private fun generateLine() = if (Random.nextFloat() < 0.15f) {
@@ -70,17 +68,15 @@ class MatrixChatBackground @JvmOverloads constructor(
             lineY[i] -= speed
         }
 
-        val bottomIdx = maxLines - 1
-        if (lineY[bottomIdx] <= screenH) {
+        if (lineY[0] < -lineHeight) {
             for (i in 0 until maxLines - 1) {
                 lines[i] = lines[i + 1]
                 lineY[i] = lineY[i + 1]
                 printed[i] = printed[i + 1]
             }
-            lines[bottomIdx] = generateLine()
-            lineY[bottomIdx] = nextLineY
-            printed[bottomIdx] = 0
-            nextLineY += lineHeight
+            lines[maxLines - 1] = generateLine()
+            lineY[maxLines - 1] = lineY[maxLines - 2] + lineHeight
+            printed[maxLines - 1] = 0
         }
 
         for (i in 0 until maxLines) {
