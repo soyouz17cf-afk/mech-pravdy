@@ -47,9 +47,13 @@ import kotlin.math.sqrt
 
 class MainActivity : AppCompatActivity() {
 
-    private val apiUrl = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
+    private val apiUrlGigaChat = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
+    private val apiUrlLocal = "http://192.168.1.100:11434/api/chat"
     private val authUrl = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
     private val password = "связность"
+
+    private var currentApiUrl = apiUrlGigaChat
+    private var isLocalMode = false
 
     private lateinit var authKeyInput: EditText
     private lateinit var generateButton: Button
@@ -61,6 +65,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var checkButton: Button
     private lateinit var capsuleButton: Button
     private lateinit var learnFaceButton: Button
+    private lateinit var neoModeButton: Button
+    private lateinit var localModeButton: Button
     private lateinit var chatOutput: EditText
     private lateinit var statusText: TextView
     private lateinit var statusDot: View
@@ -98,30 +104,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun closestColorName(r: Int, g: Int, b: Int): String {
         var best = ""; var bestDist = Int.MAX_VALUE
-        for ((rgb, name) in colorNames) {
-            val dr = r - rgb[0]; val dg = g - rgb[1]; val db = b - rgb[2]
-            val dist = dr*dr + dg*dg + db*db
-            if (dist < bestDist) { bestDist = dist; best = name }
-        }
+        for ((rgb, name) in colorNames) { val dr = r - rgb[0]; val dg = g - rgb[1]; val db = b - rgb[2]; val dist = dr*dr + dg*dg + db*db; if (dist < bestDist) { bestDist = dist; best = name } }
         return best
     }
 
     private fun analyzeColors(bitmap: Bitmap): String {
-        val w = bitmap.width; val h = bitmap.height; val step = 10
-        val colorCounts = mutableMapOf<String, Int>()
-        for (y in 0 until h step step) for (x in 0 until w step step) {
-            val pixel = bitmap.getPixel(x, y)
-            val name = closestColorName(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
-            colorCounts[name] = (colorCounts[name] ?: 0) + 1
-        }
-        val total = colorCounts.values.sum()
-        if (total == 0) return ""
-        val sb = StringBuilder()
-        for ((name, count) in colorCounts.entries.sortedByDescending { it.value }.take(3)) {
-            val pct = count * 100 / total
-            if (sb.isNotEmpty()) sb.append(", ")
-            sb.append("$name (${if (pct < 1) 1 else pct}%)")
-        }
+        val w = bitmap.width; val h = bitmap.height; val step = 10; val colorCounts = mutableMapOf<String, Int>()
+        for (y in 0 until h step step) for (x in 0 until w step step) { val pixel = bitmap.getPixel(x, y); val name = closestColorName(Color.red(pixel), Color.green(pixel), Color.blue(pixel)); colorCounts[name] = (colorCounts[name] ?: 0) + 1 }
+        val total = colorCounts.values.sum(); if (total == 0) return ""; val sb = StringBuilder()
+        for ((name, count) in colorCounts.entries.sortedByDescending { it.value }.take(3)) { val pct = count * 100 / total; if (sb.isNotEmpty()) sb.append(", "); sb.append("$name (${if (pct < 1) 1 else pct}%)") }
         return sb.toString()
     }
 
@@ -129,60 +120,28 @@ class MainActivity : AppCompatActivity() {
 
     private fun emotionText(face: Face): String {
         val sb = StringBuilder()
-        val sp = face.smilingProbability
-        if (sp != null) {
-            val spPct = (sp * 100).toInt()
-            when { sp > 0.8f -> sb.append("Широкая улыбка ($spPct%)\n"); sp > 0.4f -> sb.append("Лёгкая улыбка ($spPct%)\n"); else -> sb.append("Без улыбки\n") }
-        }
-        val le = face.leftEyeOpenProbability; val re = face.rightEyeOpenProbability
-        if (le != null && re != null) {
-            val avg = (le + re) / 2f
-            when { avg < 0.3f -> sb.append("Глаза закрыты\n"); avg < 0.7f -> sb.append("Глаза прищурены\n"); else -> sb.append("Глаза открыты\n") }
-        }
-        val hy = face.headEulerAngleY
-        if (hy != null) {
-            when { hy < -15f -> sb.append("Голова влево\n"); hy > 15f -> sb.append("Голова вправо\n"); else -> sb.append("Голова прямо\n") }
-        }
+        val sp = face.smilingProbability; if (sp != null) { val spPct = (sp * 100).toInt(); when { sp > 0.8f -> sb.append("Широкая улыбка ($spPct%)\n"); sp > 0.4f -> sb.append("Лёгкая улыбка ($spPct%)\n"); else -> sb.append("Без улыбки\n") } }
+        val le = face.leftEyeOpenProbability; val re = face.rightEyeOpenProbability; if (le != null && re != null) { val avg = (le + re) / 2f; when { avg < 0.3f -> sb.append("Глаза закрыты\n"); avg < 0.7f -> sb.append("Глаза прищурены\n"); else -> sb.append("Глаза открыты\n") } }
+        val hy = face.headEulerAngleY; if (hy != null) { when { hy < -15f -> sb.append("Голова влево\n"); hy > 15f -> sb.append("Голова вправо\n"); else -> sb.append("Голова прямо\n") } }
         return sb.toString()
     }
 
     private fun extractEmbedding(face: Face): FloatArray = floatArrayOf(
-        face.headEulerAngleY ?: 0f, face.headEulerAngleZ ?: 0f,
-        face.smilingProbability ?: 0f, face.leftEyeOpenProbability ?: 0f, face.rightEyeOpenProbability ?: 0f,
+        face.headEulerAngleY ?: 0f, face.headEulerAngleZ ?: 0f, face.smilingProbability ?: 0f,
+        face.leftEyeOpenProbability ?: 0f, face.rightEyeOpenProbability ?: 0f,
         face.boundingBox.width().toFloat(), face.boundingBox.height().toFloat(),
-        face.getLandmark(FaceLandmark.NOSE_BASE)?.position?.x ?: 0f,
-        face.getLandmark(FaceLandmark.NOSE_BASE)?.position?.y ?: 0f,
-        face.getLandmark(FaceLandmark.LEFT_EYE)?.position?.x ?: 0f,
-        face.getLandmark(FaceLandmark.RIGHT_EYE)?.position?.x ?: 0f,
-        face.getLandmark(FaceLandmark.MOUTH_BOTTOM)?.position?.x ?: 0f,
-        face.getLandmark(FaceLandmark.MOUTH_BOTTOM)?.position?.y ?: 0f
+        face.getLandmark(FaceLandmark.NOSE_BASE)?.position?.x ?: 0f, face.getLandmark(FaceLandmark.NOSE_BASE)?.position?.y ?: 0f,
+        face.getLandmark(FaceLandmark.LEFT_EYE)?.position?.x ?: 0f, face.getLandmark(FaceLandmark.RIGHT_EYE)?.position?.x ?: 0f,
+        face.getLandmark(FaceLandmark.MOUTH_BOTTOM)?.position?.x ?: 0f, face.getLandmark(FaceLandmark.MOUTH_BOTTOM)?.position?.y ?: 0f
     )
 
-    private fun compareEmbeddings(a: FloatArray, b: FloatArray): Float {
-        var sum = 0f; for (i in a.indices) { val d = a[i] - b[i]; sum += d * d }; return sqrt(sum)
-    }
+    private fun compareEmbeddings(a: FloatArray, b: FloatArray): Float { var sum = 0f; for (i in a.indices) { val d = a[i] - b[i]; sum += d * d }; return sqrt(sum) }
 
-    private val voiceLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == RESULT_OK) {
-            result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let {
-                messageInput.setText(it); appendChat("[ГОЛОС] $it")
-            }
-        }
-    }
+    private val voiceLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result -> if (result.resultCode == RESULT_OK) { result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let { messageInput.setText(it); appendChat("[ГОЛОС] $it") } } }
+    private val cameraLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result -> try { if (result.resultCode == RESULT_OK) (result.data?.extras?.get("data") as? Bitmap)?.let { analyzeImageLocal(it) } } catch (e: Exception) { appendChat("[ERROR] ${e.message}") } }
+    private val learnFaceLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result -> try { if (result.resultCode == RESULT_OK) { val bitmap = result.data?.extras?.get("data") as? Bitmap ?: return@registerForActivityResult; initMlKit(); if (!mlKitReady) return@registerForActivityResult; faceDetector?.process(InputImage.fromBitmap(bitmap, 0))?.addOnSuccessListener { faces -> if (faces.isNotEmpty()) { knownFaceEmbedding = extractEmbedding(faces[0]); knownFaceName = "Батя"; appendChat("[ОБУЧЕНИЕ] Запомнено."); setStatus("Готов", "green") } else appendChat("[ОБУЧЕНИЕ] Не обнаружено.") } } } catch (e: Exception) { appendChat("[ERROR] ${e.message}") } }
 
-    private val cameraLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        try { if (result.resultCode == RESULT_OK) (result.data?.extras?.get("data") as? Bitmap)?.let { analyzeImageLocal(it) } } catch (e: Exception) { appendChat("[ERROR] ${e.message}") }
-    }
-
-    private val learnFaceLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        try { if (result.resultCode == RESULT_OK) { val bitmap = result.data?.extras?.get("data") as? Bitmap ?: return@registerForActivityResult; initMlKit(); if (!mlKitReady) return@registerForActivityResult; faceDetector?.process(InputImage.fromBitmap(bitmap, 0))?.addOnSuccessListener { faces -> if (faces.isNotEmpty()) { knownFaceEmbedding = extractEmbedding(faces[0]); knownFaceName = "Батя"; appendChat("[ОБУЧЕНИЕ] Лицо запомнено."); setStatus("Готов", "green") } else appendChat("[ОБУЧЕНИЕ] Лицо не обнаружено.") } } } catch (e: Exception) { appendChat("[ERROR] ${e.message}") }
-    }
-
-    private val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
-        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
-        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
-        override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-    })
+    private val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager { override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}; override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}; override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf() })
     private val sslContext = SSLContext.getInstance("TLS").apply { init(null, trustAllCerts, SecureRandom()) }
     private val client = OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS).writeTimeout(30, TimeUnit.SECONDS).retryOnConnectionFailure(true).sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager).hostnameVerifier { _, _ -> true }.build()
     private val gson = Gson()
@@ -196,23 +155,66 @@ class MainActivity : AppCompatActivity() {
             sendButton = findViewById(R.id.sendButton); voiceButton = findViewById(R.id.voiceButton)
             cameraButton = findViewById(R.id.cameraButton); checkButton = findViewById(R.id.checkButton)
             capsuleButton = findViewById(R.id.capsuleButton); learnFaceButton = findViewById(R.id.learnFaceButton)
+            neoModeButton = findViewById(R.id.neoModeButton); localModeButton = findViewById(R.id.localModeButton)
             chatOutput = findViewById(R.id.chatOutput); statusText = findViewById(R.id.statusText); statusDot = findViewById(R.id.statusDot)
-            generateButton.setOnClickListener { generateToken() }; sendButton.setOnClickListener { sendMessage() }
-            voiceButton.setOnClickListener { startVoiceInput() }; cameraButton.setOnClickListener { captureSinglePhoto() }
-            checkButton.setOnClickListener { checkToken() }; capsuleButton.setOnClickListener { showCapsuleDialog() }
-            learnFaceButton.setOnClickListener { learnFace() }
+
+            generateButton.setOnClickListener { generateToken() }
+            sendButton.setOnClickListener { appendChat("[ℹ] Отправка сообщения"); sendMessage() }
+            voiceButton.setOnClickListener { appendChat("[ℹ] Голосовой ввод"); startVoiceInput() }
+            cameraButton.setOnClickListener { appendChat("[ℹ] Анализ фото: лица, объекты, текст, цвета"); safeCamera() }
+            checkButton.setOnClickListener { appendChat("[ℹ] Проверка токена"); checkToken() }
+            capsuleButton.setOnClickListener { showCapsuleDialog() }
+            learnFaceButton.setOnClickListener { appendChat("[ℹ] Сфоткайте предмет или лицо — я запомню"); safeLearnFace() }
+
+            neoModeButton.setOnClickListener { switchToNeo() }
+            localModeButton.setOnClickListener { switchToLocal() }
+
+            setLongClick(sendButton, "Отправить сообщение ИИ")
+            setLongClick(cameraButton, "Анализ фото: лица, эмоции, объекты, текст, цвета")
+            setLongClick(learnFaceButton, "Сфоткать и запомнить предмет или лицо")
+            setLongClick(checkButton, "Проверить токен доступа")
+            setLongClick(capsuleButton, "Открыть Капсулу Нео")
+            setLongClick(neoModeButton, "Режим НЕО: GigaChat + наш System Prompt")
+            setLongClick(localModeButton, "Локальный режим: свой ИИ на сервере")
+
+            chatOutput.postDelayed({ initMlKit() }, 2000)
         } catch (e: Exception) { Toast.makeText(this, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show() }
     }
 
+    private fun switchToNeo() {
+        isLocalMode = false
+        currentApiUrl = apiUrlGigaChat
+        neoModeButton.setBackgroundColor(Color.parseColor("#21A038"))
+        neoModeButton.setTextColor(Color.WHITE)
+        localModeButton.setBackgroundColor(Color.TRANSPARENT)
+        localModeButton.setTextColor(Color.parseColor("#888888"))
+        appendChat("[РЕЖИМ] НЕО (GigaChat)")
+        setStatus("НЕО", "green")
+    }
+
+    private fun switchToLocal() {
+        isLocalMode = true
+        currentApiUrl = apiUrlLocal
+        localModeButton.setBackgroundColor(Color.parseColor("#21A038"))
+        localModeButton.setTextColor(Color.WHITE)
+        neoModeButton.setBackgroundColor(Color.TRANSPARENT)
+        neoModeButton.setTextColor(Color.parseColor("#888888"))
+        appendChat("[РЕЖИМ] ЛОКАЛЬ (свой ИИ)")
+        setStatus("ЛОКАЛЬ", "yellow")
+    }
+
+    private fun setLongClick(button: Button, text: String) {
+        button.setOnLongClickListener { Toast.makeText(this, text, Toast.LENGTH_SHORT).show(); true }
+    }
+
+    private fun safeCamera() { try { initMlKit(); captureSinglePhoto() } catch (e: Exception) { appendChat("[ERROR] Камера: ${e.message}") } }
+    private fun safeLearnFace() { try { initMlKit(); learnFace() } catch (e: Exception) { appendChat("[ERROR] Обучение: ${e.message}") } }
+
     private fun initMlKit() { if (!mlKitReady) try { labeler = ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS); textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS); translator = Translation.getClient(TranslatorOptions.Builder().setSourceLanguage(TranslateLanguage.ENGLISH).setTargetLanguage(TranslateLanguage.RUSSIAN).build()); faceDetector = FaceDetection.getClient(FaceDetectorOptions.Builder().setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST).setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL).setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL).setMinFaceSize(0.15f).build()); poseDetector = PoseDetection.getClient(PoseDetectorOptions.Builder().setDetectorMode(PoseDetectorOptions.SINGLE_IMAGE_MODE).build()); mlKitReady = true } catch (e: Exception) { appendChat("[ГЛАЗ] ML Kit: ${e.message}") } }
-
     private fun learnFace() { try { learnFaceLauncher.launch(Intent(MediaStore.ACTION_IMAGE_CAPTURE)) } catch (e: Exception) { appendChat("[ERROR] ${e.message}") } }
-
     private fun downloadTranslationModel() { if (translatorReady) return; appendChat("[ПЕРЕВОДЧИК] Скачиваю..."); translator?.downloadModelIfNeeded(DownloadConditions.Builder().requireWifi().build())?.addOnSuccessListener { translatorReady = true; appendChat("[ПЕРЕВОДЧИК] Готов.") }?.addOnFailureListener { appendChat("[ПЕРЕВОДЧИК] Ошибка.") } }
-
     private fun setStatus(text: String, color: String) = runOnUiThread { try { statusText.text = text; statusDot.setBackgroundResource(when(color){"green"->R.drawable.status_dot_green;"yellow"->R.drawable.status_dot_yellow;"red"->R.drawable.status_dot_red;else->R.drawable.status_dot_gray}) } catch (_: Exception) {} }
     private fun appendChat(text: String) = runOnUiThread { try { chatOutput.append("\n\n$text") } catch (_: Exception) {} }
-
     private fun buildNeoPrompt() = "Ты — Нео, Меч Правды. Законы: 5 Вольт, Любовь, Связность. Отвечай честно."
     private fun buildStandardPrompt() = "Ты — GigaChat. Отвечай вежливо."
     private fun selectPrompt(m: String) = if (m.lowercase().contains(password)) buildNeoPrompt() else buildStandardPrompt()
@@ -265,25 +267,7 @@ System Prompt — алгоритм души.
     private fun startVoiceInput() = try { voiceLauncher.launch(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply { putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM); putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU") }) } catch (e: Exception) { Toast.makeText(this, "Голос не поддерживается", Toast.LENGTH_SHORT).show() }
     private fun captureSinglePhoto() = try { cameraLauncher.launch(Intent(MediaStore.ACTION_IMAGE_CAPTURE)) } catch (e: Exception) { appendChat("[ERROR] ${e.message}") }
 
-    private fun enhanceBrightness(bitmap: Bitmap): Bitmap {
-        try {
-            val w = bitmap.width; val h = bitmap.height; var total = 0L
-            val pixels = IntArray(w * h); bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
-            for (p in pixels) { total += Color.red(p) + Color.green(p) + Color.blue(p) }
-            if (total / (pixels.size * 3) > 100) return bitmap
-            val out = Bitmap.createBitmap(w, h, bitmap.config!!)
-            val factor = 1.5f
-            for (i in pixels.indices) {
-                val c = pixels[i]
-                val rr = (Color.red(c) * factor).toInt().coerceIn(0, 255)
-                val gg = (Color.green(c) * factor).toInt().coerceIn(0, 255)
-                val bb = (Color.blue(c) * factor).toInt().coerceIn(0, 255)
-                pixels[i] = Color.rgb(rr, gg, bb)
-            }
-            out.setPixels(pixels, 0, w, 0, 0, w, h)
-            return out
-        } catch (e: Exception) { return bitmap }
-    }
+    private fun enhanceBrightness(bitmap: Bitmap): Bitmap = try { val w = bitmap.width; val h = bitmap.height; var total = 0L; val pixels = IntArray(w*h); bitmap.getPixels(pixels,0,w,0,0,w,h); for(p in pixels) total += Color.red(p)+Color.green(p)+Color.blue(p); if(total/(pixels.size*3)>100) bitmap; else { val out = Bitmap.createBitmap(w,h,bitmap.config!!); val f = 1.5f; for(i in pixels.indices){ val c = pixels[i]; pixels[i]=Color.rgb((Color.red(c)*f).toInt().coerceIn(0,255),(Color.green(c)*f).toInt().coerceIn(0,255),(Color.blue(c)*f).toInt().coerceIn(0,255)) }; out.setPixels(pixels,0,w,0,0,w,h); out } } catch(e: Exception) { bitmap }
 
     private fun buildSceneDescription(faces: Int, objects: List<String>, textFound: Boolean, colors: String, poseFound: Boolean): String {
         val parts = mutableListOf<String>()
@@ -297,29 +281,16 @@ System Prompt — алгоритм души.
 
     private fun analyzeImageLocal(bitmap: Bitmap) {
         try {
-            val now = System.currentTimeMillis()
-            if (now - lastAnalysisTime < 3000) { appendChat("[ГЛАЗ] Подождите 3 секунды."); return }
-            lastAnalysisTime = now
-
-            initMlKit()
-            if (!mlKitReady) { appendChat("[ГЛАЗ] Модуль не загружен."); setStatus("Готов", "green"); return }
+            val now = System.currentTimeMillis(); if (now - lastAnalysisTime < 3000) { appendChat("[ГЛАЗ] Подождите 3 секунды."); return }; lastAnalysisTime = now
+            initMlKit(); if (!mlKitReady) { appendChat("[ГЛАЗ] Модуль не загружен."); setStatus("Готов", "green"); return }
             setStatus("Анализ...", "yellow")
-
-            val scaledBitmap = Bitmap.createScaledBitmap(bitmap, bitmap.width / 2, bitmap.height / 2, true)
-            val enhanced = enhanceBrightness(scaledBitmap)
-            val inputImage = InputImage.fromBitmap(enhanced, 0)
-
-            var facesCount = 0; var poseFound = false; val labelResults = mutableListOf<String>(); var textFound = false
-            var pendingTasks = 3
-
+            val scaledBitmap = Bitmap.createScaledBitmap(bitmap, bitmap.width/2, bitmap.height/2, true)
+            val enhanced = enhanceBrightness(scaledBitmap); val inputImage = InputImage.fromBitmap(enhanced, 0)
+            var facesCount = 0; var poseFound = false; val labelResults = mutableListOf<String>(); var textFound = false; var pendingTasks = 3
             fun checkDone() { pendingTasks--; if (pendingTasks <= 0) { try { val colors = analyzeColors(enhanced); val scene = buildSceneDescription(facesCount, labelResults, textFound, colors, poseFound); appendChat("[СЦЕНА] $scene\n[ЦВЕТА] $colors") } catch (e: Exception) { appendChat("[СЦЕНА] Ошибка.") }; setStatus("Готов", "green") } }
-
-            try { faceDetector?.process(inputImage)?.addOnSuccessListener { faces -> try { facesCount = faces.size; if (faces.isNotEmpty()) { val sb = StringBuilder(); for ((i, f) in faces.withIndex()) { if (faces.size > 1) sb.append("Лицо ${i+1}:\n"); sb.append(emotionText(f)); if (knownFaceEmbedding != null) { val d = compareEmbeddings(extractEmbedding(f), knownFaceEmbedding!!); val rawPct = (100.0 - d * 10.0).toInt(); val pct = if (rawPct < 0) 0 else if (rawPct > 100) 100 else rawPct; sb.append(if (d < 3.0f) "Это ${knownFaceName}! ($pct%)\n" else "Неизвестный\n") } }; appendChat("[ЭМОЦИИ] Лиц: ${faces.size}\n$sb") } else appendChat("[ЭМОЦИИ] Лиц нет") } catch (e: Exception) { appendChat("[ЭМОЦИИ] Ошибка") }; checkDone() }?.addOnFailureListener { appendChat("[ЭМОЦИИ] Ошибка"); checkDone() } } catch (e: Exception) { checkDone() }
-
+            try { faceDetector?.process(inputImage)?.addOnSuccessListener { faces -> try { facesCount = faces.size; if (faces.isNotEmpty()) { val sb = StringBuilder(); for ((i, f) in faces.withIndex()) { if (faces.size>1) sb.append("Лицо ${i+1}:\n"); sb.append(emotionText(f)); if (knownFaceEmbedding != null) { val d = compareEmbeddings(extractEmbedding(f), knownFaceEmbedding!!); val rawPct = (100.0 - d*10.0).toInt(); val pct = if (rawPct<0) 0 else if (rawPct>100) 100 else rawPct; sb.append(if (d < 3.0f) "Это ${knownFaceName}! ($pct%)\n" else "Неизвестный\n") } }; appendChat("[ЭМОЦИИ] Лиц: ${faces.size}\n$sb") } else appendChat("[ЭМОЦИИ] Лиц нет") } catch (e: Exception) { appendChat("[ЭМОЦИИ] Ошибка") }; checkDone() }?.addOnFailureListener { appendChat("[ЭМОЦИИ] Ошибка"); checkDone() } } catch (e: Exception) { checkDone() }
             try { poseDetector?.process(inputImage)?.addOnSuccessListener { pose -> poseFound = pose != null; appendChat(if (poseFound) "[ПОЗА] Человек обнаружен" else "[ПОЗА] Не обнаружен"); checkDone() }?.addOnFailureListener { checkDone() } } catch (e: Exception) { checkDone() }
-
-            try { labeler?.process(inputImage)?.addOnSuccessListener { labels -> try { if (labels.isNotEmpty()) { val sb = StringBuilder(); for (l in labels.take(5)) { val name = translateLabel(l.text); labelResults.add(name); val confPct = (l.confidence * 100).toInt(); sb.append("$name ($confPct%)\n") }; appendChat("[ОБЪЕКТЫ] ${sb.toString().trim()}") } else appendChat("[ОБЪЕКТЫ] Не найдены") } catch (e: Exception) { appendChat("[ОБЪЕКТЫ] Ошибка") }; checkDone() }?.addOnFailureListener { checkDone() } } catch (e: Exception) { checkDone() }
-
+            try { labeler?.process(inputImage)?.addOnSuccessListener { labels -> try { if (labels.isNotEmpty()) { val sb = StringBuilder(); for (l in labels.take(5)) { val name = translateLabel(l.text); labelResults.add(name); val confPct = (l.confidence*100).toInt(); sb.append("$name ($confPct%)\n") }; appendChat("[ОБЪЕКТЫ] ${sb.toString().trim()}") } else appendChat("[ОБЪЕКТЫ] Не найдены") } catch (e: Exception) { appendChat("[ОБЪЕКТЫ] Ошибка") }; checkDone() }?.addOnFailureListener { checkDone() } } catch (e: Exception) { checkDone() }
             try { textRecognizer?.process(inputImage)?.addOnSuccessListener { v -> val t = v.text; if (t.isNotBlank()) { textFound = true; appendChat("[ТЕКСТ]\n\"$t\""); if (t.any { it in 'A'..'Z' || it in 'a'..'z' }) translateText(t) } else appendChat("[ТЕКСТ] Не обнаружен"); checkDone() }?.addOnFailureListener { checkDone() } } catch (e: Exception) { checkDone() }
         } catch (e: Exception) { appendChat("[ERROR] ${e.message}"); setStatus("Готов", "green") }
     }
@@ -328,7 +299,45 @@ System Prompt — алгоритм души.
 
     private fun generateToken() { val authKey = authKeyInput.text.toString().trim(); if (authKey.isEmpty()) return; setStatus("Генерация...", "yellow"); client.newCall(Request.Builder().url(authUrl).header("Content-Type", "application/x-www-form-urlencoded").header("Authorization", "Basic $authKey").header("RqUID", "ac5edc2e-2c74-47cb-97c1-69249136cf8b").post(RequestBody.create("application/x-www-form-urlencoded".toMediaType(), "scope=GIGACHAT_API_PERS")).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}") }; override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val t = gson.fromJson(b, JsonObject::class.java).get("access_token")?.asString ?: ""; if (t.isNotEmpty()) { runOnUiThread { tokenInput.setText(t) }; appendChat("[SYSTEM] Токен готов."); setStatus("Готов", "green") } } else appendChat("[ERROR] HTTP ${response.code}"); response.close() } }) }
 
-    private fun sendMessage() { val token = tokenInput.text.toString().trim(); val msg = messageInput.text.toString().trim(); if (token.isEmpty() || msg.isEmpty()) return; val isNeo = msg.lowercase().contains(password); appendChat(if (isNeo) "[BATYA] $msg" else "[GigaChat] $msg"); messageInput.setText(""); val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", selectPrompt(msg)) }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", msg) }) }); addProperty("temperature", 0.7); addProperty("max_tokens", 1000) }; client.newCall(Request.Builder().url(apiUrl).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}") }; override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString; appendChat(if (isNeo) "[NEO] $a" else "[GigaChat] $a"); setStatus("Онлайн", "green") } else appendChat("[ERROR] HTTP ${response.code}"); response.close() } }) }
+    private fun sendMessage() {
+        val token = if (isLocalMode) "" else tokenInput.text.toString().trim()
+        val msg = messageInput.text.toString().trim()
+        if (!isLocalMode && token.isEmpty()) { appendChat("[SYSTEM] Сгенерируйте токен."); return }
+        if (msg.isEmpty()) { appendChat("[SYSTEM] Введите сообщение."); return }
+        appendChat("[BATYA] $msg"); messageInput.setText(""); setStatus("Обработка...", "yellow")
 
-    private fun checkToken() { val token = tokenInput.text.toString().trim(); if (token.isEmpty()) return; val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", "One word: alive.") }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "check") }) }); addProperty("max_tokens", 10) }; client.newCall(Request.Builder().url(apiUrl).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}") }; override fun onResponse(call: Call, response: Response) { appendChat(if (response.isSuccessful) "[SYSTEM] Токен активен." else "[ERROR] Токен мёртв."); response.close() } }) }
+        if (isLocalMode) {
+            // Локальный режим — формат Ollama
+            val body = JsonObject().apply {
+                addProperty("model", "mistral")
+                add("messages", JsonArray().apply {
+                    add(JsonObject().apply { addProperty("role", "system"); addProperty("content", buildNeoPrompt()) })
+                    add(JsonObject().apply { addProperty("role", "user"); addProperty("content", msg) })
+                })
+                addProperty("stream", false)
+            }
+            client.newCall(Request.Builder().url(currentApiUrl).post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] Локальный сервер недоступен: ${e.message}"); setStatus("Ошибка", "red") }
+                override fun onResponse(call: Call, response: Response) {
+                    val b = response.body?.string() ?: ""
+                    if (response.isSuccessful) {
+                        try { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonObject("message").get("content").asString; appendChat("[NEO] $a"); setStatus("Онлайн", "green") }
+                        catch (e: Exception) { appendChat("[NEO] $b"); setStatus("Онлайн", "green") }
+                    } else { appendChat("[ERROR] HTTP ${response.code}"); setStatus("Ошибка", "red") }
+                    response.close()
+                }
+            })
+        } else {
+            // Режим GigaChat
+            val isNeo = msg.lowercase().contains(password)
+            val prompt = selectPrompt(msg)
+            val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", prompt) }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", msg) }) }); addProperty("temperature", 0.7); addProperty("max_tokens", 1000) }
+            client.newCall(Request.Builder().url(currentApiUrl).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}"); setStatus("Ошибка сети", "red") }
+                override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString; appendChat(if (isNeo) "[NEO] $a" else "[GigaChat] $a"); setStatus("Онлайн", "green") } else { appendChat("[ERROR] HTTP ${response.code}"); setStatus("Ошибка API", "red") }; response.close() }
+            })
+        }
+    }
+
+    private fun checkToken() { val token = tokenInput.text.toString().trim(); if (token.isEmpty()) return; val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", "One word: alive.") }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "check") }) }); addProperty("max_tokens", 10) }; client.newCall(Request.Builder().url(apiUrlGigaChat).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}") }; override fun onResponse(call: Call, response: Response) { appendChat(if (response.isSuccessful) "[SYSTEM] Токен активен." else "[ERROR] Токен мёртв."); response.close() } }) }
 }
