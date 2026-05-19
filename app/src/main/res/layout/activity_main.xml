@@ -19,7 +19,7 @@
         <com.mechpravdy.neo.MatrixHeaderView
             android:id="@+id/matrixHeader"
             android:layout_width="match_parent"
-            android:layout_height="70dp"
+            android:layout_height="80dp"
             android:layout_marginBottom="3dp" />
 
         <com.google.android.material.card.MaterialCardView
@@ -235,7 +235,6 @@
                     android:textColor="#1A1A1A"
                     android:fontFamily="monospace"
                     android:lineSpacingExtra="2dp"
-                    android:background="#DDFFFFFF"
                     android:padding="4dp" />
             </ScrollView>
 
