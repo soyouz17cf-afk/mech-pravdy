@@ -15,7 +15,7 @@ class MatrixChatBackground @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
-    private val fontSize = 11f
+    private val fontSize = 12f
     private val lineHeight = fontSize * 1.2f
 
     private val paint = Paint().apply {
@@ -24,7 +24,7 @@ class MatrixChatBackground @JvmOverloads constructor(
         typeface = Typeface.MONOSPACE
         isAntiAlias = true
     }
-    private val bgPaint = Paint().apply { color = Color.parseColor("#0A0A0A") }
+    private val bgPaint = Paint().apply { color = Color.WHITE }
 
     private var columns = 0
     private var rows = 0
@@ -39,7 +39,7 @@ class MatrixChatBackground @JvmOverloads constructor(
         rows = (h / lineHeight).toInt() + 2
         lines = Array(rows) { CharArray(columns) { if (Random.nextFloat() > 0.5f) '0' else '1' } }
         lineY = FloatArray(rows) { i -> i * lineHeight }
-        speeds = FloatArray(rows) { 0.2f + Random.nextFloat() * 0.4f }
+        speeds = FloatArray(rows) { 0.15f + Random.nextFloat() * 0.3f }
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -47,6 +47,7 @@ class MatrixChatBackground @JvmOverloads constructor(
         val w = width.toFloat()
         val h = height.toFloat()
 
+        // Белый фон
         canvas.drawRect(0f, 0f, w, h, bgPaint)
 
         // Двигаем строки вверх
@@ -57,7 +58,7 @@ class MatrixChatBackground @JvmOverloads constructor(
                 for (c in 0 until columns) {
                     lines[r][c] = if (Random.nextFloat() > 0.5f) '0' else '1'
                 }
-                speeds[r] = 0.2f + Random.nextFloat() * 0.4f
+                speeds[r] = 0.15f + Random.nextFloat() * 0.3f
             }
         }
 
@@ -67,12 +68,12 @@ class MatrixChatBackground @JvmOverloads constructor(
             if (y > h || y < -lineHeight) continue
             for (c in 0 until columns) {
                 val x = c * fontSize
-                paint.alpha = 25
+                paint.alpha = 35
                 canvas.drawText(lines[r][c].toString(), x, y, paint)
             }
         }
 
         frame++
-        postInvalidateDelayed(50)
+        postInvalidateDelayed(60)
     }
 }
