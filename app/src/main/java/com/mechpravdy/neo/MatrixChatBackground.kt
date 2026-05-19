@@ -39,7 +39,6 @@ class MatrixChatBackground @JvmOverloads constructor(
     private val bgPaint = Paint().apply { color = Color.WHITE }
 
     private var columns = 0
-    // Три строки одновременно для заполнения экрана
     private val activeLines = arrayOfNulls<String>(3)
     private val lineY = FloatArray(3)
     private val printedCount = IntArray(3)
@@ -49,9 +48,10 @@ class MatrixChatBackground @JvmOverloads constructor(
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         columns = (w / fontSize).toInt() + 1
+        val fh = h.toFloat()
         for (i in 0 until 3) {
-            spawnNewLine(i, h)
-            lineY[i] = h * (0.3f + i * 0.3f)
+            spawnNewLine(i, fh)
+            lineY[i] = fh * (0.3f + i * 0.3f)
         }
     }
 
