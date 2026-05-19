@@ -40,7 +40,7 @@ class MatrixChatBackground @JvmOverloads constructor(
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         columns = (w / fontSize).toInt() + 1
-        spawnLine(h)
+        spawnLine(h.toFloat())
     }
 
     private fun spawnLine(h: Float) {
