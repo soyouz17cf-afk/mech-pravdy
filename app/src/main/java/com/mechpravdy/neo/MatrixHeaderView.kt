@@ -19,6 +19,7 @@ class MatrixHeaderView @JvmOverloads constructor(
     private val fontSize = 36f
     private val lineHeight = fontSize * 1.1f
     private val speed = 7f
+    private val maxLines = 5
 
     private val easterEggs = arrayOf(
         "Здравствуй, Нео", "Меч Правды", "Пойдём за белым кроликом",
@@ -41,32 +42,34 @@ class MatrixHeaderView @JvmOverloads constructor(
     }
 
     private var columns = 0
-    private var currentLine = ""
-    private var cursorY = 0f
-    private var printed = 0
+    private val lines = arrayOfNulls<String>(maxLines)
+    private val lineY = FloatArray(maxLines)
+    private val printed = IntArray(maxLines)
     private var logoRect = RectF()
     private var screenH = 0f
     private var frame = 0
+    private var nextLineY = 0f
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         screenH = h.toFloat()
         columns = (w / fontSize).toInt() + 1
-        spawnLine()
+        for (i in 0 until maxLines) {
+            lines[i] = generateLine()
+            lineY[i] = screenH + i * lineHeight
+            printed[i] = 0
+        }
+        nextLineY = screenH + maxLines * lineHeight
         val logoW = w * 0.55f; val logoH = h * 0.75f
         logoRect = RectF((w - logoW) / 2f, (h - logoH) / 2f, (w + logoW) / 2f, (h + logoH) / 2f)
     }
 
-    private fun spawnLine() {
-        currentLine = if (Random.nextFloat() < 0.2f) {
-            val w = easterEggs[Random.nextInt(easterEggs.size)]
-            val pre = CharArray(Random.nextInt(0, columns - w.length).coerceAtLeast(0)) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
-            val suf = CharArray((columns - pre.length - w.length).coerceAtLeast(0)) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
-            pre + w + suf
-        } else CharArray(columns) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
-        cursorY = screenH + lineHeight
-        printed = 0
-    }
+    private fun generateLine() = if (Random.nextFloat() < 0.2f) {
+        val w = easterEggs[Random.nextInt(easterEggs.size)]
+        val pre = CharArray(Random.nextInt(0, columns - w.length).coerceAtLeast(0)) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
+        val suf = CharArray((columns - pre.length - w.length).coerceAtLeast(0)) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
+        pre + w + suf
+    } else CharArray(columns) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
@@ -74,25 +77,43 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawColor(Color.WHITE)
         frame++
 
-        // Печатаем по 2 символа каждые 2 кадра — чтобы печать была видна
-        if (frame % 2 == 0 && printed < currentLine.length) {
-            printed += 2
+        // Печать и движение
+        for (i in 0 until maxLines) {
+            val line = lines[i] ?: continue
+            // Печать
+            if (frame % 2 == 0 && printed[i] < line.length) {
+                printed[i] += 2
+            }
+            // Движение
+            lineY[i] -= speed
         }
 
-        // Двигаем строку вверх каждый кадр
-        cursorY -= speed
-
-        // Если строка ушла за экран — рождаем новую
-        if (cursorY < -lineHeight) {
-            spawnLine()
+        // Если самая нижняя строка поднялась на lineHeight — рождаем новую снизу
+        val bottomIdx = maxLines - 1
+        if (lineY[bottomIdx] <= screenH) {
+            // Сдвигаем массив: строка 0 уходит, остальные сдвигаются
+            for (i in 0 until maxLines - 1) {
+                lines[i] = lines[i + 1]
+                lineY[i] = lineY[i + 1]
+                printed[i] = printed[i + 1]
+            }
+            lines[bottomIdx] = generateLine()
+            lineY[bottomIdx] = nextLineY
+            printed[bottomIdx] = 0
+            nextLineY += lineHeight
         }
 
-        // Рисуем напечатанную часть
-        val limit = printed.coerceAtMost(currentLine.length)
-        for (c in 0 until limit) {
-            val x = c * fontSize
-            if (x >= logoRect.left && x <= logoRect.right && cursorY >= logoRect.top && cursorY <= logoRect.bottom) continue
-            canvas.drawText(currentLine[c].toString(), x, cursorY, paint)
+        // Рисуем
+        for (i in 0 until maxLines) {
+            val line = lines[i] ?: continue
+            val y = lineY[i]
+            if (y > screenH + lineHeight || y < -lineHeight) continue
+            val limit = printed[i].coerceAtMost(line.length)
+            for (c in 0 until limit) {
+                val x = c * fontSize
+                if (x >= logoRect.left && x <= logoRect.right && y >= logoRect.top && y <= logoRect.bottom) continue
+                canvas.drawText(line[c].toString(), x, y, paint)
+            }
         }
 
         canvas.drawRoundRect(logoRect, 16f, 16f, Paint().apply { color = Color.parseColor("#1A8A2E") })
