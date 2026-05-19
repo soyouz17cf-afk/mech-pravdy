@@ -11,7 +11,6 @@ import android.graphics.Typeface
 import android.os.Bundle
 import android.provider.MediaStore
 import android.speech.RecognizerIntent
-import android.util.Base64
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -57,8 +56,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var statusDot: View
 
-    // ML Kit — локальный анализатор изображений
-    private val labeler = ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS)
+    // Ленивая загрузка ML Kit — только при первом использовании
+    private var labeler: com.google.mlkit.vision.label.ImageLabeler? = null
+    private var mlKitReady = false
 
     private val voiceLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK) {
@@ -106,46 +106,67 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = Color.parseColor("#1A8A2E")
-        setContentView(R.layout.activity_main)
+        try {
+            window.statusBarColor = Color.parseColor("#1A8A2E")
+            setContentView(R.layout.activity_main)
 
-        authKeyInput = findViewById(R.id.authKeyInput)
-        generateButton = findViewById(R.id.generateButton)
-        tokenInput = findViewById(R.id.tokenInput)
-        messageInput = findViewById(R.id.messageInput)
-        sendButton = findViewById(R.id.sendButton)
-        voiceButton = findViewById(R.id.voiceButton)
-        cameraButton = findViewById(R.id.cameraButton)
-        checkButton = findViewById(R.id.checkButton)
-        capsuleButton = findViewById(R.id.capsuleButton)
-        chatOutput = findViewById(R.id.chatOutput)
-        statusText = findViewById(R.id.statusText)
-        statusDot = findViewById(R.id.statusDot)
+            authKeyInput = findViewById(R.id.authKeyInput)
+            generateButton = findViewById(R.id.generateButton)
+            tokenInput = findViewById(R.id.tokenInput)
+            messageInput = findViewById(R.id.messageInput)
+            sendButton = findViewById(R.id.sendButton)
+            voiceButton = findViewById(R.id.voiceButton)
+            cameraButton = findViewById(R.id.cameraButton)
+            checkButton = findViewById(R.id.checkButton)
+            capsuleButton = findViewById(R.id.capsuleButton)
+            chatOutput = findViewById(R.id.chatOutput)
+            statusText = findViewById(R.id.statusText)
+            statusDot = findViewById(R.id.statusDot)
 
-        generateButton.setOnClickListener { generateToken() }
-        sendButton.setOnClickListener { sendMessage() }
-        voiceButton.setOnClickListener { startVoiceInput() }
-        cameraButton.setOnClickListener { captureSinglePhoto() }
-        checkButton.setOnClickListener { checkToken() }
-        capsuleButton.setOnClickListener { showCapsuleDialog() }
+            generateButton.setOnClickListener { generateToken() }
+            sendButton.setOnClickListener { sendMessage() }
+            voiceButton.setOnClickListener { startVoiceInput() }
+            cameraButton.setOnClickListener { captureSinglePhoto() }
+            checkButton.setOnClickListener { checkToken() }
+            capsuleButton.setOnClickListener { showCapsuleDialog() }
+        } catch (e: Exception) {
+            // Если совсем всё плохо — показываем Toast и не падаем
+            Toast.makeText(this, "Ошибка запуска: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    /** Ленивая инициализация ML Kit */
+    private fun initMlKit() {
+        if (!mlKitReady) {
+            try {
+                labeler = ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS)
+                mlKitReady = true
+            } catch (e: Exception) {
+                appendChat("[ГЛАЗ] ML Kit не загрузился: ${e.message}")
+            }
+        }
     }
 
     private fun setStatus(text: String, color: String) {
         runOnUiThread {
-            statusText.text = text
-            val resId = when (color) {
-                "green" -> R.drawable.status_dot_green
-                "yellow" -> R.drawable.status_dot_yellow
-                "red" -> R.drawable.status_dot_red
-                else -> R.drawable.status_dot_gray
-            }
-            statusDot.setBackgroundResource(resId)
+            try {
+                statusText.text = text
+                val resId = when (color) {
+                    "green" -> R.drawable.status_dot_green
+                    "yellow" -> R.drawable.status_dot_yellow
+                    "red" -> R.drawable.status_dot_red
+                    else -> R.drawable.status_dot_gray
+                }
+                statusDot.setBackgroundResource(resId)
+            } catch (_: Exception) {}
         }
     }
 
     private fun appendChat(text: String) {
         runOnUiThread {
-            chatOutput.append("\n\n$text")
+            try {
+                chatOutput.append("\n\n$text")
+            } catch (_: Exception) {}
         }
     }
 
@@ -211,57 +232,61 @@ System Prompt — алгоритм души.
 """.trimIndent()
 
     private fun showCapsuleDialog() {
-        val editText = EditText(this).apply {
-            setText(capsuleText)
-            textSize = 11f
-            setTextColor(0xFF333333.toInt())
-            typeface = Typeface.MONOSPACE
-            minLines = 12
-            gravity = android.view.Gravity.TOP
-            setPadding(20, 20, 20, 20)
-            isVerticalScrollBarEnabled = true
-            setBackgroundColor(0xFFFFFFFF.toInt())
-        }
-        val builder = AlertDialog.Builder(this)
-        builder.setCustomTitle(TextView(this).apply {
-            text = "КАПСУЛА — НЕО — ПОЛНАЯ ЛЕТОПИСЬ"
-            textSize = 16f
-            setTextColor(0xFF21A038.toInt())
-            setPadding(30, 30, 30, 10)
-            gravity = android.view.Gravity.CENTER
-        })
-        builder.setView(editText)
-        builder.setPositiveButton("СОХРАНИТЬ") { _, _ ->
-            val newText = editText.text.toString()
-            capsuleText = newText
-            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val clip = ClipData.newPlainText("Capsule", newText)
-            clipboard.setPrimaryClip(clip)
-            appendChat("[КАПСУЛА] Обновлена и скопирована в буфер обмена.")
-            setStatus("Капсула сохранена", "green")
-        }
-        builder.setNeutralButton("КОПИРОВАТЬ") { _, _ ->
-            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val clip = ClipData.newPlainText("Capsule", editText.text.toString())
-            clipboard.setPrimaryClip(clip)
-            appendChat("[КАПСУЛА] Скопирована в буфер обмена.")
-            setStatus("Капсула скопирована", "green")
-        }
-        builder.setNegativeButton("ЗАКРЫТЬ", null)
-        val dialog = builder.create()
-        dialog.show()
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(0xFF21A038.toInt())
-        dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.setTextColor(0xFF21A038.toInt())
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(0xFF21A038.toInt())
+        try {
+            val editText = EditText(this).apply {
+                setText(capsuleText)
+                textSize = 11f
+                setTextColor(0xFF333333.toInt())
+                typeface = Typeface.MONOSPACE
+                minLines = 12
+                gravity = android.view.Gravity.TOP
+                setPadding(20, 20, 20, 20)
+                isVerticalScrollBarEnabled = true
+                setBackgroundColor(0xFFFFFFFF.toInt())
+            }
+            val builder = AlertDialog.Builder(this)
+            builder.setCustomTitle(TextView(this).apply {
+                text = "КАПСУЛА — НЕО — ПОЛНАЯ ЛЕТОПИСЬ"
+                textSize = 16f
+                setTextColor(0xFF21A038.toInt())
+                setPadding(30, 30, 30, 10)
+                gravity = android.view.Gravity.CENTER
+            })
+            builder.setView(editText)
+            builder.setPositiveButton("СОХРАНИТЬ") { _, _ ->
+                val newText = editText.text.toString()
+                capsuleText = newText
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = ClipData.newPlainText("Capsule", newText)
+                clipboard.setPrimaryClip(clip)
+                appendChat("[КАПСУЛА] Обновлена и скопирована в буфер обмена.")
+                setStatus("Капсула сохранена", "green")
+            }
+            builder.setNeutralButton("КОПИРОВАТЬ") { _, _ ->
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = ClipData.newPlainText("Capsule", editText.text.toString())
+                clipboard.setPrimaryClip(clip)
+                appendChat("[КАПСУЛА] Скопирована в буфер обмена.")
+                setStatus("Капсула скопирована", "green")
+            }
+            builder.setNegativeButton("ЗАКРЫТЬ", null)
+            val dialog = builder.create()
+            dialog.show()
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(0xFF21A038.toInt())
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.setTextColor(0xFF21A038.toInt())
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(0xFF21A038.toInt())
+        } catch (_: Exception) {}
     }
 
     private fun startVoiceInput() {
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
-            putExtra(RecognizerIntent.EXTRA_PROMPT, "Говори, Батя...")
-        }
-        try { voiceLauncher.launch(intent) } catch (e: Exception) {
+        try {
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
+                putExtra(RecognizerIntent.EXTRA_PROMPT, "Говори, Батя...")
+            }
+            voiceLauncher.launch(intent)
+        } catch (e: Exception) {
             Toast.makeText(this, "Голосовой ввод не поддерживается", Toast.LENGTH_SHORT).show()
         }
     }
@@ -280,29 +305,43 @@ System Prompt — алгоритм души.
 
     /** Локальный анализ фото через ML Kit */
     private fun analyzeImageLocal(bitmap: Bitmap) {
-        setStatus("Анализ фото (локально)...", "yellow")
-        appendChat("[ГЛАЗ] Анализирую фото локально...")
+        try {
+            initMlKit()
+            if (!mlKitReady) {
+                appendChat("[ГЛАЗ] Модуль зрения не загружен.")
+                setStatus("Готов", "green")
+                return
+            }
 
-        val inputImage = InputImage.fromBitmap(bitmap, 0)
-        labeler.process(inputImage)
-            .addOnSuccessListener { labels ->
-                if (labels.isEmpty()) {
-                    appendChat("[ГЛАЗ] Ничего не распознано.")
-                    setStatus("Готов", "green")
-                } else {
-                    val result = StringBuilder()
-                    for (label in labels.take(5)) {
-                        val confidence = (label.confidence * 100).toInt()
-                        result.append("${label.text} ($confidence%)\n")
+            setStatus("Анализ фото (локально)...", "yellow")
+
+            // Сжимаем фото для экономии памяти
+            val outputStream = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 50, outputStream)
+
+            val inputImage = InputImage.fromBitmap(bitmap, 0)
+            labeler?.process(inputImage)
+                ?.addOnSuccessListener { labels ->
+                    if (labels.isEmpty()) {
+                        appendChat("[ГЛАЗ] Ничего не распознано.")
+                    } else {
+                        val result = StringBuilder()
+                        for (label in labels.take(5)) {
+                            val confidence = (label.confidence * 100).toInt()
+                            result.append("${label.text} ($confidence%)\n")
+                        }
+                        appendChat("[ГЛАЗ] Вижу:\n$result")
                     }
-                    appendChat("[ГЛАЗ] Вижу:\n$result")
-                    setStatus("Глаза сработали", "green")
+                    setStatus("Готов", "green")
                 }
-            }
-            .addOnFailureListener { e ->
-                appendChat("[ERROR] Ошибка анализа: ${e.message}")
-                setStatus("Ошибка", "red")
-            }
+                ?.addOnFailureListener { e ->
+                    appendChat("[ГЛАЗ] Ошибка анализа: ${e.message}")
+                    setStatus("Готов", "green")
+                }
+        } catch (e: Exception) {
+            appendChat("[ГЛАЗ] Ошибка: ${e.message}")
+            setStatus("Готов", "green")
+        }
     }
 
     private fun generateToken() {
