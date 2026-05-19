@@ -272,11 +272,7 @@ System Prompt — алгоритм души.
         appendChat("[BATYA] $msg"); messageInput.setText(""); setStatus("Обработка...", "yellow")
 
         if (isLocalMode) {
-            val body = JsonObject().apply {
-                addProperty("model", "mistral"); add("messages", JsonArray().apply {
-                add(JsonObject().apply { addProperty("role", "system"); addProperty("content", buildNeoPrompt()) })
-                add(JsonObject().apply { addProperty("role", "user"); addProperty("content", msg) })
-            }); addProperty("stream", false) }
+            val body = JsonObject().apply { addProperty("model", "mistral"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", buildNeoPrompt()) }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", msg) }) }); addProperty("stream", false) }
             client.newCall(Request.Builder().url(currentApiUrl).post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] Сервер недоступен: ${e.message}"); matrixHeader.setConnectionLost(true); setStatus("Нет связи", "red") }
                 override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { try { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonObject("message").get("content").asString; appendChat("[NEO] $a"); matrixHeader.setLocalActive(true); setStatus("Онлайн", "green") } catch (e: Exception) { appendChat("[NEO] $b"); matrixHeader.setLocalActive(true); setStatus("Онлайн", "green") } } else { appendChat("[ERROR] HTTP ${response.code}"); matrixHeader.setConnectionLost(true); setStatus("Ошибка", "red") }; response.close() }
