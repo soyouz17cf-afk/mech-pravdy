@@ -67,7 +67,7 @@ class MatrixHeaderView @JvmOverloads constructor(
         cursorY = h + lineHeight
         printed = 0
         state = 0
-        floatSpeed = 7f
+        floatSpeed = 7.0f
     }
 
     override fun onDraw(canvas: Canvas) {
