@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.util.AttributeSet
 import android.view.View
@@ -42,19 +43,26 @@ class MatrixHeaderView @JvmOverloads constructor(
         textAlign = Paint.Align.CENTER
     }
     private val bgPaint = Paint().apply { color = Color.WHITE }
+    private val logoBgPaint = Paint().apply { color = Color.parseColor("#EEFFFFFF") }
+    private val logoBorderPaint = Paint().apply {
+        color = Color.parseColor("#21A038")
+        style = Paint.Style.STROKE
+        strokeWidth = 1.5f
+        isAntiAlias = true
+    }
 
     private var columns = 0
     private var rows = 0
+    // Массив строк: каждая строка знает, сколько символов уже "напечатано"
     private lateinit var lines: Array<CharArray>
     private lateinit var lineY: FloatArray
     private lateinit var speeds: FloatArray
+    // Сколько символов уже видно в каждой строке (эффект печати)
+    private lateinit var printedCount: IntArray
     private var frame = 0
 
-    // Границы текста (обтекаем их)
-    private var textLeft = 0f
-    private var textTop = 0f
-    private var textRight = 0f
-    private var textBottom = 0f
+    // Границы закруглённого прямоугольника вокруг текста
+    private var logoRect = RectF()
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -63,15 +71,16 @@ class MatrixHeaderView @JvmOverloads constructor(
         lines = Array(rows) { CharArray(columns) { if (Random.nextFloat() > 0.5f) '0' else '1' } }
         lineY = FloatArray(rows) { i -> i * lineHeight }
         speeds = FloatArray(rows) { 0.3f + Random.nextFloat() * 0.5f }
+        printedCount = IntArray(rows) { 0 }
 
-        // Считаем границы текста «СБЕР» с запасом
         val rect = Rect()
         titlePaint.getTextBounds("СБЕР", 0, 4, rect)
         val textCenterY = h * 0.50f
-        textLeft = w / 2f - rect.width() / 2f - 30f
-        textTop = textCenterY - titlePaint.textSize * 0.7f - 10f
-        textRight = w / 2f + rect.width() / 2f + 30f
-        textBottom = textCenterY + titlePaint.textSize * 0.3f + 40f
+        val left = w / 2f - rect.width() / 2f - 35f
+        val top = textCenterY - titlePaint.textSize * 0.7f - 15f
+        val right = w / 2f + rect.width() / 2f + 35f
+        val bottom = textCenterY + titlePaint.textSize * 0.3f + 45f
+        logoRect = RectF(left, top, right, bottom)
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -85,32 +94,46 @@ class MatrixHeaderView @JvmOverloads constructor(
         for (r in 0 until rows) {
             lineY[r] -= speeds[r]
             if (lineY[r] < -lineHeight) {
+                // Строка ушла за верх — сбрасываем вниз
                 lineY[r] = h + lineHeight
                 for (c in 0 until columns) {
                     lines[r][c] = if (Random.nextFloat() > 0.5f) '0' else '1'
                 }
                 speeds[r] = 0.3f + Random.nextFloat() * 0.5f
+                printedCount[r] = 0
             }
         }
 
-        // Рисуем строки, обтекая текст со всех сторон
+        // Эффект печати: каждые 3 кадра увеличиваем счётчик напечатанных символов
+        if (frame % 3 == 0) {
+            for (r in 0 until rows) {
+                if (printedCount[r] < columns) {
+                    printedCount[r]++
+                }
+            }
+        }
+
+        // Рисуем строки
         for (r in 0 until rows) {
             val y = lineY[r]
             if (y > h || y < -lineHeight) continue
 
             for (c in 0 until columns) {
+                // Рисуем только "напечатанные" символы
+                if (c >= printedCount[r]) continue
+
                 val x = c * fontSize
 
-                // Пропускаем зону текста (прямоугольник вокруг «СБЕР ГигаЧат»)
-                if (x >= textLeft && x <= textRight && y >= textTop && y <= textBottom) continue
+                // Пропускаем зону логотипа
+                if (x >= logoRect.left && x <= logoRect.right && y >= logoRect.top && y <= logoRect.bottom) continue
 
                 canvas.drawText(lines[r][c].toString(), x, y, matrixPaint)
             }
         }
 
-        // Полупрозрачная белая плашка под текст
-        val overlayPaint = Paint().apply { color = Color.parseColor("#DDFFFFFF") }
-        canvas.drawRect(textLeft - 5f, textTop - 5f, textRight + 5f, textBottom + 5f, overlayPaint)
+        // Закруглённый прямоугольник позади текста
+        canvas.drawRoundRect(logoRect, 20f, 20f, logoBgPaint)
+        canvas.drawRoundRect(logoRect, 20f, 20f, logoBorderPaint)
 
         val textCenterY = h * 0.50f
         canvas.drawText("СБЕР", w / 2, textCenterY + 10f, titlePaint)
