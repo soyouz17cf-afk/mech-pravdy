@@ -46,9 +46,7 @@ class MatrixHeaderView @JvmOverloads constructor(
     private lateinit var lines: Array<String>
     private lateinit var lineY: FloatArray
     private lateinit var printedCount: IntArray
-    // Скорость подъёма = скорость печати (символов за кадр)
     private lateinit var speeds: FloatArray
-    private var frame = 0
 
     private var logoRect = RectF()
 
@@ -59,8 +57,7 @@ class MatrixHeaderView @JvmOverloads constructor(
         lines = Array(maxRows) { generateLine() }
         lineY = FloatArray(maxRows) { i -> h + i * lineHeight }
         printedCount = IntArray(maxRows) { 0 }
-        // Скорость: 1.0–2.0 пикселей за кадр. Печатаем столько же символов за кадр.
-        speeds = FloatArray(maxRows) { 1.0f + Random.nextFloat() * 1.0f }
+        speeds = FloatArray(maxRows) { 4.0f + Random.nextFloat() * 4.0f }
 
         val logoWidth = w * 0.55f; val logoHeight = h * 0.75f
         val left = (w - logoWidth) / 2f; val top = (h - logoHeight) / 2f
@@ -82,26 +79,21 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRect(0f, 0f, w, h, bgPaint)
 
         for (i in 0 until maxRows) {
-            // Печатаем и двигаем одновременно
             val speed = speeds[i]
-            // Печатаем символов = скорость в пикселях (примерно 1–2 символа за кадр)
-            val charsToAdd = speed.toInt().coerceAtLeast(1)
+            val charsToAdd = speed.toInt().coerceAtLeast(4)
             if (printedCount[i] < lines[i].length) {
                 printedCount[i] = (printedCount[i] + charsToAdd).coerceAtMost(lines[i].length)
             }
-            // Двигаем строку вверх
             lineY[i] -= speed
 
-            // Если строка полностью ушла за верх — перезапускаем снизу
             if (lineY[i] < -lineHeight && printedCount[i] >= lines[i].length) {
                 lines[i] = generateLine()
                 lineY[i] = h + lineHeight
                 printedCount[i] = 0
-                speeds[i] = 1.0f + Random.nextFloat() * 1.0f
+                speeds[i] = 4.0f + Random.nextFloat() * 4.0f
             }
         }
 
-        // Рисуем
         for (i in 0 until maxRows) {
             val y = lineY[i]
             if (y > h + lineHeight || y < -lineHeight) continue
@@ -116,7 +108,6 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRoundRect(logoRect, 16f, 16f, logoBgPaint)
         canvas.drawText("СБЕР", w / 2, logoRect.top + logoRect.height() * 0.45f, titlePaint)
         canvas.drawText("ГигаЧат", w / 2, logoRect.top + logoRect.height() * 0.75f, subtitlePaint)
-        frame++
         postInvalidateDelayed(50)
     }
 }
