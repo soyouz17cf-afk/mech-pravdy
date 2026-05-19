@@ -15,7 +15,7 @@ class MatrixChatBackground @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
-    private val fontSize = 12f
+    private val fontSize = 16f
     private val lineHeight = fontSize * 1.2f
 
     private val paint = Paint().apply {
@@ -47,10 +47,8 @@ class MatrixChatBackground @JvmOverloads constructor(
         val w = width.toFloat()
         val h = height.toFloat()
 
-        // Белый фон
         canvas.drawRect(0f, 0f, w, h, bgPaint)
 
-        // Двигаем строки вверх
         for (r in 0 until rows) {
             lineY[r] -= speeds[r]
             if (lineY[r] < -lineHeight) {
@@ -62,13 +60,12 @@ class MatrixChatBackground @JvmOverloads constructor(
             }
         }
 
-        // Рисуем строки
         for (r in 0 until rows) {
             val y = lineY[r]
             if (y > h || y < -lineHeight) continue
             for (c in 0 until columns) {
                 val x = c * fontSize
-                paint.alpha = 35
+                paint.alpha = 45
                 canvas.drawText(lines[r][c].toString(), x, y, paint)
             }
         }
