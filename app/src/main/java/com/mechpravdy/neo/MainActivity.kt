@@ -28,8 +28,6 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.*
 import com.google.mlkit.vision.label.ImageLabeling
 import com.google.mlkit.vision.label.defaults.ImageLabelerOptions
-import com.google.mlkit.vision.objects.ObjectDetection
-import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
 import com.google.mlkit.vision.pose.PoseDetection
 import com.google.mlkit.vision.pose.defaults.PoseDetectorOptions
 import com.google.mlkit.vision.text.TextRecognition
@@ -72,7 +70,6 @@ class MainActivity : AppCompatActivity() {
     private var translator: com.google.mlkit.nl.translate.Translator? = null
     private var faceDetector: com.google.mlkit.vision.face.FaceDetector? = null
     private var poseDetector: com.google.mlkit.vision.pose.PoseDetector? = null
-    private var objectDetector: com.google.mlkit.vision.objects.ObjectDetector? = null
     private var mlKitReady = false
     private var translatorReady = false
 
@@ -118,27 +115,32 @@ class MainActivity : AppCompatActivity() {
         }
         val total = colorCounts.values.sum()
         if (total == 0) return ""
-        return colorCounts.entries.sortedByDescending { it.value }.take(3).joinToString(", ") {
-            val pct = it.value * 100 / total
-            "${it.key} (${if (pct < 1) 1 else pct}%)"
+        val sb = StringBuilder()
+        for ((name, count) in colorCounts.entries.sortedByDescending { it.value }.take(3)) {
+            val pct = count * 100 / total
+            if (sb.isNotEmpty()) sb.append(", ")
+            sb.append("$name (${if (pct < 1) 1 else pct}%)")
         }
+        return sb.toString()
     }
 
     private fun translateLabel(text: String) = translateMap[text.lowercase()] ?: text
 
     private fun emotionText(face: Face): String {
         val sb = StringBuilder()
-        face.smilingProbability?.let {
-            when { it > 0.8f -> sb.append("Широкая улыбка (${(it*100).toInt()}%)\n"); it > 0.4f -> sb.append("Лёгкая улыбка (${(it*100).toInt()}%)\n"); else -> sb.append("Без улыбки\n") }
+        val sp = face.smilingProbability
+        if (sp != null) {
+            val spPct = (sp * 100).toInt()
+            when { sp > 0.8f -> sb.append("Широкая улыбка ($spPct%)\n"); sp > 0.4f -> sb.append("Лёгкая улыбка ($spPct%)\n"); else -> sb.append("Без улыбки\n") }
         }
-        face.leftEyeOpenProbability?.let { left ->
-            face.rightEyeOpenProbability?.let { right ->
-                val avg = (left + right) / 2f
-                when { avg < 0.3f -> sb.append("Глаза закрыты\n"); avg < 0.7f -> sb.append("Глаза прищурены\n"); else -> sb.append("Глаза открыты\n") }
-            }
+        val le = face.leftEyeOpenProbability; val re = face.rightEyeOpenProbability
+        if (le != null && re != null) {
+            val avg = (le + re) / 2f
+            when { avg < 0.3f -> sb.append("Глаза закрыты\n"); avg < 0.7f -> sb.append("Глаза прищурены\n"); else -> sb.append("Глаза открыты\n") }
         }
-        face.headEulerAngleY?.let {
-            when { it < -15f -> sb.append("Голова влево\n"); it > 15f -> sb.append("Голова вправо\n"); else -> sb.append("Голова прямо\n") }
+        val hy = face.headEulerAngleY
+        if (hy != null) {
+            when { hy < -15f -> sb.append("Голова влево\n"); hy > 15f -> sb.append("Голова вправо\n"); else -> sb.append("Голова прямо\n") }
         }
         return sb.toString()
     }
@@ -201,7 +203,7 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) { Toast.makeText(this, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show() }
     }
 
-    private fun initMlKit() { if (!mlKitReady) try { labeler = ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS); textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS); translator = Translation.getClient(TranslatorOptions.Builder().setSourceLanguage(TranslateLanguage.ENGLISH).setTargetLanguage(TranslateLanguage.RUSSIAN).build()); faceDetector = FaceDetection.getClient(FaceDetectorOptions.Builder().setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST).setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL).setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL).setMinFaceSize(0.15f).build()); poseDetector = PoseDetection.getClient(PoseDetectorOptions.Builder().setDetectorMode(PoseDetectorOptions.SINGLE_IMAGE_MODE).build()); objectDetector = ObjectDetection.getClient(ObjectDetectorOptions.Builder().setDetectorMode(ObjectDetectorOptions.SINGLE_IMAGE_MODE).enableMultipleObjects().enableClassification().build()); mlKitReady = true } catch (e: Exception) { appendChat("[ГЛАЗ] ML Kit: ${e.message}") } }
+    private fun initMlKit() { if (!mlKitReady) try { labeler = ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS); textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS); translator = Translation.getClient(TranslatorOptions.Builder().setSourceLanguage(TranslateLanguage.ENGLISH).setTargetLanguage(TranslateLanguage.RUSSIAN).build()); faceDetector = FaceDetection.getClient(FaceDetectorOptions.Builder().setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST).setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL).setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL).setMinFaceSize(0.15f).build()); poseDetector = PoseDetection.getClient(PoseDetectorOptions.Builder().setDetectorMode(PoseDetectorOptions.SINGLE_IMAGE_MODE).build()); mlKitReady = true } catch (e: Exception) { appendChat("[ГЛАЗ] ML Kit: ${e.message}") } }
 
     private fun learnFace() { try { learnFaceLauncher.launch(Intent(MediaStore.ACTION_IMAGE_CAPTURE)) } catch (e: Exception) { appendChat("[ERROR] ${e.message}") } }
 
@@ -227,9 +229,9 @@ class MainActivity : AppCompatActivity() {
         val factor = 1.5f
         for (i in pixels.indices) {
             val c = pixels[i]
-            val r = (Color.red(c) * factor).toInt(); val rr = if (r < 0) 0 else if (r > 255) 255 else r
-            val g = (Color.green(c) * factor).toInt(); val gg = if (g < 0) 0 else if (g > 255) 255 else g
-            val b = (Color.blue(c) * factor).toInt(); val bb = if (b < 0) 0 else if (b > 255) 255 else b
+            val rr = (Color.red(c) * factor).toInt().coerceIn(0, 255)
+            val gg = (Color.green(c) * factor).toInt().coerceIn(0, 255)
+            val bb = (Color.blue(c) * factor).toInt().coerceIn(0, 255)
             pixels[i] = Color.rgb(rr, gg, bb)
         }
         out.setPixels(pixels, 0, w, 0, 0, w, h)
@@ -251,25 +253,23 @@ class MainActivity : AppCompatActivity() {
             initMlKit(); if (!mlKitReady) { appendChat("[ГЛАЗ] Модуль не загружен."); return }
             setStatus("Анализ...", "yellow")
             val enhanced = enhanceBrightness(bitmap); val inputImage = InputImage.fromBitmap(enhanced, 0)
-            val canvasBitmap = enhanced.copy(Bitmap.Config.ARGB_8888, true); val canvas = Canvas(canvasBitmap)
-            val boxPaint = Paint().apply { color = Color.GREEN; style = Paint.Style.STROKE; strokeWidth = 4f }
-            val labelPaint = Paint().apply { color = Color.GREEN; textSize = 24f; isFakeBoldText = true }
 
-            var facesCount = 0; var poseFound = false; val objectsFound = mutableListOf<String>(); var textFound = false
-            var pendingTasks = 4
+            var facesCount = 0; var poseFound = false; val labelResults = mutableListOf<String>(); var textFound = false
+            var pendingTasks = 3
 
-            fun checkDone() { pendingTasks--; if (pendingTasks <= 0) { val colors = analyzeColors(enhanced); val scene = buildSceneDescription(facesCount, objectsFound, textFound, colors, poseFound); appendChat("[СЦЕНА] $scene\n[ЦВЕТА] $colors"); setStatus("Готов", "green") } }
+            fun checkDone() { pendingTasks--; if (pendingTasks <= 0) { val colors = analyzeColors(enhanced); val scene = buildSceneDescription(facesCount, labelResults, textFound, colors, poseFound); appendChat("[СЦЕНА] $scene\n[ЦВЕТА] $colors"); setStatus("Готов", "green") } }
 
             faceDetector?.process(inputImage)?.addOnSuccessListener { faces ->
                 facesCount = faces.size
-                if (faces.isNotEmpty()) { val sb = StringBuilder(); for ((i, f) in faces.withIndex()) { if (faces.size > 1) sb.append("Лицо ${i+1}:\n"); sb.append(emotionText(f)); if (knownFaceEmbedding != null) { val d = compareEmbeddings(extractEmbedding(f), knownFaceEmbedding!!); val rawPct = (100.0 - d * 10.0).toInt(); val pct = if (rawPct < 0) 0 else if (rawPct > 100) 100 else rawPct; sb.append(if (d < 3.0f) "Это ${knownFaceName}! ($pct%)\n" else "Неизвестный\n") }; canvas.drawRect(f.boundingBox, boxPaint) }; appendChat("[ЭМОЦИИ] Лиц: ${faces.size}\n$sb") } else appendChat("[ЭМОЦИИ] Лиц нет")
+                if (faces.isNotEmpty()) { val sb = StringBuilder(); for ((i, f) in faces.withIndex()) { if (faces.size > 1) sb.append("Лицо ${i+1}:\n"); sb.append(emotionText(f)); if (knownFaceEmbedding != null) { val d = compareEmbeddings(extractEmbedding(f), knownFaceEmbedding!!); val rawPct = (100.0 - d * 10.0).toInt(); val pct = if (rawPct < 0) 0 else if (rawPct > 100) 100 else rawPct; sb.append(if (d < 3.0f) "Это ${knownFaceName}! ($pct%)\n" else "Неизвестный\n") } }; appendChat("[ЭМОЦИИ] Лиц: ${faces.size}\n$sb") } else appendChat("[ЭМОЦИИ] Лиц нет")
                 checkDone()
             }?.addOnFailureListener { appendChat("[ЭМОЦИИ] Ошибка"); checkDone() }
 
             poseDetector?.process(inputImage)?.addOnSuccessListener { pose -> poseFound = pose != null; appendChat(if (poseFound) "[ПОЗА] Человек обнаружен" else "[ПОЗА] Человек не обнаружен"); checkDone() }?.addOnFailureListener { checkDone() }
 
-            objectDetector?.process(inputImage)?.addOnSuccessListener { objects ->
-                if (objects.isNotEmpty()) { val sb = StringBuilder(); for (obj in objects.take(5)) { obj.labels.firstOrNull()?.let { val name = translateLabel(it.text); objectsFound.add(name); sb.append("$name (${(it.confidence*100).toInt()}%)\n") }; canvas.drawRect(obj.boundingBox, boxPaint); obj.labels.firstOrNull()?.let { canvas.drawText(translateLabel(it.text), obj.boundingBox.left, obj.boundingBox.top - 8, labelPaint) } }; appendChat("[ОБЪЕКТЫ] Найдено: ${objects.size}\n$sb") } else appendChat("[ОБЪЕКТЫ] Не найдены")
+            // Вместо Object Detection — Image Labeling
+            labeler?.process(inputImage)?.addOnSuccessListener { labels ->
+                if (labels.isNotEmpty()) { val sb = StringBuilder(); for (l in labels.take(5)) { val name = translateLabel(l.text); labelResults.add(name); val confPct = (l.confidence * 100).toInt(); sb.append("$name ($confPct%)\n") }; appendChat("[ОБЪЕКТЫ] ${sb.toString().trim()}") } else appendChat("[ОБЪЕКТЫ] Не найдены")
                 checkDone()
             }?.addOnFailureListener { checkDone() }
 
