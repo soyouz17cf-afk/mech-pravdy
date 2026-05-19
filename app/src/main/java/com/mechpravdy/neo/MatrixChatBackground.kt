@@ -17,6 +17,7 @@ class MatrixChatBackground @JvmOverloads constructor(
 
     private val fontSize = 40f
     private val lineHeight = fontSize * 1.1f
+    private val speed = 7f
 
     private val easterEggs = arrayOf(
         "Здравствуй, Нео", "Меч Правды", "Пойдём за белым кроликом",
@@ -32,12 +33,12 @@ class MatrixChatBackground @JvmOverloads constructor(
     private var currentLine = ""
     private var cursorY = 0f
     private var printed = 0
-    private var state = 0
     private var screenH = 0f
+    private var frame = 0
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        this.screenH = h.toFloat()
+        screenH = h.toFloat()
         columns = (w / fontSize).toInt() + 1
         spawnLine()
     }
@@ -51,25 +52,29 @@ class MatrixChatBackground @JvmOverloads constructor(
         } else CharArray(columns) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
         cursorY = screenH + lineHeight
         printed = 0
-        state = 0
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         canvas.drawColor(Color.WHITE)
+        frame++
 
-        when (state) {
-            0 -> {
-                printed += 2
-                if (printed >= currentLine.length) state = 1
-            }
-            1 -> {
-                cursorY -= 7f
-                if (cursorY < -lineHeight) spawnLine()
-            }
+        // Печатаем по 2 символа каждые 2 кадра
+        if (frame % 2 == 0 && printed < currentLine.length) {
+            printed += 2
         }
 
-        for (c in 0 until printed.coerceAtMost(currentLine.length)) {
+        // Двигаем вверх
+        cursorY -= speed
+
+        // Новая строка
+        if (cursorY < -lineHeight) {
+            spawnLine()
+        }
+
+        // Рисуем
+        val limit = printed.coerceAtMost(currentLine.length)
+        for (c in 0 until limit) {
             canvas.drawText(currentLine[c].toString(), c * fontSize, cursorY, paint)
         }
         postInvalidateDelayed(60)
