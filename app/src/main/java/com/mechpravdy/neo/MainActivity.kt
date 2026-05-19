@@ -1,7 +1,6 @@
 package com.mechpravdy.neo
 
 import android.app.AlertDialog
-import android.app.PictureInPictureModeParams
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -149,9 +148,7 @@ class MainActivity : AppCompatActivity() {
             matrixHeader.onNeoClick = { switchToNeo() }
             matrixHeader.onLocalClick = { switchToLocal() }
             matrixHeader.setOnTouchListener { _, event ->
-                if (event.action == MotionEvent.ACTION_DOWN) {
-                    matrixHeader.handleTouch(event.x, event.y)
-                }
+                if (event.action == MotionEvent.ACTION_DOWN) { matrixHeader.handleTouch(event.x, event.y) }
                 true
             }
 
@@ -189,7 +186,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun enterPipMode() {
-        try { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) { enterPictureInPictureMode(PictureInPictureModeParams.Builder().build()) } }
+        try { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) { enterPictureInPictureMode(android.app.PictureInPictureParams.Builder().build()) } }
         catch (e: Exception) { Toast.makeText(this, "Режим ОКНО не поддерживается", Toast.LENGTH_SHORT).show() }
     }
 
@@ -226,7 +223,18 @@ class MainActivity : AppCompatActivity() {
 
     private fun safeCamera() { try { initMlKit(); captureSinglePhoto() } catch (e: Exception) { appendChat("[ERROR] Камера: ${e.message}") } }
 
-    private fun initMlKit() { if (!mlKitReady) try { labeler = ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS); textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS); translator = Translation.getClient(TranslatorOptions.Builder().setSourceLanguage(TranslateLanguage.ENGLISH).setTargetLanguage(TranslateLanguage.RUSSIAN).build()); faceDetector = FaceDetection.getClient(FaceDetectorOptions.Builder().setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST).setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL).setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL).setMinFaceSize(0.15f).build()); poseDetector = PoseDetection.getClient(PoseDetectorOptions.Builder().setDetectorMode(PoseDetectorOptions.SINGLE_IMAGE_MODE).build()); mlKitReady = true } catch (e: Exception) { appendChat("[ГЛАЗ] ML Kit: ${e.message}") } }
+    private fun initMlKit() {
+        if (mlKitReady) return
+        try {
+            labeler = ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS)
+            textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+            translator = Translation.getClient(TranslatorOptions.Builder().setSourceLanguage(TranslateLanguage.ENGLISH).setTargetLanguage(TranslateLanguage.RUSSIAN).build())
+            faceDetector = FaceDetection.getClient(FaceDetectorOptions.Builder().setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST).setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL).setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL).setMinFaceSize(0.15f).build())
+            poseDetector = PoseDetection.getClient(PoseDetectorOptions.Builder().setDetectorMode(PoseDetectorOptions.SINGLE_IMAGE_MODE).build())
+            mlKitReady = true
+        } catch (e: Exception) { appendChat("[ГЛАЗ] ML Kit: ${e.message}") }
+    }
+
     private fun downloadTranslationModel() { if (translatorReady) return; appendChat("[ПЕРЕВОДЧИК] Скачиваю..."); translator?.downloadModelIfNeeded(DownloadConditions.Builder().requireWifi().build())?.addOnSuccessListener { translatorReady = true; appendChat("[ПЕРЕВОДЧИК] Готов.") }?.addOnFailureListener { appendChat("[ПЕРЕВОДЧИК] Ошибка.") } }
     private fun setStatus(text: String, color: String) = runOnUiThread { try { statusText.text = text; statusDot.setBackgroundResource(when(color){"green"->R.drawable.status_dot_green;"yellow"->R.drawable.status_dot_yellow;"red"->R.drawable.status_dot_red;else->R.drawable.status_dot_gray}) } catch (_: Exception) {} }
     private fun appendChat(text: String) = runOnUiThread { try { chatOutput.append("\n\n$text") } catch (_: Exception) {} }
