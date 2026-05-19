@@ -19,7 +19,7 @@
         <com.mechpravdy.neo.MatrixHeaderView
             android:id="@+id/matrixHeader"
             android:layout_width="match_parent"
-            android:layout_height="80dp"
+            android:layout_height="100dp"
             android:layout_marginBottom="3dp" />
 
         <com.google.android.material.card.MaterialCardView
@@ -50,7 +50,7 @@
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/generateButton"
                     android:layout_width="wrap_content"
-                    android:layout_height="32dp"
+                    android:layout_height="36dp"
                     android:text="ТОКЕН"
                     android:textSize="9sp"
                     android:textStyle="bold"
@@ -80,7 +80,7 @@
                 <EditText
                     android:id="@+id/tokenInput"
                     android:layout_width="match_parent"
-                    android:layout_height="32dp"
+                    android:layout_height="36dp"
                     android:hint="Access Token"
                     android:inputType="text"
                     android:textSize="10sp"
@@ -102,7 +102,7 @@
                     <EditText
                         android:id="@+id/messageInput"
                         android:layout_width="0dp"
-                        android:layout_height="32dp"
+                        android:layout_height="36dp"
                         android:layout_weight="1"
                         android:hint="Общение с ИИ..."
                         android:inputType="text"
@@ -111,11 +111,11 @@
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/voiceButton"
-                        android:layout_width="32dp"
-                        android:layout_height="32dp"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
                         android:text="🎤"
                         android:textSize="14sp"
-                        app:cornerRadius="16dp"
+                        app:cornerRadius="18dp"
                         android:backgroundTint="#21A038"
                         android:textColor="#FFFFFF"
                         android:layout_marginStart="3dp"
@@ -124,43 +124,7 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Режимы НЕО и ЛОКАЛЬ -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center"
-            android:layout_marginBottom="3dp">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/neoModeButton"
-                android:layout_width="0dp"
-                android:layout_height="28dp"
-                android:layout_weight="1"
-                android:text="НЕО"
-                android:textSize="7sp"
-                android:textStyle="bold"
-                app:cornerRadius="3dp"
-                android:backgroundTint="#21A038"
-                android:textColor="#FFFFFF"
-                android:layout_marginEnd="1dp" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/localModeButton"
-                android:layout_width="0dp"
-                android:layout_height="28dp"
-                android:layout_weight="1"
-                android:text="ЛОКАЛЬ"
-                android:textSize="7sp"
-                android:textStyle="bold"
-                app:cornerRadius="3dp"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:textColor="#888888"
-                app:strokeColor="#888888"
-                android:layout_marginStart="1dp" />
-        </LinearLayout>
-
-        <!-- Основные кнопки -->
+        <!-- Основные кнопки — все 36dp -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -171,10 +135,10 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/sendButton"
                 android:layout_width="0dp"
-                android:layout_height="28dp"
+                android:layout_height="36dp"
                 android:layout_weight="1"
                 android:text="ОТПРАВИТЬ"
-                android:textSize="4sp"
+                android:textSize="6sp"
                 android:textStyle="bold"
                 app:cornerRadius="3dp"
                 android:backgroundTint="#21A038"
@@ -184,10 +148,10 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/cameraButton"
                 android:layout_width="0dp"
-                android:layout_height="28dp"
+                android:layout_height="36dp"
                 android:layout_weight="1"
                 android:text="СМОТРЕТЬ"
-                android:textSize="4sp"
+                android:textSize="6sp"
                 android:textStyle="bold"
                 app:cornerRadius="3dp"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
@@ -199,10 +163,10 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/checkButton"
                 android:layout_width="0dp"
-                android:layout_height="28dp"
+                android:layout_height="36dp"
                 android:layout_weight="1"
                 android:text="ПРОВЕРИТЬ"
-                android:textSize="4sp"
+                android:textSize="6sp"
                 android:textStyle="bold"
                 app:cornerRadius="3dp"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
@@ -214,23 +178,24 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/capsuleButton"
                 android:layout_width="0dp"
-                android:layout_height="28dp"
+                android:layout_height="36dp"
                 android:layout_weight="1"
                 android:text="КАПСУЛА"
-                android:textSize="4sp"
+                android:textSize="6sp"
                 android:textStyle="bold"
                 app:cornerRadius="3dp"
                 android:backgroundTint="#21A038"
                 android:textColor="#FFFFFF"
-                android:layout_marginStart="1dp" />
+                android:layout_marginStart="1dp"
+                android:layout_marginEnd="1dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/pipButton"
                 android:layout_width="0dp"
-                android:layout_height="28dp"
+                android:layout_height="36dp"
                 android:layout_weight="1"
                 android:text="ОКНО"
-                android:textSize="4sp"
+                android:textSize="6sp"
                 android:textStyle="bold"
                 app:cornerRadius="3dp"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
