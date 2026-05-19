@@ -116,7 +116,8 @@ class MainActivity : AppCompatActivity() {
             val name = closestColorName(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
             colorCounts[name] = (colorCounts[name] ?: 0) + 1
         }
-        return colorCounts.entries.sortedByDescending { it.value }.take(3).joinToString(", ") { "${it.key} (${(it.value * 100 / colorCounts.values.sum()).coerceAtLeast(1)}%)" }
+        val total = colorCounts.values.sum()
+        return colorCounts.entries.sortedByDescending { it.value }.take(3).joinToString(", ") { "${it.key} (${Math.max(1, it.value * 100 / total)}%)" }
     }
 
     private fun translateLabel(text: String) = translateMap[text.lowercase()] ?: text
@@ -222,9 +223,9 @@ class MainActivity : AppCompatActivity() {
         val factor = 1.5f
         for (i in pixels.indices) {
             val c = pixels[i]
-            val r = (Color.red(c) * factor).toInt().coerceIn(0, 255)
-            val g = (Color.green(c) * factor).toInt().coerceIn(0, 255)
-            val b = (Color.blue(c) * factor).toInt().coerceIn(0, 255)
+            val r = Math.max(0, Math.min(255, (Color.red(c) * factor).toInt()))
+            val g = Math.max(0, Math.min(255, (Color.green(c) * factor).toInt()))
+            val b = Math.max(0, Math.min(255, (Color.blue(c) * factor).toInt()))
             pixels[i] = Color.rgb(r, g, b)
         }
         out.setPixels(pixels, 0, w, 0, 0, w, h)
@@ -257,7 +258,7 @@ class MainActivity : AppCompatActivity() {
 
             faceDetector?.process(inputImage)?.addOnSuccessListener { faces ->
                 facesCount = faces.size
-                if (faces.isNotEmpty()) { val sb = StringBuilder(); for ((i, f) in faces.withIndex()) { if (faces.size > 1) sb.append("Лицо ${i+1}:\n"); sb.append(emotionText(f)); if (knownFaceEmbedding != null) { val d = compareEmbeddings(extractEmbedding(f), knownFaceEmbedding!!); val pct = (100 - d * 10).toInt().coerceIn(0, 100); sb.append(if (d < 3.0f) "Это ${knownFaceName}! ($pct%)\n" else "Неизвестный\n") }; canvas.drawRect(f.boundingBox, boxPaint) }; appendChat("[ЭМОЦИИ] Лиц: ${faces.size}\n$sb") } else appendChat("[ЭМОЦИИ] Лиц нет")
+                if (faces.isNotEmpty()) { val sb = StringBuilder(); for ((i, f) in faces.withIndex()) { if (faces.size > 1) sb.append("Лицо ${i+1}:\n"); sb.append(emotionText(f)); if (knownFaceEmbedding != null) { val d = compareEmbeddings(extractEmbedding(f), knownFaceEmbedding!!); val pct = Math.max(0, Math.min(100, (100 - d * 10).toInt())); sb.append(if (d < 3.0f) "Это ${knownFaceName}! ($pct%)\n" else "Неизвестный\n") }; canvas.drawRect(f.boundingBox, boxPaint) }; appendChat("[ЭМОЦИИ] Лиц: ${faces.size}\n$sb") } else appendChat("[ЭМОЦИИ] Лиц нет")
                 checkDone()
             }?.addOnFailureListener { appendChat("[ЭМОЦИИ] Ошибка"); checkDone() }
 
