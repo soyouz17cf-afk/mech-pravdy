@@ -257,7 +257,7 @@ class MainActivity : AppCompatActivity() {
 
             faceDetector?.process(inputImage)?.addOnSuccessListener { faces ->
                 facesCount = faces.size
-                if (faces.isNotEmpty()) { val sb = StringBuilder(); for ((i, f) in faces.withIndex()) { if (faces.size > 1) sb.append("Лицо ${i+1}:\n"); sb.append(emotionText(f)); if (knownFaceEmbedding != null) { val d = compareEmbeddings(extractEmbedding(f), knownFaceEmbedding!!); sb.append(if (d < 3.0f) "Это ${knownFaceName}! (${(100-d*10).toInt().coerceIn(0,100)}%)\n" else "Неизвестный\n") }; canvas.drawRect(f.boundingBox, boxPaint) }; appendChat("[ЭМОЦИИ] Лиц: ${faces.size}\n$sb") } else appendChat("[ЭМОЦИИ] Лиц нет")
+                if (faces.isNotEmpty()) { val sb = StringBuilder(); for ((i, f) in faces.withIndex()) { if (faces.size > 1) sb.append("Лицо ${i+1}:\n"); sb.append(emotionText(f)); if (knownFaceEmbedding != null) { val d = compareEmbeddings(extractEmbedding(f), knownFaceEmbedding!!); val pct = (100 - d * 10).toInt().coerceIn(0, 100); sb.append(if (d < 3.0f) "Это ${knownFaceName}! ($pct%)\n" else "Неизвестный\n") }; canvas.drawRect(f.boundingBox, boxPaint) }; appendChat("[ЭМОЦИИ] Лиц: ${faces.size}\n$sb") } else appendChat("[ЭМОЦИИ] Лиц нет")
                 checkDone()
             }?.addOnFailureListener { appendChat("[ЭМОЦИИ] Ошибка"); checkDone() }
 
