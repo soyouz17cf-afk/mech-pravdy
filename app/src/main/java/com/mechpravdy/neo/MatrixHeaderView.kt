@@ -30,20 +30,20 @@ class MatrixHeaderView @JvmOverloads constructor(
     private val titlePaint = Paint().apply {
         color = Color.parseColor("#21A038")
         textSize = 88f
-        typeface = Typeface.DEFAULT_BOLD
+        typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
         isAntiAlias = true
         textAlign = Paint.Align.CENTER
-        isFakeBoldText = true
     }
     private val subtitlePaint = Paint().apply {
         color = Color.parseColor("#555555")
         textSize = 32f
-        typeface = Typeface.DEFAULT
+        typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
         isAntiAlias = true
         textAlign = Paint.Align.CENTER
     }
     private val bgPaint = Paint().apply { color = Color.WHITE }
-    private val logoBgPaint = Paint().apply { color = Color.parseColor("#EEFFFFFF") }
+    // Легкий зеленоватый фон для плашки логотипа
+    private val logoBgPaint = Paint().apply { color = Color.parseColor("#F0FFF0") }
     private val logoBorderPaint = Paint().apply {
         color = Color.parseColor("#21A038")
         style = Paint.Style.STROKE
@@ -53,15 +53,12 @@ class MatrixHeaderView @JvmOverloads constructor(
 
     private var columns = 0
     private var rows = 0
-    // Массив строк: каждая строка знает, сколько символов уже "напечатано"
     private lateinit var lines: Array<CharArray>
     private lateinit var lineY: FloatArray
     private lateinit var speeds: FloatArray
-    // Сколько символов уже видно в каждой строке (эффект печати)
     private lateinit var printedCount: IntArray
     private var frame = 0
 
-    // Границы закруглённого прямоугольника вокруг текста
     private var logoRect = RectF()
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -90,11 +87,9 @@ class MatrixHeaderView @JvmOverloads constructor(
 
         canvas.drawRect(0f, 0f, w, h, bgPaint)
 
-        // Двигаем строки вверх
         for (r in 0 until rows) {
             lineY[r] -= speeds[r]
             if (lineY[r] < -lineHeight) {
-                // Строка ушла за верх — сбрасываем вниз
                 lineY[r] = h + lineHeight
                 for (c in 0 until columns) {
                     lines[r][c] = if (Random.nextFloat() > 0.5f) '0' else '1'
@@ -104,7 +99,6 @@ class MatrixHeaderView @JvmOverloads constructor(
             }
         }
 
-        // Эффект печати: каждые 3 кадра увеличиваем счётчик напечатанных символов
         if (frame % 3 == 0) {
             for (r in 0 until rows) {
                 if (printedCount[r] < columns) {
@@ -113,25 +107,19 @@ class MatrixHeaderView @JvmOverloads constructor(
             }
         }
 
-        // Рисуем строки
         for (r in 0 until rows) {
             val y = lineY[r]
             if (y > h || y < -lineHeight) continue
 
             for (c in 0 until columns) {
-                // Рисуем только "напечатанные" символы
                 if (c >= printedCount[r]) continue
-
                 val x = c * fontSize
-
-                // Пропускаем зону логотипа
                 if (x >= logoRect.left && x <= logoRect.right && y >= logoRect.top && y <= logoRect.bottom) continue
-
                 canvas.drawText(lines[r][c].toString(), x, y, matrixPaint)
             }
         }
 
-        // Закруглённый прямоугольник позади текста
+        // Закруглённый прямоугольник с зеленоватым фоном
         canvas.drawRoundRect(logoRect, 20f, 20f, logoBgPaint)
         canvas.drawRoundRect(logoRect, 20f, 20f, logoBorderPaint)
 
