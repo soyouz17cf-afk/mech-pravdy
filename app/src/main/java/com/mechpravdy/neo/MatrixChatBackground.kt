@@ -30,21 +30,20 @@ class MatrixChatBackground @JvmOverloads constructor(
     private val bgPaint = Paint().apply { color = Color.WHITE }
 
     private var columns = 0
-    // 5 строк для заполнения экрана
-    private val lines = arrayOfNulls<String>(5)
-    private val lineY = FloatArray(5)
-    private val printedCount = IntArray(5)
-    private val isPrinting = BooleanArray(5) { true }
+    private var maxRows = 0
+    private lateinit var lines: Array<String>
+    private lateinit var lineY: FloatArray
+    private lateinit var printedCount: IntArray
+    private lateinit var speeds: FloatArray
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         columns = (w / fontSize).toInt() + 1
-        for (i in 0 until 5) {
-            lines[i] = generateLine()
-            lineY[i] = h + i * lineHeight
-            printedCount[i] = 0
-            isPrinting[i] = true
-        }
+        maxRows = (h / lineHeight).toInt() + 2
+        lines = Array(maxRows) { generateLine() }
+        lineY = FloatArray(maxRows) { i -> h + i * lineHeight }
+        printedCount = IntArray(maxRows) { 0 }
+        speeds = FloatArray(maxRows) { 0.6f + Random.nextFloat() * 0.8f }
     }
 
     private fun generateLine() = if (Random.nextFloat() < 0.15f) {
@@ -61,36 +60,30 @@ class MatrixChatBackground @JvmOverloads constructor(
         val w = width.toFloat(); val h = height.toFloat()
         canvas.drawRect(0f, 0f, w, h, bgPaint)
 
-        // Печатаем самую нижнюю
-        if (isPrinting[0]) {
-            printedCount[0] += 3
-            if (printedCount[0] >= lines[0]!!.length) isPrinting[0] = false
-        }
-
-        // Сдвиг вверх
-        if (!isPrinting[0]) {
-            for (i in 4 downTo 1) {
-                lines[i] = lines[i - 1]
-                lineY[i] = lineY[i - 1]
-                printedCount[i] = printedCount[i - 1]
-                isPrinting[i] = isPrinting[i - 1]
+        for (i in 0 until maxRows) {
+            val speed = speeds[i]
+            val charsToAdd = speed.toInt().coerceAtLeast(1)
+            if (printedCount[i] < lines[i].length) {
+                printedCount[i] = (printedCount[i] + charsToAdd).coerceAtMost(lines[i].length)
             }
-            lines[0] = generateLine()
-            lineY[0] = h + lineHeight
-            printedCount[0] = 0
-            isPrinting[0] = true
+            lineY[i] -= speed
+
+            if (lineY[i] < -lineHeight && printedCount[i] >= lines[i].length) {
+                lines[i] = generateLine()
+                lineY[i] = h + lineHeight
+                printedCount[i] = 0
+                speeds[i] = 0.6f + Random.nextFloat() * 0.8f
+            }
         }
 
-        // Рисуем
-        for (i in 0 until 5) {
-            val line = lines[i] ?: continue
+        for (i in 0 until maxRows) {
             val y = lineY[i]
             if (y > h + lineHeight || y < -lineHeight) continue
             paint.alpha = 45
-            val limit = printedCount[i].coerceAtMost(line.length)
+            val limit = printedCount[i].coerceAtMost(lines[i].length)
             for (c in 0 until limit) {
                 val x = c * fontSize
-                canvas.drawText(line[c].toString(), x, y, paint)
+                canvas.drawText(lines[i][c].toString(), x, y, paint)
             }
         }
         postInvalidateDelayed(60)
