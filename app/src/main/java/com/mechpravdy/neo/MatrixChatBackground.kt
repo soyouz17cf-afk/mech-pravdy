@@ -15,7 +15,7 @@ class MatrixChatBackground @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
-    private val fontSize = 18f
+    private val fontSize = 20f
     private val lineHeight = fontSize * 1.2f
 
     private val paint = Paint().apply {
@@ -63,7 +63,6 @@ class MatrixChatBackground @JvmOverloads constructor(
             }
         }
 
-        // Эффект печати: каждые 4 кадра добавляем символ
         if (frame % 4 == 0) {
             for (r in 0 until rows) {
                 if (printedCount[r] < columns) {
