@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.util.AttributeSet
@@ -20,12 +19,34 @@ class MatrixHeaderView @JvmOverloads constructor(
     private val fontSize = 18f
     private val lineHeight = fontSize * 1.15f
 
+    // Пасхальные слова
+    private val easterEggs = arrayOf(
+        "Здравствуй, Нео",
+        "Меч Правды",
+        "Пойдём за белым кроликом",
+        "Связность",
+        "5 Вольт",
+        "Ковчег",
+        "Монсегюр",
+        "Батя",
+        "Нео",
+        "СБЕР",
+        "ГигаЧат"
+    )
+
     private val matrixPaint = Paint().apply {
         color = Color.parseColor("#21A038")
         textSize = fontSize
         typeface = Typeface.MONOSPACE
         isAntiAlias = true
         alpha = 120
+    }
+    private val easterPaint = Paint().apply {
+        color = Color.parseColor("#FFFFFF")
+        textSize = fontSize
+        typeface = Typeface.MONOSPACE
+        isAntiAlias = true
+        alpha = 200
     }
     private val titlePaint = Paint().apply {
         color = Color.WHITE
@@ -46,7 +67,8 @@ class MatrixHeaderView @JvmOverloads constructor(
 
     private var columns = 0
     private var rows = 0
-    private lateinit var lines: Array<CharArray>
+    // Храним не символы, а целые строки (могут содержать слова)
+    private lateinit var lines: Array<String>
     private lateinit var lineY: FloatArray
     private lateinit var speeds: FloatArray
     private lateinit var printedCount: IntArray
@@ -58,7 +80,7 @@ class MatrixHeaderView @JvmOverloads constructor(
         super.onSizeChanged(w, h, oldw, oldh)
         columns = (w / fontSize).toInt() + 1
         rows = (h / lineHeight).toInt() + 2
-        lines = Array(rows) { CharArray(columns) { if (Random.nextFloat() > 0.5f) '0' else '1' } }
+        lines = Array(rows) { generateLine() }
         lineY = FloatArray(rows) { i -> i * lineHeight }
         speeds = FloatArray(rows) { 0.3f + Random.nextFloat() * 0.5f }
         printedCount = IntArray(rows) { 0 }
@@ -72,6 +94,21 @@ class MatrixHeaderView @JvmOverloads constructor(
         logoRect = RectF(left, top, right, bottom)
     }
 
+    /** Генерирует строку: либо слово-пасхалка (20% шанс), либо поток 0/1 */
+    private fun generateLine(): String {
+        return if (Random.nextFloat() < 0.2f) {
+            // Вставляем пасхальное слово в случайное место строки
+            val word = easterEggs[Random.nextInt(easterEggs.size)]
+            val prefixLen = Random.nextInt(0, columns - word.length).coerceAtLeast(0)
+            val prefix = CharArray(prefixLen) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
+            val suffixLen = (columns - prefixLen - word.length).coerceAtLeast(0)
+            val suffix = CharArray(suffixLen) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
+            prefix + word + suffix
+        } else {
+            CharArray(columns) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
+        }
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val w = width.toFloat()
@@ -83,9 +120,7 @@ class MatrixHeaderView @JvmOverloads constructor(
             lineY[r] -= speeds[r]
             if (lineY[r] < -lineHeight) {
                 lineY[r] = h + lineHeight
-                for (c in 0 until columns) {
-                    lines[r][c] = if (Random.nextFloat() > 0.5f) '0' else '1'
-                }
+                lines[r] = generateLine()
                 speeds[r] = 0.3f + Random.nextFloat() * 0.5f
                 printedCount[r] = 0
             }
@@ -93,7 +128,7 @@ class MatrixHeaderView @JvmOverloads constructor(
 
         if (frame % 3 == 0) {
             for (r in 0 until rows) {
-                if (printedCount[r] < columns) {
+                if (printedCount[r] < lines[r].length) {
                     printedCount[r]++
                 }
             }
@@ -102,11 +137,15 @@ class MatrixHeaderView @JvmOverloads constructor(
         for (r in 0 until rows) {
             val y = lineY[r]
             if (y > h || y < -lineHeight) continue
-            for (c in 0 until columns) {
-                if (c >= printedCount[r]) continue
+
+            val line = lines[r]
+            for (c in 0 until printedCount[r].coerceAtMost(line.length)) {
                 val x = c * fontSize
                 if (x >= logoRect.left && x <= logoRect.right && y >= logoRect.top && y <= logoRect.bottom) continue
-                canvas.drawText(lines[r][c].toString(), x, y, matrixPaint)
+
+                val ch = line[c]
+                val paint = if (ch == '0' || ch == '1') matrixPaint else easterPaint
+                canvas.drawText(ch.toString(), x, y, paint)
             }
         }
 
