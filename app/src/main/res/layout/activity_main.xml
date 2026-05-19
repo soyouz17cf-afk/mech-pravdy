@@ -3,16 +3,17 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#21A038"
-    android:padding="6dp">
+    android:background="#F5F7FA"
+    android:padding="8dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
         android:background="#FFFFFF"
-        android:padding="4dp"
-        android:layout_margin="3dp"
+        android:padding="6dp"
+        android:layout_margin="4dp"
+        android:outlineProvider="background"
         android:elevation="8dp">
 
         <com.mechpravdy.neo.MatrixHeaderView
@@ -223,14 +224,13 @@
             <ScrollView
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:padding="6dp"
-                android:background="@android:color/transparent">
+                android:padding="6dp">
 
                 <TextView
                     android:id="@+id/chatOutput"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Mech Pravdy v1.0\nPowered by GigaChat API\n\nВставьте Authorization Key и нажмите «ТОКЕН».\nЗатем напишите «Связность» или нажмите 🎤."
+                    android:text="Mech Pravdy v1.0\nPowered by GigaChat API\n\nВставьте Authorization Key и нажмите «ТОКЕН».\nЗатем начните диалог с ИИ или нажмите 🎤."
                     android:textSize="11sp"
                     android:textColor="#1A1A1A"
                     android:fontFamily="monospace"
