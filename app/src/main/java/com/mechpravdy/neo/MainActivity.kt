@@ -23,6 +23,9 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.label.ImageLabeling
+import com.google.mlkit.vision.label.defaults.ImageLabelerOptions
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -54,6 +57,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var statusDot: View
 
+    // ML Kit — локальный анализатор изображений
+    private val labeler = ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS)
+
     private val voiceLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK) {
             val matches = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
@@ -69,12 +75,7 @@ class MainActivity : AppCompatActivity() {
             if (result.resultCode == RESULT_OK) {
                 val imageBitmap = result.data?.extras?.get("data") as? Bitmap
                 if (imageBitmap != null) {
-                    val outputStream = ByteArrayOutputStream()
-                    imageBitmap.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
-                    val byteArray = outputStream.toByteArray()
-                    val base64 = Base64.encodeToString(byteArray, Base64.NO_WRAP)
-                    val token = tokenInput.text.toString().trim()
-                    analyzeImage(base64, token)
+                    analyzeImageLocal(imageBitmap)
                 }
             }
         } catch (e: Exception) {
@@ -277,47 +278,31 @@ System Prompt — алгоритм души.
         }
     }
 
-    private fun analyzeImage(base64Image: String, token: String) {
-        setStatus("Анализ фото...", "yellow")
-        val jsonBody = JsonObject().apply {
-            addProperty("model", "GigaChat:latest")
-            add("messages", JsonArray().apply {
-                add(JsonObject().apply {
-                    addProperty("role", "system")
-                    addProperty("content", "${buildNeoPrompt()}\nТы можешь анализировать изображения. Описывай, что видишь, честно и прямо.")
-                })
-                add(JsonObject().apply {
-                    addProperty("role", "user")
-                    addProperty("content", "data:image/jpeg;base64,$base64Image\nОпиши, что ты видишь на этом фото. Кратко и по делу.")
-                })
-            })
-            addProperty("temperature", 0.7)
-            addProperty("max_tokens", 500)
-        }
-        val request = Request.Builder().url(apiUrl)
-            .header("Content-Type", "application/json")
-            .header("Authorization", "Bearer $token")
-            .post(jsonBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
-            .build()
-        client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                appendChat("[ERROR] ${e.message}")
-                setStatus("Ошибка анализа", "red")
-            }
-            override fun onResponse(call: Call, response: Response) {
-                val responseBody = response.body?.string() ?: ""
-                if (response.isSuccessful) {
-                    val json = gson.fromJson(responseBody, JsonObject::class.java)
-                    val answer = json.getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString
-                    appendChat("[NEO АНАЛИЗ] $answer")
-                    setStatus("Онлайн", "green")
+    /** Локальный анализ фото через ML Kit */
+    private fun analyzeImageLocal(bitmap: Bitmap) {
+        setStatus("Анализ фото (локально)...", "yellow")
+        appendChat("[ГЛАЗ] Анализирую фото локально...")
+
+        val inputImage = InputImage.fromBitmap(bitmap, 0)
+        labeler.process(inputImage)
+            .addOnSuccessListener { labels ->
+                if (labels.isEmpty()) {
+                    appendChat("[ГЛАЗ] Ничего не распознано.")
+                    setStatus("Готов", "green")
                 } else {
-                    appendChat("[ERROR] HTTP ${response.code}: $responseBody")
-                    setStatus("Ошибка", "red")
+                    val result = StringBuilder()
+                    for (label in labels.take(5)) {
+                        val confidence = (label.confidence * 100).toInt()
+                        result.append("${label.text} ($confidence%)\n")
+                    }
+                    appendChat("[ГЛАЗ] Вижу:\n$result")
+                    setStatus("Глаза сработали", "green")
                 }
-                response.close()
             }
-        })
+            .addOnFailureListener { e ->
+                appendChat("[ERROR] Ошибка анализа: ${e.message}")
+                setStatus("Ошибка", "red")
+            }
     }
 
     private fun generateToken() {
