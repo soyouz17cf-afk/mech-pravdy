@@ -44,17 +44,18 @@ class MatrixHeaderView @JvmOverloads constructor(
     private var cursorY = 0f
     private var printed = 0
     private var floatSpeed = 0f
-    private var state = 0 // 0=печать, 1=ползёт вверх
+    private var state = 0
     private var logoRect = RectF()
-    private var h = 0f
+    private var viewH = 0f
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        this.h = h
-        columns = (w / fontSize).toInt() + 1
+        this.viewH = h.toFloat()
+        columns = (w.toFloat() / fontSize).toInt() + 1
         spawnLine()
-        val logoW = w * 0.55f; val logoH = h * 0.75f
-        logoRect = RectF((w - logoW) / 2f, (h - logoH) / 2f, (w + logoW) / 2f, (h + logoH) / 2f)
+        val fw = w.toFloat(); val fh = h.toFloat()
+        val logoW = fw * 0.55f; val logoH = fh * 0.75f
+        logoRect = RectF((fw - logoW) / 2f, (fh - logoH) / 2f, (fw + logoW) / 2f, (fh + logoH) / 2f)
     }
 
     private fun spawnLine() {
@@ -64,7 +65,7 @@ class MatrixHeaderView @JvmOverloads constructor(
             val suf = CharArray((columns - pre.length - w.length).coerceAtLeast(0)) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
             pre + w + suf
         } else CharArray(columns) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
-        cursorY = h + lineHeight
+        cursorY = viewH + lineHeight
         printed = 0
         state = 0
         floatSpeed = 8f + Random.nextFloat() * 6f
@@ -87,7 +88,7 @@ class MatrixHeaderView @JvmOverloads constructor(
         }
 
         for (c in 0 until printed.coerceAtMost(currentLine.length)) {
-            val x = c * fontSize
+            val x = c.toFloat() * fontSize
             if (x >= logoRect.left && x <= logoRect.right && cursorY >= logoRect.top && cursorY <= logoRect.bottom) continue
             canvas.drawText(currentLine[c].toString(), x, cursorY, paint)
         }
