@@ -44,4 +44,6 @@ dependencies {
     implementation 'com.google.mlkit:text-recognition:16.0.1'
     // ML Kit — локальный переводчик
     implementation 'com.google.mlkit:translate:17.0.3'
+    // ML Kit — детектор лиц + эмоции
+    implementation 'com.google.mlkit:face-detection:16.1.7'
 }
