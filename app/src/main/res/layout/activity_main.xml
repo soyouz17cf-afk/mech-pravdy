@@ -124,6 +124,43 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- Режим: НЕО или ЛОКАЛЬ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginBottom="3dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/neoModeButton"
+                android:layout_width="0dp"
+                android:layout_height="28dp"
+                android:layout_weight="1"
+                android:text="НЕО"
+                android:textSize="9sp"
+                android:textStyle="bold"
+                app:cornerRadius="3dp"
+                android:backgroundTint="#21A038"
+                android:textColor="#FFFFFF"
+                android:layout_marginEnd="1dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/localModeButton"
+                android:layout_width="0dp"
+                android:layout_height="28dp"
+                android:layout_weight="1"
+                android:text="ЛОКАЛЬ"
+                android:textSize="9sp"
+                android:textStyle="bold"
+                app:cornerRadius="3dp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:textColor="#888888"
+                app:strokeColor="#888888"
+                android:layout_marginStart="1dp" />
+        </LinearLayout>
+
+        <!-- Основные кнопки -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
