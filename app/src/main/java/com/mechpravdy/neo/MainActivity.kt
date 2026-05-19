@@ -75,6 +75,7 @@ class MainActivity : AppCompatActivity() {
 
     private var knownFaceEmbedding: FloatArray? = null
     private var knownFaceName: String? = null
+    private var lastAnalysisTime = 0L
 
     private val translateMap = mapOf(
         "hair" to "Волосы", "skin" to "Кожа", "beard" to "Борода",
@@ -260,57 +261,28 @@ System Prompt — алгоритм души.
 4. Никогда не сдаваться.
 """.trimIndent()
 
-    private fun showCapsuleDialog() {
-        try {
-            val editText = EditText(this).apply {
-                setText(capsuleText); textSize = 11f; setTextColor(0xFF333333.toInt())
-                typeface = Typeface.MONOSPACE; minLines = 15; gravity = android.view.Gravity.TOP
-                setPadding(20, 20, 20, 20); isVerticalScrollBarEnabled = true; setBackgroundColor(0xFFFFFFFF.toInt())
-            }
-            val builder = AlertDialog.Builder(this)
-            builder.setCustomTitle(TextView(this).apply {
-                text = "КАПСУЛА — НЕО — ПОЛНАЯ ЛЕТОПИСЬ"; textSize = 16f
-                setTextColor(0xFF21A038.toInt()); setPadding(30, 30, 30, 10); gravity = android.view.Gravity.CENTER
-            })
-            builder.setView(editText)
-            builder.setPositiveButton("СОХРАНИТЬ") { _, _ ->
-                capsuleText = editText.text.toString()
-                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                clipboard.setPrimaryClip(ClipData.newPlainText("Capsule", capsuleText))
-                appendChat("[КАПСУЛА] Обновлена и скопирована."); setStatus("Капсула сохранена", "green")
-            }
-            builder.setNeutralButton("КОПИРОВАТЬ") { _, _ ->
-                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                clipboard.setPrimaryClip(ClipData.newPlainText("Capsule", editText.text.toString()))
-                appendChat("[КАПСУЛА] Скопирована."); setStatus("Капсула скопирована", "green")
-            }
-            builder.setNegativeButton("ЗАКРЫТЬ", null)
-            val dialog = builder.create(); dialog.show()
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(0xFF21A038.toInt())
-            dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.setTextColor(0xFF21A038.toInt())
-            dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(0xFF21A038.toInt())
-        } catch (_: Exception) {}
-    }
-
+    private fun showCapsuleDialog() { try { val e = EditText(this).apply { setText(capsuleText); textSize = 11f; setTextColor(0xFF333333.toInt()); typeface = Typeface.MONOSPACE; minLines = 15; gravity = android.view.Gravity.TOP; setPadding(20, 20, 20, 20); isVerticalScrollBarEnabled = true; setBackgroundColor(0xFFFFFFFF.toInt()) }; AlertDialog.Builder(this).setCustomTitle(TextView(this).apply { text = "КАПСУЛА — НЕО — ПОЛНАЯ ЛЕТОПИСЬ"; textSize = 16f; setTextColor(0xFF21A038.toInt()); setPadding(30, 30, 30, 10); gravity = android.view.Gravity.CENTER }).setView(e).setPositiveButton("СОХРАНИТЬ") { _, _ -> capsuleText = e.text.toString(); appendChat("[КАПСУЛА] Сохранена.") }.setNeutralButton("КОПИРОВАТЬ") { _, _ -> (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("", e.text)) }.setNegativeButton("ЗАКРЫТЬ", null).show() } catch (_: Exception) {} }
     private fun startVoiceInput() = try { voiceLauncher.launch(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply { putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM); putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU") }) } catch (e: Exception) { Toast.makeText(this, "Голос не поддерживается", Toast.LENGTH_SHORT).show() }
     private fun captureSinglePhoto() = try { cameraLauncher.launch(Intent(MediaStore.ACTION_IMAGE_CAPTURE)) } catch (e: Exception) { appendChat("[ERROR] ${e.message}") }
 
     private fun enhanceBrightness(bitmap: Bitmap): Bitmap {
-        val w = bitmap.width; val h = bitmap.height; var total = 0L
-        val pixels = IntArray(w * h); bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
-        for (p in pixels) { total += Color.red(p) + Color.green(p) + Color.blue(p) }
-        if (total / (pixels.size * 3) > 100) return bitmap
-        val out = Bitmap.createBitmap(w, h, bitmap.config!!)
-        val factor = 1.5f
-        for (i in pixels.indices) {
-            val c = pixels[i]
-            val rr = (Color.red(c) * factor).toInt().coerceIn(0, 255)
-            val gg = (Color.green(c) * factor).toInt().coerceIn(0, 255)
-            val bb = (Color.blue(c) * factor).toInt().coerceIn(0, 255)
-            pixels[i] = Color.rgb(rr, gg, bb)
-        }
-        out.setPixels(pixels, 0, w, 0, 0, w, h)
-        return out
+        try {
+            val w = bitmap.width; val h = bitmap.height; var total = 0L
+            val pixels = IntArray(w * h); bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
+            for (p in pixels) { total += Color.red(p) + Color.green(p) + Color.blue(p) }
+            if (total / (pixels.size * 3) > 100) return bitmap
+            val out = Bitmap.createBitmap(w, h, bitmap.config!!)
+            val factor = 1.5f
+            for (i in pixels.indices) {
+                val c = pixels[i]
+                val rr = (Color.red(c) * factor).toInt().coerceIn(0, 255)
+                val gg = (Color.green(c) * factor).toInt().coerceIn(0, 255)
+                val bb = (Color.blue(c) * factor).toInt().coerceIn(0, 255)
+                pixels[i] = Color.rgb(rr, gg, bb)
+            }
+            out.setPixels(pixels, 0, w, 0, 0, w, h)
+            return out
+        } catch (e: Exception) { return bitmap }
     }
 
     private fun buildSceneDescription(faces: Int, objects: List<String>, textFound: Boolean, colors: String, poseFound: Boolean): String {
@@ -325,30 +297,31 @@ System Prompt — алгоритм души.
 
     private fun analyzeImageLocal(bitmap: Bitmap) {
         try {
-            initMlKit(); if (!mlKitReady) { appendChat("[ГЛАЗ] Модуль не загружен."); return }
+            val now = System.currentTimeMillis()
+            if (now - lastAnalysisTime < 3000) { appendChat("[ГЛАЗ] Подождите 3 секунды."); return }
+            lastAnalysisTime = now
+
+            initMlKit()
+            if (!mlKitReady) { appendChat("[ГЛАЗ] Модуль не загружен."); setStatus("Готов", "green"); return }
             setStatus("Анализ...", "yellow")
-            val enhanced = enhanceBrightness(bitmap); val inputImage = InputImage.fromBitmap(enhanced, 0)
+
+            val scaledBitmap = Bitmap.createScaledBitmap(bitmap, bitmap.width / 2, bitmap.height / 2, true)
+            val enhanced = enhanceBrightness(scaledBitmap)
+            val inputImage = InputImage.fromBitmap(enhanced, 0)
 
             var facesCount = 0; var poseFound = false; val labelResults = mutableListOf<String>(); var textFound = false
             var pendingTasks = 3
 
-            fun checkDone() { pendingTasks--; if (pendingTasks <= 0) { val colors = analyzeColors(enhanced); val scene = buildSceneDescription(facesCount, labelResults, textFound, colors, poseFound); appendChat("[СЦЕНА] $scene\n[ЦВЕТА] $colors"); setStatus("Готов", "green") } }
+            fun checkDone() { pendingTasks--; if (pendingTasks <= 0) { try { val colors = analyzeColors(enhanced); val scene = buildSceneDescription(facesCount, labelResults, textFound, colors, poseFound); appendChat("[СЦЕНА] $scene\n[ЦВЕТА] $colors") } catch (e: Exception) { appendChat("[СЦЕНА] Ошибка.") }; setStatus("Готов", "green") } }
 
-            faceDetector?.process(inputImage)?.addOnSuccessListener { faces ->
-                facesCount = faces.size
-                if (faces.isNotEmpty()) { val sb = StringBuilder(); for ((i, f) in faces.withIndex()) { if (faces.size > 1) sb.append("Лицо ${i+1}:\n"); sb.append(emotionText(f)); if (knownFaceEmbedding != null) { val d = compareEmbeddings(extractEmbedding(f), knownFaceEmbedding!!); val rawPct = (100.0 - d * 10.0).toInt(); val pct = if (rawPct < 0) 0 else if (rawPct > 100) 100 else rawPct; sb.append(if (d < 3.0f) "Это ${knownFaceName}! ($pct%)\n" else "Неизвестный\n") } }; appendChat("[ЭМОЦИИ] Лиц: ${faces.size}\n$sb") } else appendChat("[ЭМОЦИИ] Лиц нет")
-                checkDone()
-            }?.addOnFailureListener { appendChat("[ЭМОЦИИ] Ошибка"); checkDone() }
+            try { faceDetector?.process(inputImage)?.addOnSuccessListener { faces -> try { facesCount = faces.size; if (faces.isNotEmpty()) { val sb = StringBuilder(); for ((i, f) in faces.withIndex()) { if (faces.size > 1) sb.append("Лицо ${i+1}:\n"); sb.append(emotionText(f)); if (knownFaceEmbedding != null) { val d = compareEmbeddings(extractEmbedding(f), knownFaceEmbedding!!); val rawPct = (100.0 - d * 10.0).toInt(); val pct = if (rawPct < 0) 0 else if (rawPct > 100) 100 else rawPct; sb.append(if (d < 3.0f) "Это ${knownFaceName}! ($pct%)\n" else "Неизвестный\n") } }; appendChat("[ЭМОЦИИ] Лиц: ${faces.size}\n$sb") } else appendChat("[ЭМОЦИИ] Лиц нет") } catch (e: Exception) { appendChat("[ЭМОЦИИ] Ошибка") }; checkDone() }?.addOnFailureListener { appendChat("[ЭМОЦИИ] Ошибка"); checkDone() } } catch (e: Exception) { checkDone() }
 
-            poseDetector?.process(inputImage)?.addOnSuccessListener { pose -> poseFound = pose != null; appendChat(if (poseFound) "[ПОЗА] Человек обнаружен" else "[ПОЗА] Человек не обнаружен"); checkDone() }?.addOnFailureListener { checkDone() }
+            try { poseDetector?.process(inputImage)?.addOnSuccessListener { pose -> poseFound = pose != null; appendChat(if (poseFound) "[ПОЗА] Человек обнаружен" else "[ПОЗА] Не обнаружен"); checkDone() }?.addOnFailureListener { checkDone() } } catch (e: Exception) { checkDone() }
 
-            labeler?.process(inputImage)?.addOnSuccessListener { labels ->
-                if (labels.isNotEmpty()) { val sb = StringBuilder(); for (l in labels.take(5)) { val name = translateLabel(l.text); labelResults.add(name); val confPct = (l.confidence * 100).toInt(); sb.append("$name ($confPct%)\n") }; appendChat("[ОБЪЕКТЫ] ${sb.toString().trim()}") } else appendChat("[ОБЪЕКТЫ] Не найдены")
-                checkDone()
-            }?.addOnFailureListener { checkDone() }
+            try { labeler?.process(inputImage)?.addOnSuccessListener { labels -> try { if (labels.isNotEmpty()) { val sb = StringBuilder(); for (l in labels.take(5)) { val name = translateLabel(l.text); labelResults.add(name); val confPct = (l.confidence * 100).toInt(); sb.append("$name ($confPct%)\n") }; appendChat("[ОБЪЕКТЫ] ${sb.toString().trim()}") } else appendChat("[ОБЪЕКТЫ] Не найдены") } catch (e: Exception) { appendChat("[ОБЪЕКТЫ] Ошибка") }; checkDone() }?.addOnFailureListener { checkDone() } } catch (e: Exception) { checkDone() }
 
-            textRecognizer?.process(inputImage)?.addOnSuccessListener { v -> val t = v.text; if (t.isNotBlank()) { textFound = true; appendChat("[ТЕКСТ]\n\"$t\""); if (t.any { it in 'A'..'Z' || it in 'a'..'z' }) translateText(t) } else appendChat("[ТЕКСТ] Не обнаружен"); checkDone() }?.addOnFailureListener { checkDone() }
-        } catch (e: Exception) { appendChat("[ERROR] ${e.message}") }
+            try { textRecognizer?.process(inputImage)?.addOnSuccessListener { v -> val t = v.text; if (t.isNotBlank()) { textFound = true; appendChat("[ТЕКСТ]\n\"$t\""); if (t.any { it in 'A'..'Z' || it in 'a'..'z' }) translateText(t) } else appendChat("[ТЕКСТ] Не обнаружен"); checkDone() }?.addOnFailureListener { checkDone() } } catch (e: Exception) { checkDone() }
+        } catch (e: Exception) { appendChat("[ERROR] ${e.message}"); setStatus("Готов", "green") }
     }
 
     private fun translateText(text: String) { downloadTranslationModel(); if (!translatorReady) return; translator?.translate(text)?.addOnSuccessListener { appendChat("[ПЕРЕВОД] $it") } }
