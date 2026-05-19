@@ -17,7 +17,7 @@ class MatrixHeaderView @JvmOverloads constructor(
 ) : View(context, attrs, defStyleAttr) {
 
     private val fontSize = 36f
-    private val lineHeight = fontSize * 1.05f // меньше расстояние между строками
+    private val lineHeight = fontSize * 1.05f
 
     private val easterEggs = arrayOf(
         "Здравствуй, Нео",
@@ -80,7 +80,7 @@ class MatrixHeaderView @JvmOverloads constructor(
     }
 
     private fun spawnNewLine(h: Float) {
-        activeLine = if (Random.nextFloat() < 0.2f) {
+        activeLine = if (Random.nextFloat() < 0.35f) {
             val word = easterEggs[Random.nextInt(easterEggs.size)]
             val prefixLen = Random.nextInt(0, columns - word.length).coerceAtLeast(0)
             val prefix = CharArray(prefixLen) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
@@ -93,7 +93,7 @@ class MatrixHeaderView @JvmOverloads constructor(
         activeLineY = h + lineHeight
         printedCount = 0
         isPrinting = true
-        floatSpeed = 0.6f + Random.nextFloat() * 0.8f // быстрее плывёт
+        floatSpeed = 0.6f + Random.nextFloat() * 0.8f
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -104,7 +104,6 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRect(0f, 0f, w, h, bgPaint)
 
         if (isPrinting) {
-            // Печатаем быстрее — по 4 символа за кадр
             printedCount += 4
             if (printedCount >= activeLine.length) {
                 isPrinting = false
@@ -112,7 +111,6 @@ class MatrixHeaderView @JvmOverloads constructor(
         } else {
             activeLineY -= floatSpeed
             if (activeLineY < -lineHeight) {
-                // Новая строка рождается сразу, без паузы
                 spawnNewLine(h + lineHeight)
             }
         }
