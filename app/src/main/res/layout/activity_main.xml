@@ -214,22 +214,19 @@
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1"
-            android:layout_margin="2dp"
-            android:background="@drawable/chat_border">
+            android:layout_weight="1">
 
             <com.mechpravdy.neo.MatrixChatBackground
                 android:id="@+id/matrixChatBg"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:layout_margin="3dp" />
+                android:layout_height="match_parent" />
 
             <ScrollView
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:padding="10dp">
+                android:padding="6dp">
 
-                <TextView
+                <EditText
                     android:id="@+id/chatOutput"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -238,7 +235,10 @@
                     android:textColor="#1A1A1A"
                     android:fontFamily="monospace"
                     android:lineSpacingExtra="2dp"
-                    android:padding="6dp" />
+                    android:padding="6dp"
+                    android:background="@android:color/transparent"
+                    android:inputType="textMultiLine"
+                    android:textIsSelectable="true" />
             </ScrollView>
 
         </FrameLayout>
