@@ -1,11 +1,13 @@
 package com.mechpravdy.neo
 
 import android.app.AlertDialog
+import android.app.PictureInPictureModeParams
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.*
+import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.speech.RecognizerIntent
@@ -48,7 +50,7 @@ import kotlin.math.sqrt
 class MainActivity : AppCompatActivity() {
 
     private val apiUrlGigaChat = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
-    private val apiUrlLocal = "http://localhost:8080/v1/chat/completions"
+    private val apiUrlLocal = "http://192.168.1.100:11434/api/chat"
     private val authUrl = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
     private val password = "связность"
 
@@ -146,17 +148,7 @@ class MainActivity : AppCompatActivity() {
             neoModeButton = findViewById(R.id.neoModeButton); localModeButton = findViewById(R.id.localModeButton)
             chatOutput = findViewById(R.id.chatOutput); statusText = findViewById(R.id.statusText); statusDot = findViewById(R.id.statusDot)
 
-            generateButton.setOnClickListener { generateToken() }
-            sendButton.setOnClickListener { appendChat("[ℹ] Отправка сообщения ИИ"); sendMessage() }
-            voiceButton.setOnClickListener { appendChat("[ℹ] Голосовой ввод: говорите"); startVoiceInput() }
-            cameraButton.setOnClickListener { appendChat("[ℹ] Анализ фото: лица, объекты, текст, цвета"); safeCamera() }
-            checkButton.setOnClickListener { appendChat("[ℹ] Проверка: активен ли токен"); checkToken() }
-            capsuleButton.setOnClickListener { showCapsuleDialog() }
-            pipButton.setOnClickListener { enterPipMode() }
-            neoModeButton.setOnClickListener { switchToNeo() }
-            localModeButton.setOnClickListener { switchToLocal() }
-
-            // Восстановление состояния после перезапуска
+            // Восстановление после перезапуска
             val prefs = getSharedPreferences("mech_prefs", Context.MODE_PRIVATE)
             val savedChat = prefs.getString("chat_text", "")
             val savedToken = prefs.getString("token", "")
@@ -165,6 +157,16 @@ class MainActivity : AppCompatActivity() {
             if (!savedToken.isNullOrEmpty()) { tokenInput.setText(savedToken) }
             if (!savedAuthKey.isNullOrEmpty()) { authKeyInput.setText(savedAuthKey) }
 
+            generateButton.setOnClickListener { generateToken() }
+            sendButton.setOnClickListener { appendChat("[ℹ] Отправка сообщения ИИ"); sendMessage() }
+            voiceButton.setOnClickListener { appendChat("[ℹ] Голосовой ввод: говорите"); startVoiceInput() }
+            cameraButton.setOnClickListener { appendChat("[ℹ] Анализ фото: лица, объекты, текст, цвета"); safeCamera() }
+            checkButton.setOnClickListener { appendChat("[ℹ] Проверка токена"); checkToken() }
+            capsuleButton.setOnClickListener { showCapsuleDialog() }
+            pipButton.setOnClickListener { enterPipMode() }
+            neoModeButton.setOnClickListener { switchToNeo() }
+            localModeButton.setOnClickListener { switchToLocal() }
+
             chatOutput.postDelayed({ initMlKit() }, 2000)
         } catch (e: Exception) { Toast.makeText(this, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show() }
     }
@@ -172,20 +174,13 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         val prefs = getSharedPreferences("mech_prefs", Context.MODE_PRIVATE)
-        prefs.edit().apply {
-            putString("chat_text", chatOutput.text.toString())
-            putString("token", tokenInput.text.toString())
-            putString("auth_key", authKeyInput.text.toString())
-            apply()
-        }
+        prefs.edit().apply { putString("chat_text", chatOutput.text.toString()); putString("token", tokenInput.text.toString()); putString("auth_key", authKeyInput.text.toString()); apply() }
     }
 
     override fun onResume() {
         super.onResume()
         val prefs = getSharedPreferences("mech_prefs", Context.MODE_PRIVATE)
-        val savedChat = prefs.getString("chat_text", "")
-        val savedToken = prefs.getString("token", "")
-        val savedAuthKey = prefs.getString("auth_key", "")
+        val savedChat = prefs.getString("chat_text", ""); val savedToken = prefs.getString("token", ""); val savedAuthKey = prefs.getString("auth_key", "")
         if (!savedChat.isNullOrEmpty() && savedChat != chatOutput.text.toString()) { chatOutput.setText(savedChat) }
         if (!savedToken.isNullOrEmpty() && tokenInput.text.toString().isEmpty()) { tokenInput.setText(savedToken) }
         if (!savedAuthKey.isNullOrEmpty() && authKeyInput.text.toString().isEmpty()) { authKeyInput.setText(savedAuthKey) }
@@ -193,9 +188,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun enterPipMode() {
         try {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                val builder = android.app.PictureInPictureModeParams.Builder()
-                enterPictureInPictureMode(builder.build())
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                enterPictureInPictureMode(PictureInPictureModeParams.Builder().build())
             }
         } catch (e: Exception) {
             Toast.makeText(this, "Режим ОКНО не поддерживается", Toast.LENGTH_SHORT).show()
@@ -208,6 +202,7 @@ class MainActivity : AppCompatActivity() {
         localModeButton.setBackgroundColor(Color.TRANSPARENT); localModeButton.setTextColor(Color.parseColor("#888888"))
         matrixHeader.setNeoActive(true)
         appendChat("[РЕЖИМ] НЕО (GigaChat)"); setStatus("НЕО", "green")
+        checkConnection()
     }
 
     private fun switchToLocal() {
@@ -216,6 +211,31 @@ class MainActivity : AppCompatActivity() {
         neoModeButton.setBackgroundColor(Color.TRANSPARENT); neoModeButton.setTextColor(Color.parseColor("#888888"))
         matrixHeader.setLocalActive(true)
         appendChat("[РЕЖИМ] ЛОКАЛЬ (свой ИИ)"); setStatus("ЛОКАЛЬ", "yellow")
+        checkConnection()
+    }
+
+    private fun checkConnection() {
+        val testBody = JsonObject().apply { addProperty("model", if (isLocalMode) "mistral" else "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "ping") }) }); addProperty("max_tokens", 1) }
+        val request = Request.Builder().url(currentApiUrl)
+        if (!isLocalMode) { request.header("Authorization", "Bearer ${tokenInput.text.toString().trim()}") }
+        request.post(testBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+
+        client.newCall(request.build()).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                runOnUiThread { matrixHeader.setConnectionLost(true); setStatus("Нет связи", "red") }
+            }
+            override fun onResponse(call: Call, response: Response) {
+                runOnUiThread {
+                    if (response.isSuccessful) {
+                        if (isLocalMode) matrixHeader.setLocalActive(true) else matrixHeader.setNeoActive(true)
+                        setStatus("Онлайн", "green")
+                    } else {
+                        matrixHeader.setConnectionLost(true); setStatus("Ошибка", "red")
+                    }
+                }
+                response.close()
+            }
+        })
     }
 
     private fun safeCamera() { try { initMlKit(); captureSinglePhoto() } catch (e: Exception) { appendChat("[ERROR] Камера: ${e.message}") } }
@@ -331,5 +351,4 @@ System Prompt — алгоритм души.
         }
     }
 
-    private fun checkToken() { val token = tokenInput.text.toString().trim(); if (token.isEmpty()) return; val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", "One word: alive.") }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "check") }) }); addProperty("max_tokens", 10) }; client.newCall(Request.Builder().url(apiUrlGigaChat).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}") }; override fun onResponse(call: Call, response: Response) { appendChat(if (response.isSuccessful) "[SYSTEM] Токен активен." else "[ERROR] Токен мёртв."); response.close() } }) }
-}
+    private fun checkToken() { val token = tokenInput.text.toString().trim(); if (token.isEmpty()) return; val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", "One word: alive.") }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "check") }) }); addProperty("max_tokens", 10) }; client.newCall(Request.Builder().url(apiUrlGigaChat).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback { override
