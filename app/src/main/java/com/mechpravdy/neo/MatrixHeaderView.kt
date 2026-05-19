@@ -43,14 +43,13 @@ class MatrixHeaderView @JvmOverloads constructor(
     private var currentLine = ""
     private var cursorY = 0f
     private var printed = 0
-    private var floatSpeed = 0f
     private var state = 0
     private var logoRect = RectF()
-    private var h = 0f
+    private var screenH = 0f
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        this.h = h
+        this.screenH = h.toFloat()
         columns = (w / fontSize).toInt() + 1
         spawnLine()
         val logoW = w * 0.55f; val logoH = h * 0.75f
@@ -64,10 +63,9 @@ class MatrixHeaderView @JvmOverloads constructor(
             val suf = CharArray((columns - pre.length - w.length).coerceAtLeast(0)) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
             pre + w + suf
         } else CharArray(columns) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
-        cursorY = h + lineHeight
+        cursorY = screenH + lineHeight
         printed = 0
         state = 0
-        floatSpeed = 7.0f
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -81,7 +79,7 @@ class MatrixHeaderView @JvmOverloads constructor(
                 if (printed >= currentLine.length) state = 1
             }
             1 -> {
-                cursorY -= floatSpeed
+                cursorY -= 7f
                 if (cursorY < -lineHeight) spawnLine()
             }
         }
