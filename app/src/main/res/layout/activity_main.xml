@@ -124,7 +124,7 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Переключатели режимов -->
+        <!-- Режимы НЕО и ЛОКАЛЬ -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -138,7 +138,7 @@
                 android:layout_height="28dp"
                 android:layout_weight="1"
                 android:text="НЕО"
-                android:textSize="9sp"
+                android:textSize="7sp"
                 android:textStyle="bold"
                 app:cornerRadius="3dp"
                 android:backgroundTint="#21A038"
@@ -151,7 +151,7 @@
                 android:layout_height="28dp"
                 android:layout_weight="1"
                 android:text="ЛОКАЛЬ"
-                android:textSize="9sp"
+                android:textSize="7sp"
                 android:textStyle="bold"
                 app:cornerRadius="3dp"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
@@ -160,7 +160,7 @@
                 android:layout_marginStart="1dp" />
         </LinearLayout>
 
-        <!-- Основные кнопки действий -->
+        <!-- Основные кнопки -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -222,6 +222,20 @@
                 app:cornerRadius="3dp"
                 android:backgroundTint="#21A038"
                 android:textColor="#FFFFFF"
+                android:layout_marginStart="1dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/pipButton"
+                android:layout_width="0dp"
+                android:layout_height="28dp"
+                android:layout_weight="1"
+                android:text="ОКНО"
+                android:textSize="4sp"
+                android:textStyle="bold"
+                app:cornerRadius="3dp"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:textColor="#FF8800"
+                app:strokeColor="#FF8800"
                 android:layout_marginStart="1dp" />
         </LinearLayout>
 
