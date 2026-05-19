@@ -160,6 +160,20 @@
                 android:layout_marginEnd="1dp" />
 
             <com.google.android.material.button.MaterialButton
+                android:id="@+id/learnFaceButton"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_weight="1"
+                android:text="ОБУЧИТЬ"
+                android:textSize="6sp"
+                android:textStyle="bold"
+                app:cornerRadius="4dp"
+                android:backgroundTint="#FF8800"
+                android:textColor="#FFFFFF"
+                android:layout_marginStart="1dp"
+                android:layout_marginEnd="1dp" />
+
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/checkButton"
                 android:layout_width="0dp"
                 android:layout_height="32dp"
