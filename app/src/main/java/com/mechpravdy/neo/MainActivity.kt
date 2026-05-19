@@ -13,7 +13,6 @@ import android.speech.RecognizerIntent
 import android.util.Base64
 import android.widget.Button
 import android.widget.EditText
-import android.widget.ScrollView
 import android.widget.TextView
 import android.view.View
 import android.widget.LinearLayout
@@ -65,16 +64,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     private val cameraLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == RESULT_OK) {
-            val imageBitmap = result.data?.extras?.get("data") as? Bitmap
-            if (imageBitmap != null) {
-                val outputStream = ByteArrayOutputStream()
-                imageBitmap.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
-                val byteArray = outputStream.toByteArray()
-                val base64 = Base64.encodeToString(byteArray, Base64.NO_WRAP)
-                val token = tokenInput.text.toString().trim()
-                analyzeImage(base64, token)
+        try {
+            if (result.resultCode == RESULT_OK) {
+                val imageBitmap = result.data?.extras?.get("data") as? Bitmap
+                if (imageBitmap != null) {
+                    val outputStream = ByteArrayOutputStream()
+                    imageBitmap.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
+                    val byteArray = outputStream.toByteArray()
+                    val base64 = Base64.encodeToString(byteArray, Base64.NO_WRAP)
+                    val token = tokenInput.text.toString().trim()
+                    analyzeImage(base64, token)
+                }
             }
+        } catch (e: Exception) {
+            appendChat("[ERROR] Ошибка обработки фото: ${e.message}")
         }
     }
 
@@ -89,8 +92,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
         .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
         .hostnameVerifier { _, _ -> true }
         .build()
@@ -208,7 +213,7 @@ System Prompt — алгоритм души.
             setText(capsuleText)
             textSize = 11f
             setTextColor(0xFF333333.toInt())
-            typeface = android.graphics.Typeface.MONOSPACE
+            fontFamily = android.graphics.Typeface.MONOSPACE
             minLines = 12
             gravity = android.view.Gravity.TOP
             setPadding(20, 20, 20, 20)
@@ -260,11 +265,15 @@ System Prompt — алгоритм души.
     }
 
     private fun captureSinglePhoto() {
-        val token = tokenInput.text.toString().trim()
-        if (token.isEmpty()) { appendChat("[SYSTEM] Сгенерируйте токен перед анализом фото."); return }
-        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-        if (intent.resolveActivity(packageManager) != null) cameraLauncher.launch(intent)
-        else appendChat("[SYSTEM] Камера не найдена на устройстве.")
+        try {
+            val token = tokenInput.text.toString().trim()
+            if (token.isEmpty()) { appendChat("[SYSTEM] Сгенерируйте токен перед анализом фото."); return }
+            val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+            if (intent.resolveActivity(packageManager) != null) cameraLauncher.launch(intent)
+            else appendChat("[SYSTEM] Камера не найдена на устройстве.")
+        } catch (e: Exception) {
+            appendChat("[ERROR] Ошибка запуска камеры: ${e.message}")
+        }
     }
 
     private fun analyzeImage(base64Image: String, token: String) {
@@ -374,7 +383,7 @@ System Prompt — алгоритм души.
                 })
             })
             addProperty("temperature", 0.7)
-            addProperty("max_tokens", 1500)
+            addProperty("max_tokens", 1000)
         }
         val request = Request.Builder().url(apiUrl)
             .header("Content-Type", "application/json")
