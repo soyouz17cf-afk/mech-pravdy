@@ -16,10 +16,9 @@ class MatrixHeaderView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
-    private val fontSize = 18f
+    private val fontSize = 36f
     private val lineHeight = fontSize * 1.15f
 
-    // Пасхальные слова
     private val easterEggs = arrayOf(
         "Здравствуй, Нео",
         "Меч Правды",
@@ -41,13 +40,6 @@ class MatrixHeaderView @JvmOverloads constructor(
         isAntiAlias = true
         alpha = 120
     }
-    private val easterPaint = Paint().apply {
-        color = Color.parseColor("#FFFFFF")
-        textSize = fontSize
-        typeface = Typeface.MONOSPACE
-        isAntiAlias = true
-        alpha = 200
-    }
     private val titlePaint = Paint().apply {
         color = Color.WHITE
         textSize = 72f
@@ -67,7 +59,6 @@ class MatrixHeaderView @JvmOverloads constructor(
 
     private var columns = 0
     private var rows = 0
-    // Храним не символы, а целые строки (могут содержать слова)
     private lateinit var lines: Array<String>
     private lateinit var lineY: FloatArray
     private lateinit var speeds: FloatArray
@@ -94,10 +85,8 @@ class MatrixHeaderView @JvmOverloads constructor(
         logoRect = RectF(left, top, right, bottom)
     }
 
-    /** Генерирует строку: либо слово-пасхалка (20% шанс), либо поток 0/1 */
     private fun generateLine(): String {
         return if (Random.nextFloat() < 0.2f) {
-            // Вставляем пасхальное слово в случайное место строки
             val word = easterEggs[Random.nextInt(easterEggs.size)]
             val prefixLen = Random.nextInt(0, columns - word.length).coerceAtLeast(0)
             val prefix = CharArray(prefixLen) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
@@ -142,10 +131,7 @@ class MatrixHeaderView @JvmOverloads constructor(
             for (c in 0 until printedCount[r].coerceAtMost(line.length)) {
                 val x = c * fontSize
                 if (x >= logoRect.left && x <= logoRect.right && y >= logoRect.top && y <= logoRect.bottom) continue
-
-                val ch = line[c]
-                val paint = if (ch == '0' || ch == '1') matrixPaint else easterPaint
-                canvas.drawText(ch.toString(), x, y, paint)
+                canvas.drawText(line[c].toString(), x, y, matrixPaint)
             }
         }
 
