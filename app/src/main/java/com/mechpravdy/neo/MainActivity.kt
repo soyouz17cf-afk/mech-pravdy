@@ -29,9 +29,6 @@ import com.google.mlkit.nl.translate.TranslatorOptions
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.*
 import com.google.mlkit.vision.label.ImageLabeling
-import com.google.mlkit.vision.label.ImageLabelerOptions
-import com.google.mlkit.vision.pose.PoseDetection
-import com.google.mlkit.vision.pose.PoseDetectorOptions
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import okhttp3.*
@@ -76,7 +73,6 @@ class MainActivity : AppCompatActivity() {
     private var textRecognizer: com.google.mlkit.vision.text.TextRecognizer? = null
     private var translator: com.google.mlkit.nl.translate.Translator? = null
     private var faceDetector: com.google.mlkit.vision.face.FaceDetector? = null
-    private var poseDetector: com.google.mlkit.vision.pose.PoseDetector? = null
     private var mlKitReady = false
     private var translatorReady = false
 
@@ -226,11 +222,10 @@ class MainActivity : AppCompatActivity() {
     private fun initMlKit() {
         if (mlKitReady) return
         try {
-            labeler = ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS)
+            labeler = ImageLabeling.getClient(com.google.mlkit.vision.label.ImageLabelerOptions.DEFAULT_OPTIONS)
             textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
             translator = Translation.getClient(TranslatorOptions.Builder().setSourceLanguage(TranslateLanguage.ENGLISH).setTargetLanguage(TranslateLanguage.RUSSIAN).build())
             faceDetector = FaceDetection.getClient(FaceDetectorOptions.Builder().setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST).setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL).setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL).setMinFaceSize(0.15f).build())
-            poseDetector = PoseDetection.getClient(PoseDetectorOptions.Builder().setDetectorMode(PoseDetectorOptions.SINGLE_IMAGE_MODE).build())
             mlKitReady = true
         } catch (e: Exception) { appendChat("[ГЛАЗ] ML Kit: ${e.message}") }
     }
@@ -292,10 +287,9 @@ System Prompt — алгоритм души.
 
     private fun enhanceBrightness(bitmap: Bitmap): Bitmap = try { val w = bitmap.width; val h = bitmap.height; var total = 0L; val pixels = IntArray(w*h); bitmap.getPixels(pixels,0,w,0,0,w,h); for(p in pixels) total += Color.red(p)+Color.green(p)+Color.blue(p); if(total/(pixels.size*3)>100) bitmap; else { val out = Bitmap.createBitmap(w,h,bitmap.config!!); val f = 1.5f; for(i in pixels.indices){ val c = pixels[i]; pixels[i]=Color.rgb((Color.red(c)*f).toInt().coerceIn(0,255),(Color.green(c)*f).toInt().coerceIn(0,255),(Color.blue(c)*f).toInt().coerceIn(0,255)) }; out.setPixels(pixels,0,w,0,0,w,h); out } } catch(e: Exception) { bitmap }
 
-    private fun buildSceneDescription(faces: Int, objects: List<String>, textFound: Boolean, colors: String, poseFound: Boolean): String {
+    private fun buildSceneDescription(faces: Int, objects: List<String>, textFound: Boolean, colors: String): String {
         val parts = mutableListOf<String>()
         if (faces == 1) parts.add("В кадре один человек") else if (faces > 1) parts.add("В кадре $faces человек")
-        if (poseFound && faces == 0) parts.add("В кадре человек")
         if (objects.isNotEmpty()) parts.add("Обнаружены: ${objects.joinToString(", ")}")
         if (textFound) parts.add("Присутствует текст")
         if (colors.isNotBlank()) parts.add("Цвета: $colors")
@@ -309,10 +303,9 @@ System Prompt — алгоритм души.
             setStatus("Анализ...", "yellow")
             val scaledBitmap = Bitmap.createScaledBitmap(bitmap, bitmap.width/2, bitmap.height/2, true)
             val enhanced = enhanceBrightness(scaledBitmap); val inputImage = InputImage.fromBitmap(enhanced, 0)
-            var facesCount = 0; var poseFound = false; val labelResults = mutableListOf<String>(); var textFound = false; var pendingTasks = 3
-            fun checkDone() { pendingTasks--; if (pendingTasks <= 0) { try { val colors = analyzeColors(enhanced); val scene = buildSceneDescription(facesCount, labelResults, textFound, colors, poseFound); appendChat("[СЦЕНА] $scene\n[ЦВЕТА] $colors") } catch (e: Exception) { appendChat("[СЦЕНА] Ошибка.") }; setStatus("Готов", "green") } }
+            var facesCount = 0; val labelResults = mutableListOf<String>(); var textFound = false; var pendingTasks = 3
+            fun checkDone() { pendingTasks--; if (pendingTasks <= 0) { try { val colors = analyzeColors(enhanced); val scene = buildSceneDescription(facesCount, labelResults, textFound, colors); appendChat("[СЦЕНА] $scene\n[ЦВЕТА] $colors") } catch (e: Exception) { appendChat("[СЦЕНА] Ошибка.") }; setStatus("Готов", "green") } }
             try { faceDetector?.process(inputImage)?.addOnSuccessListener { faces -> try { facesCount = faces.size; if (faces.isNotEmpty()) { val sb = StringBuilder(); for ((i, f) in faces.withIndex()) { if (faces.size>1) sb.append("Лицо ${i+1}:\n"); sb.append(emotionText(f)) }; appendChat("[ЭМОЦИИ] Лиц: ${faces.size}\n$sb") } else appendChat("[ЭМОЦИИ] Лиц нет") } catch (e: Exception) { appendChat("[ЭМОЦИИ] Ошибка") }; checkDone() }?.addOnFailureListener { appendChat("[ЭМОЦИИ] Ошибка"); checkDone() } } catch (e: Exception) { checkDone() }
-            try { poseDetector?.process(inputImage)?.addOnSuccessListener { pose -> poseFound = pose != null; appendChat(if (poseFound) "[ПОЗА] Человек обнаружен" else "[ПОЗА] Не обнаружен"); checkDone() }?.addOnFailureListener { checkDone() } } catch (e: Exception) { checkDone() }
             try { labeler?.process(inputImage)?.addOnSuccessListener { labels -> try { if (labels.isNotEmpty()) { val sb = StringBuilder(); for (l in labels.take(5)) { val name = translateLabel(l.text); labelResults.add(name); val confPct = (l.confidence*100).toInt(); sb.append("$name ($confPct%)\n") }; appendChat("[ОБЪЕКТЫ] ${sb.toString().trim()}") } else appendChat("[ОБЪЕКТЫ] Не найдены") } catch (e: Exception) { appendChat("[ОБЪЕКТЫ] Ошибка") }; checkDone() }?.addOnFailureListener { checkDone() } } catch (e: Exception) { checkDone() }
             try { textRecognizer?.process(inputImage)?.addOnSuccessListener { v -> val t = v.text; if (t.isNotBlank()) { textFound = true; appendChat("[ТЕКСТ]\n\"$t\""); if (t.any { it in 'A'..'Z' || it in 'a'..'z' }) translateText(t) } else appendChat("[ТЕКСТ] Не обнаружен"); checkDone() }?.addOnFailureListener { checkDone() } } catch (e: Exception) { checkDone() }
         } catch (e: Exception) { appendChat("[ERROR] ${e.message}"); setStatus("Готов", "green") }
