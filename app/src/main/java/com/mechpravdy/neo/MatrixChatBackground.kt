@@ -30,22 +30,21 @@ class MatrixChatBackground @JvmOverloads constructor(
     private val bgPaint = Paint().apply { color = Color.WHITE }
 
     private var columns = 0
-    private var maxRows = 0
-    private lateinit var lines: Array<String>
-    private lateinit var lineY: FloatArray
-    private lateinit var printedCount: IntArray
-    private lateinit var isPrinting: BooleanArray
-    private lateinit var speeds: FloatArray
+    // 5 строк для заполнения экрана
+    private val lines = arrayOfNulls<String>(5)
+    private val lineY = FloatArray(5)
+    private val printedCount = IntArray(5)
+    private val isPrinting = BooleanArray(5) { true }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         columns = (w / fontSize).toInt() + 1
-        maxRows = (h / lineHeight).toInt() + 2
-        lines = Array(maxRows) { generateLine() }
-        lineY = FloatArray(maxRows) { i -> h + i * lineHeight }
-        printedCount = IntArray(maxRows) { 0 }
-        isPrinting = BooleanArray(maxRows) { true }
-        speeds = FloatArray(maxRows) { 0.2f + Random.nextFloat() * 0.4f }
+        for (i in 0 until 5) {
+            lines[i] = generateLine()
+            lineY[i] = h + i * lineHeight
+            printedCount[i] = 0
+            isPrinting[i] = true
+        }
     }
 
     private fun generateLine() = if (Random.nextFloat() < 0.15f) {
@@ -62,28 +61,36 @@ class MatrixChatBackground @JvmOverloads constructor(
         val w = width.toFloat(); val h = height.toFloat()
         canvas.drawRect(0f, 0f, w, h, bgPaint)
 
-        for (i in 0 until maxRows) {
-            if (isPrinting[i]) {
-                printedCount[i]++
-                if (printedCount[i] >= lines[i].length) isPrinting[i] = false
-            } else {
-                lineY[i] -= speeds[i]
-                if (lineY[i] < -lineHeight) {
-                    lines[i] = generateLine()
-                    lineY[i] = h + lineHeight
-                    printedCount[i] = 0
-                    isPrinting[i] = true
-                    speeds[i] = 0.2f + Random.nextFloat() * 0.4f
-                }
-            }
+        // Печатаем самую нижнюю
+        if (isPrinting[0]) {
+            printedCount[0] += 3
+            if (printedCount[0] >= lines[0]!!.length) isPrinting[0] = false
+        }
 
+        // Сдвиг вверх
+        if (!isPrinting[0]) {
+            for (i in 4 downTo 1) {
+                lines[i] = lines[i - 1]
+                lineY[i] = lineY[i - 1]
+                printedCount[i] = printedCount[i - 1]
+                isPrinting[i] = isPrinting[i - 1]
+            }
+            lines[0] = generateLine()
+            lineY[0] = h + lineHeight
+            printedCount[0] = 0
+            isPrinting[0] = true
+        }
+
+        // Рисуем
+        for (i in 0 until 5) {
+            val line = lines[i] ?: continue
             val y = lineY[i]
             if (y > h + lineHeight || y < -lineHeight) continue
             paint.alpha = 45
-            val limit = printedCount[i].coerceAtMost(lines[i].length)
+            val limit = printedCount[i].coerceAtMost(line.length)
             for (c in 0 until limit) {
                 val x = c * fontSize
-                canvas.drawText(lines[i][c].toString(), x, y, paint)
+                canvas.drawText(line[c].toString(), x, y, paint)
             }
         }
         postInvalidateDelayed(60)
