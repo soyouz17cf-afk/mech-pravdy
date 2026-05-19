@@ -34,12 +34,12 @@ class MatrixChatBackground @JvmOverloads constructor(
     private var printed = 0
     private var floatSpeed = 0f
     private var state = 0
-    private var h = 0f
+    private var viewH = 0f
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        this.h = h
-        columns = (w / fontSize).toInt() + 1
+        this.viewH = h.toFloat()
+        columns = (w.toFloat() / fontSize).toInt() + 1
         spawnLine()
     }
 
@@ -50,7 +50,7 @@ class MatrixChatBackground @JvmOverloads constructor(
             val suf = CharArray((columns - pre.length - w.length).coerceAtLeast(0)) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
             pre + w + suf
         } else CharArray(columns) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
-        cursorY = h + lineHeight
+        cursorY = viewH + lineHeight
         printed = 0
         state = 0
         floatSpeed = 8f + Random.nextFloat() * 6f
@@ -72,7 +72,7 @@ class MatrixChatBackground @JvmOverloads constructor(
         }
 
         for (c in 0 until printed.coerceAtMost(currentLine.length)) {
-            canvas.drawText(currentLine[c].toString(), c * fontSize, cursorY, paint)
+            canvas.drawText(currentLine[c].toString(), c.toFloat() * fontSize, cursorY, paint)
         }
         postInvalidateDelayed(60)
     }
