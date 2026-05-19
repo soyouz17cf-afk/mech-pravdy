@@ -25,6 +25,8 @@ import com.google.gson.JsonObject
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.label.ImageLabeling
 import com.google.mlkit.vision.label.defaults.ImageLabelerOptions
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -56,9 +58,34 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var statusDot: View
 
-    // Ленивая загрузка ML Kit — только при первом использовании
     private var labeler: com.google.mlkit.vision.label.ImageLabeler? = null
+    private var textRecognizer: com.google.mlkit.vision.text.TextRecognizer? = null
     private var mlKitReady = false
+
+    // Словарь перевода на русский
+    private val translateMap = mapOf(
+        "hair" to "Волосы", "skin" to "Кожа", "beard" to "Борода",
+        "selfie" to "Селфи", "moustache" to "Усы", "face" to "Лицо",
+        "person" to "Человек", "man" to "Мужчина", "woman" to "Женщина",
+        "eyeglasses" to "Очки", "eye" to "Глаз", "nose" to "Нос",
+        "mouth" to "Рот", "lip" to "Губа", "forehead" to "Лоб",
+        "chin" to "Подбородок", "cheek" to "Щека", "eyebrow" to "Бровь",
+        "smile" to "Улыбка", "head" to "Голова", "neck" to "Шея",
+        "clothing" to "Одежда", "jacket" to "Куртка", "shirt" to "Рубашка",
+        "tshirt" to "Футболка", "sweater" to "Свитер", "coat" to "Пальто",
+        "car" to "Автомобиль", "vehicle" to "Транспорт", "bicycle" to "Велосипед",
+        "dog" to "Собака", "cat" to "Кошка", "bird" to "Птица",
+        "tree" to "Дерево", "plant" to "Растение", "flower" to "Цветок",
+        "building" to "Здание", "house" to "Дом", "window" to "Окно",
+        "door" to "Дверь", "table" to "Стол", "chair" to "Стул",
+        "phone" to "Телефон", "laptop" to "Ноутбук", "computer" to "Компьютер",
+        "book" to "Книга", "paper" to "Бумага", "food" to "Еда",
+        "drink" to "Напиток", "water" to "Вода", "cup" to "Чашка"
+    )
+
+    private fun translateLabel(text: String): String {
+        return translateMap[text.lowercase()] ?: text
+    }
 
     private val voiceLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK) {
@@ -130,16 +157,15 @@ class MainActivity : AppCompatActivity() {
             checkButton.setOnClickListener { checkToken() }
             capsuleButton.setOnClickListener { showCapsuleDialog() }
         } catch (e: Exception) {
-            // Если совсем всё плохо — показываем Toast и не падаем
             Toast.makeText(this, "Ошибка запуска: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
-    /** Ленивая инициализация ML Kit */
     private fun initMlKit() {
         if (!mlKitReady) {
             try {
                 labeler = ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS)
+                textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
                 mlKitReady = true
             } catch (e: Exception) {
                 appendChat("[ГЛАЗ] ML Kit не загрузился: ${e.message}")
@@ -303,7 +329,7 @@ System Prompt — алгоритм души.
         }
     }
 
-    /** Локальный анализ фото через ML Kit */
+    /** Локальный анализ фото: текст + объекты */
     private fun analyzeImageLocal(bitmap: Bitmap) {
         try {
             initMlKit()
@@ -313,35 +339,53 @@ System Prompt — алгоритм души.
                 return
             }
 
-            setStatus("Анализ фото (локально)...", "yellow")
-
-            // Сжимаем фото для экономии памяти
-            val outputStream = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 50, outputStream)
+            setStatus("Анализ фото...", "yellow")
 
             val inputImage = InputImage.fromBitmap(bitmap, 0)
-            labeler?.process(inputImage)
-                ?.addOnSuccessListener { labels ->
-                    if (labels.isEmpty()) {
-                        appendChat("[ГЛАЗ] Ничего не распознано.")
+
+            // Сначала распознаём текст (OCR)
+            textRecognizer?.process(inputImage)
+                ?.addOnSuccessListener { visionText ->
+                    val text = visionText.text
+                    if (text.isNotBlank()) {
+                        appendChat("[ГЛАЗ] Текст на фото:\n\"$text\"")
                     } else {
-                        val result = StringBuilder()
-                        for (label in labels.take(5)) {
-                            val confidence = (label.confidence * 100).toInt()
-                            result.append("${label.text} ($confidence%)\n")
-                        }
-                        appendChat("[ГЛАЗ] Вижу:\n$result")
+                        appendChat("[ГЛАЗ] Текст не обнаружен.")
                     }
-                    setStatus("Готов", "green")
+                    // После текста запускаем распознавание объектов
+                    recognizeObjects(inputImage)
                 }
                 ?.addOnFailureListener { e ->
-                    appendChat("[ГЛАЗ] Ошибка анализа: ${e.message}")
-                    setStatus("Готов", "green")
+                    appendChat("[ГЛАЗ] Ошибка чтения текста: ${e.message}")
+                    recognizeObjects(inputImage)
                 }
         } catch (e: Exception) {
             appendChat("[ГЛАЗ] Ошибка: ${e.message}")
             setStatus("Готов", "green")
         }
+    }
+
+    /** Распознавание объектов на фото */
+    private fun recognizeObjects(inputImage: InputImage) {
+        labeler?.process(inputImage)
+            ?.addOnSuccessListener { labels ->
+                if (labels.isEmpty()) {
+                    appendChat("[ГЛАЗ] Объекты не распознаны.")
+                } else {
+                    val result = StringBuilder()
+                    for (label in labels.take(5)) {
+                        val confidence = (label.confidence * 100).toInt()
+                        val translated = translateLabel(label.text)
+                        result.append("$translated ($confidence%)\n")
+                    }
+                    appendChat("[ГЛАЗ] Вижу:\n$result")
+                }
+                setStatus("Готов", "green")
+            }
+            ?.addOnFailureListener { e ->
+                appendChat("[ГЛАЗ] Ошибка анализа: ${e.message}")
+                setStatus("Готов", "green")
+            }
     }
 
     private fun generateToken() {
