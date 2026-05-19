@@ -39,25 +39,24 @@ class MatrixChatBackground @JvmOverloads constructor(
     private val bgPaint = Paint().apply { color = Color.WHITE }
 
     private var columns = 0
-    private var rows = 0
-    private lateinit var lines: Array<String>
-    private lateinit var lineY: FloatArray
-    private lateinit var speeds: FloatArray
-    private lateinit var printedCount: IntArray
-    private var frame = 0
+    // Три строки одновременно для заполнения экрана
+    private val activeLines = arrayOfNulls<String>(3)
+    private val lineY = FloatArray(3)
+    private val printedCount = IntArray(3)
+    private val isPrinting = BooleanArray(3) { true }
+    private val floatSpeed = FloatArray(3)
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         columns = (w / fontSize).toInt() + 1
-        rows = (h / lineHeight).toInt() + 2
-        lines = Array(rows) { generateLine() }
-        lineY = FloatArray(rows) { i -> i * lineHeight }
-        speeds = FloatArray(rows) { 0.15f + Random.nextFloat() * 0.3f }
-        printedCount = IntArray(rows) { 0 }
+        for (i in 0 until 3) {
+            spawnNewLine(i, h)
+            lineY[i] = h * (0.3f + i * 0.3f)
+        }
     }
 
-    private fun generateLine(): String {
-        return if (Random.nextFloat() < 0.15f) {
+    private fun spawnNewLine(index: Int, h: Float) {
+        activeLines[index] = if (Random.nextFloat() < 0.15f) {
             val word = easterEggs[Random.nextInt(easterEggs.size)]
             val prefixLen = Random.nextInt(0, columns - word.length).coerceAtLeast(0)
             val prefix = CharArray(prefixLen) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
@@ -67,6 +66,9 @@ class MatrixChatBackground @JvmOverloads constructor(
         } else {
             CharArray(columns) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
         }
+        printedCount[index] = 0
+        isPrinting[index] = true
+        floatSpeed[index] = 0.15f + Random.nextFloat() * 0.3f
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -76,36 +78,30 @@ class MatrixChatBackground @JvmOverloads constructor(
 
         canvas.drawRect(0f, 0f, w, h, bgPaint)
 
-        for (r in 0 until rows) {
-            lineY[r] -= speeds[r]
-            if (lineY[r] < -lineHeight) {
-                lineY[r] = h + lineHeight
-                lines[r] = generateLine()
-                speeds[r] = 0.15f + Random.nextFloat() * 0.3f
-                printedCount[r] = 0
-            }
-        }
+        for (i in 0 until 3) {
+            val line = activeLines[i] ?: continue
 
-        if (frame % 4 == 0) {
-            for (r in 0 until rows) {
-                if (printedCount[r] < lines[r].length) {
-                    printedCount[r]++
+            if (isPrinting[i]) {
+                printedCount[i]++
+                if (printedCount[i] >= line.length) {
+                    isPrinting[i] = false
+                }
+            } else {
+                lineY[i] -= floatSpeed[i]
+                if (lineY[i] < -lineHeight) {
+                    lineY[i] = h + lineHeight
+                    spawnNewLine(i, h)
                 }
             }
-        }
 
-        for (r in 0 until rows) {
-            val y = lineY[r]
-            if (y > h || y < -lineHeight) continue
-            val line = lines[r]
-            for (c in 0 until printedCount[r].coerceAtMost(line.length)) {
+            val y = lineY[i]
+            paint.alpha = 45
+            for (c in 0 until printedCount[i].coerceAtMost(line.length)) {
                 val x = c * fontSize
-                paint.alpha = 45
                 canvas.drawText(line[c].toString(), x, y, paint)
             }
         }
 
-        frame++
         postInvalidateDelayed(60)
     }
 }
