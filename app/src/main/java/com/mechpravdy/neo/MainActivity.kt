@@ -123,14 +123,18 @@ class MainActivity : AppCompatActivity() {
 
     private fun switchToNeo() {
         isLocalMode = false; currentApiUrl = apiUrlGigaChat
-        matrixHeader.setNeoActive(true)
+        matrixHeader.neoActive = true
+        matrixHeader.localActive = false
+        matrixHeader.connectionLost = false
         appendChat("[РЕЖИМ] НЕО (GigaChat)"); setStatus("НЕО", "green")
         checkConnection()
     }
 
     private fun switchToLocal() {
         isLocalMode = true; currentApiUrl = apiUrlLocal
-        matrixHeader.setLocalActive(true)
+        matrixHeader.localActive = true
+        matrixHeader.neoActive = false
+        matrixHeader.connectionLost = false
         appendChat("[РЕЖИМ] ЛОКАЛЬ (свой ИИ)"); setStatus("ЛОКАЛЬ", "yellow")
         checkConnection()
     }
@@ -141,11 +145,11 @@ class MainActivity : AppCompatActivity() {
         if (!isLocalMode) { request.header("Authorization", "Bearer ${tokenInput.text.toString().trim()}") }
         request.post(testBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
         client.newCall(request.build()).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) { runOnUiThread { matrixHeader.setConnectionLost(true); setStatus("Нет связи", "red") } }
+            override fun onFailure(call: Call, e: IOException) { runOnUiThread { matrixHeader.connectionLost = true; setStatus("Нет связи", "red") } }
             override fun onResponse(call: Call, response: Response) {
                 runOnUiThread {
-                    if (response.isSuccessful) { if (isLocalMode) matrixHeader.setLocalActive(true) else matrixHeader.setNeoActive(true); setStatus("Онлайн", "green") }
-                    else { matrixHeader.setConnectionLost(true); setStatus("Ошибка", "red") }
+                    if (response.isSuccessful) { matrixHeader.connectionLost = false; setStatus("Онлайн", "green") }
+                    else { matrixHeader.connectionLost = true; setStatus("Ошибка", "red") }
                 }
                 response.close()
             }
@@ -218,15 +222,15 @@ System Prompt — алгоритм души.
         if (isLocalMode) {
             val body = JsonObject().apply { addProperty("model", "mistral"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", buildNeoPrompt()) }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", msg) }) }); addProperty("stream", false) }
             client.newCall(Request.Builder().url(currentApiUrl).post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback {
-                override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] Сервер недоступен: ${e.message}"); matrixHeader.setConnectionLost(true); setStatus("Нет связи", "red") }
-                override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { try { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonObject("message").get("content").asString; appendChat("[NEO] $a"); matrixHeader.setLocalActive(true); setStatus("Онлайн", "green") } catch (e: Exception) { appendChat("[NEO] $b"); matrixHeader.setLocalActive(true); setStatus("Онлайн", "green") } } else { appendChat("[ERROR] HTTP ${response.code}"); matrixHeader.setConnectionLost(true); setStatus("Ошибка", "red") }; response.close() }
+                override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] Сервер недоступен: ${e.message}"); matrixHeader.connectionLost = true; setStatus("Нет связи", "red") }
+                override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { try { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonObject("message").get("content").asString; appendChat("[NEO] $a"); matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } catch (e: Exception) { appendChat("[NEO] $b"); matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } } else { appendChat("[ERROR] HTTP ${response.code}"); matrixHeader.connectionLost = true; setStatus("Ошибка", "red") }; response.close() }
             })
         } else {
             val isNeo = msg.lowercase().contains(password); val prompt = selectPrompt(msg)
             val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", prompt) }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", msg) }) }); addProperty("temperature", 0.7); addProperty("max_tokens", 1000) }
             client.newCall(Request.Builder().url(currentApiUrl).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback {
-                override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}"); matrixHeader.setConnectionLost(true); setStatus("Нет связи", "red") }
-                override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString; appendChat(if (isNeo) "[NEO] $a" else "[GigaChat] $a"); matrixHeader.setNeoActive(true); setStatus("Онлайн", "green") } else { appendChat("[ERROR] HTTP ${response.code}"); matrixHeader.setConnectionLost(true); setStatus("Ошибка", "red") }; response.close() }
+                override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}"); matrixHeader.connectionLost = true; setStatus("Нет связи", "red") }
+                override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString; appendChat(if (isNeo) "[NEO] $a" else "[GigaChat] $a"); matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } else { appendChat("[ERROR] HTTP ${response.code}"); matrixHeader.connectionLost = true; setStatus("Ошибка", "red") }; response.close() }
             })
         }
     }
