@@ -38,6 +38,6 @@ dependencies {
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation 'com.google.code.gson:gson:2.10.1'
 
-    // Google ML Kit Image Labeling (офлайн-глаза)
-    implementation 'com.google.mlkit:image-labeling:17.0.8'
+    // ML Kit — локальные глаза
+    implementation 'com.google.mlkit:image-labeling:17.0.9'
 }
