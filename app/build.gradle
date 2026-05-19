@@ -40,4 +40,6 @@ dependencies {
 
     // ML Kit — локальные глаза
     implementation 'com.google.mlkit:image-labeling:17.0.9'
+    // ML Kit — распознавание текста (OCR)
+    implementation 'com.google.mlkit:text-recognition:16.0.1'
 }
