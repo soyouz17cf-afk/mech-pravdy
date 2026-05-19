@@ -27,7 +27,6 @@ class MatrixHeaderView @JvmOverloads constructor(
         isAntiAlias = true
         alpha = 120
     }
-    // Шрифт для «СБЕР» — современный, стильный
     private val titlePaint = Paint().apply {
         color = Color.WHITE
         textSize = 72f
@@ -35,7 +34,6 @@ class MatrixHeaderView @JvmOverloads constructor(
         isAntiAlias = true
         textAlign = Paint.Align.CENTER
     }
-    // Шрифт для «ГигаЧат»
     private val subtitlePaint = Paint().apply {
         color = Color.parseColor("#CCFFCC")
         textSize = 26f
@@ -44,7 +42,6 @@ class MatrixHeaderView @JvmOverloads constructor(
         textAlign = Paint.Align.CENTER
     }
     private val bgPaint = Paint().apply { color = Color.WHITE }
-    // Тёмно-зелёный фон логотипа
     private val logoBgPaint = Paint().apply { color = Color.parseColor("#1A8A2E") }
 
     private var columns = 0
@@ -66,7 +63,6 @@ class MatrixHeaderView @JvmOverloads constructor(
         speeds = FloatArray(rows) { 0.3f + Random.nextFloat() * 0.5f }
         printedCount = IntArray(rows) { 0 }
 
-        // Прямоугольник логотипа — компактный, по центру
         val logoWidth = w * 0.55f
         val logoHeight = h * 0.75f
         val left = (w - logoWidth) / 2f
@@ -114,13 +110,8 @@ class MatrixHeaderView @JvmOverloads constructor(
             }
         }
 
-        // Зелёная плашка логотипа с закруглёнными углами
         canvas.drawRoundRect(logoRect, 16f, 16f, logoBgPaint)
-
-        // «СБЕР» — белым по зелёному
         canvas.drawText("СБЕР", w / 2, logoRect.top + logoRect.height() * 0.45f, titlePaint)
-
-        // «ГигаЧат» — светло-зелёным, близко к «СБЕР»
         canvas.drawText("ГигаЧат", w / 2, logoRect.top + logoRect.height() * 0.75f, subtitlePaint)
 
         frame++
