@@ -31,7 +31,7 @@ class MatrixHeaderView @JvmOverloads constructor(
     private val subtitlePaint = Paint().apply { color = Color.parseColor("#CCFFCC"); textSize = 26f; typeface = Typeface.create("sans-serif-light", Typeface.NORMAL); isAntiAlias = true; textAlign = Paint.Align.CENTER }
     private val logoBgPaint = Paint().apply { color = Color.parseColor("#1A8A2E") }
 
-    // Светофор
+    // Состояния светофора
     var neoActive = true
     var localActive = false
     var connectionLost = false
@@ -118,8 +118,4 @@ class MatrixHeaderView @JvmOverloads constructor(
         if (neoButtonRect.contains(x, y)) onNeoClick?.invoke()
         else if (localButtonRect.contains(x, y)) onLocalClick?.invoke()
     }
-
-    fun setNeoActive(active: Boolean) { neoActive = active; localActive = !active; connectionLost = false; invalidate() }
-    fun setLocalActive(active: Boolean) { localActive = active; neoActive = !active; connectionLost = false; invalidate() }
-    fun setConnectionLost(lost: Boolean) { connectionLost = lost; invalidate() }
 }
