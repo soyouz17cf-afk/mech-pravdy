@@ -16,7 +16,7 @@ class MatrixChatBackground @JvmOverloads constructor(
 ) : View(context, attrs, defStyleAttr) {
 
     private val fontSize = 40f
-    private val lineHeight = fontSize * 1.2f
+    private val lineHeight = fontSize * 1.05f // меньше расстояние
 
     private val easterEggs = arrayOf(
         "Здравствуй, Нео",
@@ -39,19 +39,20 @@ class MatrixChatBackground @JvmOverloads constructor(
     private val bgPaint = Paint().apply { color = Color.WHITE }
 
     private var columns = 0
-    private val activeLines = arrayOfNulls<String>(3)
-    private val lineY = FloatArray(3)
-    private val printedCount = IntArray(3)
-    private val isPrinting = BooleanArray(3) { true }
-    private val floatSpeed = FloatArray(3)
+    // 5 строк для плотности
+    private val activeLines = arrayOfNulls<String>(5)
+    private val lineY = FloatArray(5)
+    private val printedCount = IntArray(5)
+    private val isPrinting = BooleanArray(5) { true }
+    private val floatSpeed = FloatArray(5)
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         columns = (w / fontSize).toInt() + 1
         val fh = h.toFloat()
-        for (i in 0 until 3) {
+        for (i in 0 until 5) {
             spawnNewLine(i, fh)
-            lineY[i] = fh * (0.3f + i * 0.3f)
+            lineY[i] = fh * (0.15f + i * 0.2f) // плотнее
         }
     }
 
@@ -68,7 +69,7 @@ class MatrixChatBackground @JvmOverloads constructor(
         }
         printedCount[index] = 0
         isPrinting[index] = true
-        floatSpeed[index] = 0.15f + Random.nextFloat() * 0.3f
+        floatSpeed[index] = 0.4f + Random.nextFloat() * 0.6f // быстрее
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -78,11 +79,12 @@ class MatrixChatBackground @JvmOverloads constructor(
 
         canvas.drawRect(0f, 0f, w, h, bgPaint)
 
-        for (i in 0 until 3) {
+        for (i in 0 until 5) {
             val line = activeLines[i] ?: continue
 
             if (isPrinting[i]) {
-                printedCount[i]++
+                // Печатаем быстрее — по 3 символа за кадр
+                printedCount[i] += 3
                 if (printedCount[i] >= line.length) {
                     isPrinting[i] = false
                 }
@@ -102,6 +104,6 @@ class MatrixChatBackground @JvmOverloads constructor(
             }
         }
 
-        postInvalidateDelayed(60)
+        postInvalidateDelayed(50) // быстрее обновление
     }
 }
