@@ -22,6 +22,9 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.label.ImageLabeling
+import com.google.mlkit.vision.label.ImageLabelerOptions
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -53,13 +56,44 @@ class MainActivity : AppCompatActivity() {
     private lateinit var checkButton: Button
     private lateinit var capsuleButton: Button
     private lateinit var pipButton: Button
+    private lateinit var attachButton: Button
     private lateinit var chatOutput: EditText
     private lateinit var statusText: TextView
     private lateinit var statusDot: View
     private lateinit var matrixHeader: MatrixHeaderView
 
+    private var labeler: com.google.mlkit.vision.label.ImageLabeler? = null
+    private var mlKitReady = false
+
+    private val translateMap = mapOf(
+        "hair" to "Волосы", "skin" to "Кожа", "beard" to "Борода",
+        "selfie" to "Селфи", "moustache" to "Усы", "face" to "Лицо",
+        "person" to "Человек", "man" to "Мужчина", "woman" to "Женщина",
+        "eyeglasses" to "Очки", "eye" to "Глаз", "nose" to "Нос",
+        "mouth" to "Рот", "car" to "Машина", "dog" to "Собака",
+        "cat" to "Кошка", "tree" to "Дерево", "house" to "Дом",
+        "phone" to "Телефон", "laptop" to "Ноутбук", "book" to "Книга",
+        "sky" to "Небо", "grass" to "Трава", "road" to "Дорога",
+        "building" to "Здание", "chair" to "Стул", "table" to "Стол"
+    )
+
+    private fun translateLabel(text: String) = translateMap[text.lowercase()] ?: text
+
     private val voiceLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result -> if (result.resultCode == RESULT_OK) { result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let { messageInput.setText(it); appendChat("[ГОЛОС] $it") } } }
-    private val cameraLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result -> try { if (result.resultCode == RESULT_OK) { appendChat("[ФОТО] Снимок сделан. Отправьте его на анализ в режиме НЕО.") } } catch (e: Exception) { appendChat("[ERROR] ${e.message}") } }
+    private val cameraLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result -> try { if (result.resultCode == RESULT_OK) { appendChat("[ФОТО] Снимок сделан.") } } catch (e: Exception) { appendChat("[ERROR] ${e.message}") } }
+
+    private val photoAnalysisLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        try {
+            if (result.resultCode == RESULT_OK) {
+                val bitmap = result.data?.extras?.get("data") as? Bitmap
+                if (bitmap != null) {
+                    analyzeBitmap(bitmap)
+                }
+            }
+        } catch (e: Exception) {
+            appendChat("[ERROR] Ошибка анализа фото: ${e.message}")
+        }
+    }
 
     private val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager { override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}; override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}; override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf() })
     private val sslContext = SSLContext.getInstance("TLS").apply { init(null, trustAllCerts, SecureRandom()) }
@@ -76,6 +110,7 @@ class MainActivity : AppCompatActivity() {
             sendButton = findViewById(R.id.sendButton); voiceButton = findViewById(R.id.voiceButton)
             cameraButton = findViewById(R.id.cameraButton); checkButton = findViewById(R.id.checkButton)
             capsuleButton = findViewById(R.id.capsuleButton); pipButton = findViewById(R.id.pipButton)
+            attachButton = findViewById(R.id.attachButton)
             chatOutput = findViewById(R.id.chatOutput); statusText = findViewById(R.id.statusText); statusDot = findViewById(R.id.statusDot)
 
             matrixHeader.onNeoClick = { switchToNeo() }
@@ -94,10 +129,13 @@ class MainActivity : AppCompatActivity() {
             generateButton.setOnClickListener { generateToken() }
             sendButton.setOnClickListener { appendChat("[ℹ] Отправка сообщения ИИ"); sendMessage() }
             voiceButton.setOnClickListener { appendChat("[ℹ] Голосовой ввод: говорите"); startVoiceInput() }
-            cameraButton.setOnClickListener { appendChat("[ℹ] Фото: снимок сделан, можно отправить в чат"); captureSinglePhoto() }
+            cameraButton.setOnClickListener { appendChat("[ℹ] Фото: снимок сделан"); captureSinglePhoto() }
+            attachButton.setOnClickListener { appendChat("[ℹ] Анализ фото: объекты и сцена"); captureAndAnalyze() }
             checkButton.setOnClickListener { appendChat("[ℹ] Проверка токена"); checkToken() }
             capsuleButton.setOnClickListener { showCapsuleDialog() }
             pipButton.setOnClickListener { enterPipMode() }
+
+            initMlKit()
         } catch (e: Exception) { Toast.makeText(this, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show() }
     }
 
@@ -123,18 +161,16 @@ class MainActivity : AppCompatActivity() {
 
     private fun switchToNeo() {
         isLocalMode = false; currentApiUrl = apiUrlGigaChat
-        matrixHeader.neoActive = true
-        matrixHeader.localActive = false
-        matrixHeader.connectionLost = false
+        matrixHeader.neoActive = true; matrixHeader.localActive = false; matrixHeader.connectionLost = false
+        matrixHeader.invalidate()
         appendChat("[РЕЖИМ] НЕО (GigaChat)"); setStatus("НЕО", "green")
         checkConnection()
     }
 
     private fun switchToLocal() {
         isLocalMode = true; currentApiUrl = apiUrlLocal
-        matrixHeader.localActive = true
-        matrixHeader.neoActive = false
-        matrixHeader.connectionLost = false
+        matrixHeader.localActive = true; matrixHeader.neoActive = false; matrixHeader.connectionLost = false
+        matrixHeader.invalidate()
         appendChat("[РЕЖИМ] ЛОКАЛЬ (свой ИИ)"); setStatus("ЛОКАЛЬ", "yellow")
         checkConnection()
     }
@@ -154,6 +190,47 @@ class MainActivity : AppCompatActivity() {
                 response.close()
             }
         })
+    }
+
+    private fun initMlKit() {
+        if (mlKitReady) return
+        try {
+            labeler = ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS)
+            mlKitReady = true
+        } catch (e: Exception) { appendChat("[ГЛАЗ] ML Kit: ${e.message}") }
+    }
+
+    private fun captureAndAnalyze() {
+        try {
+            val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+            photoAnalysisLauncher.launch(intent)
+        } catch (e: Exception) { appendChat("[ERROR] Камера: ${e.message}") }
+    }
+
+    private fun analyzeBitmap(bitmap: Bitmap) {
+        try {
+            initMlKit()
+            if (!mlKitReady) { appendChat("[ГЛАЗ] Модуль не загружен."); return }
+            setStatus("Анализ...", "yellow")
+            val scaledBitmap = Bitmap.createScaledBitmap(bitmap, bitmap.width / 2, bitmap.height / 2, true)
+            val inputImage = InputImage.fromBitmap(scaledBitmap, 0)
+            labeler?.process(inputImage)?.addOnSuccessListener { labels ->
+                if (labels.isEmpty()) { appendChat("[АНАЛИЗ] Объекты не распознаны.") }
+                else {
+                    val sb = StringBuilder()
+                    for (l in labels.take(5)) {
+                        val name = translateLabel(l.text)
+                        val confPct = (l.confidence * 100).toInt()
+                        sb.append("$name ($confPct%)\n")
+                    }
+                    appendChat("[АНАЛИЗ] На фото:\n${sb.toString().trim()}")
+                }
+                setStatus("Готов", "green")
+            }?.addOnFailureListener { e ->
+                appendChat("[АНАЛИЗ] Ошибка: ${e.message}")
+                setStatus("Готов", "green")
+            }
+        } catch (e: Exception) { appendChat("[ERROR] ${e.message}"); setStatus("Готов", "green") }
     }
 
     private fun setStatus(text: String, color: String) = runOnUiThread { try { statusText.text = text; statusDot.setBackgroundResource(when(color){"green"->R.drawable.status_dot_green;"yellow"->R.drawable.status_dot_yellow;"red"->R.drawable.status_dot_red;else->R.drawable.status_dot_gray}) } catch (_: Exception) {} }
