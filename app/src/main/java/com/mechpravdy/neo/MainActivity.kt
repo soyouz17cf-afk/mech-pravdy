@@ -24,12 +24,20 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
+import com.google.mlkit.common.model.DownloadConditions
+import com.google.mlkit.nl.translate.TranslateLanguage
+import com.google.mlkit.nl.translate.Translation
+import com.google.mlkit.nl.translate.TranslatorOptions
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.face.*
 import com.google.mlkit.vision.label.ImageLabeling
 import com.google.mlkit.vision.label.ImageLabelerOptions
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
@@ -37,6 +45,7 @@ import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
+import kotlin.math.sqrt
 
 class MainActivity : AppCompatActivity() {
 
@@ -65,7 +74,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var matrixHeader: MatrixHeaderView
 
     private var labeler: com.google.mlkit.vision.label.ImageLabeler? = null
+    private var faceDetector: com.google.mlkit.vision.face.FaceDetector? = null
+    private var textRecognizer: com.google.mlkit.vision.text.TextRecognizer? = null
+    private var translator: com.google.mlkit.nl.translate.Translator? = null
     private var mlKitReady = false
+    private var translatorReady = false
+
+    private var lastAnalysisTime = 0L
 
     private val translateMap = mapOf(
         "hair" to "Волосы", "skin" to "Кожа", "beard" to "Борода",
@@ -80,6 +95,14 @@ class MainActivity : AppCompatActivity() {
     )
 
     private fun translateLabel(text: String) = translateMap[text.lowercase()] ?: text
+
+    private fun emotionText(face: Face): String {
+        val sb = StringBuilder()
+        val sp = face.smilingProbability; if (sp != null) { val spPct = (sp * 100).toInt(); when { sp > 0.8f -> sb.append("Широкая улыбка ($spPct%)\n"); sp > 0.4f -> sb.append("Лёгкая улыбка ($spPct%)\n"); else -> sb.append("Без улыбки\n") } }
+        val le = face.leftEyeOpenProbability; val re = face.rightEyeOpenProbability; if (le != null && re != null) { val avg = (le + re) / 2f; when { avg < 0.3f -> sb.append("Глаза закрыты\n"); avg < 0.7f -> sb.append("Глаза прищурены\n"); else -> sb.append("Глаза открыты\n") } }
+        val hy = face.headEulerAngleY; if (hy != null) { when { hy < -15f -> sb.append("Голова влево\n"); hy > 15f -> sb.append("Голова вправо\n"); else -> sb.append("Голова прямо\n") } }
+        return sb.toString()
+    }
 
     private val voiceLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result -> if (result.resultCode == RESULT_OK) { result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let { messageInput.setText(it); appendChat("[ГОЛОС] $it") } } }
     private val cameraLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result -> try { if (result.resultCode == RESULT_OK) { appendChat("[ФОТО] Снимок сделан.") } } catch (e: Exception) { appendChat("[ERROR] ${e.message}") } }
@@ -128,7 +151,7 @@ class MainActivity : AppCompatActivity() {
             sendButton.setOnClickListener { appendChat("[ℹ] Отправка сообщения ИИ"); sendMessage() }
             voiceButton.setOnClickListener { appendChat("[ℹ] Голосовой ввод: говорите"); startVoiceInput() }
             cameraButton.setOnClickListener { appendChat("[ℹ] Фото: снимок сделан"); captureSinglePhoto() }
-            attachButton.setOnClickListener { appendChat("[ℹ] Анализ фото: объекты и сцена"); captureAndAnalyze() }
+            attachButton.setOnClickListener { appendChat("[ℹ] Анализ фото: лица, объекты, текст"); captureAndAnalyze() }
             checkButton.setOnClickListener { appendChat("[ℹ] Проверка токена"); checkToken() }
             capsuleButton.setOnClickListener { showCapsuleDialog() }
             pipButton.setOnClickListener { enterPipMode() }
@@ -156,27 +179,13 @@ class MainActivity : AppCompatActivity() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 if (Settings.canDrawOverlays(this)) {
-                    // Разрешение есть — пробуем PiP
                     enterPictureInPictureMode(android.app.PictureInPictureParams.Builder().build())
                 } else {
-                    // Разрешения нет — отправляем в настройки
                     Toast.makeText(this, "Дайте разрешение 'Поверх других окон'", Toast.LENGTH_LONG).show()
-                    val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${packageName}"))
-                    startActivity(intent)
+                    startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${packageName}")))
                 }
-            } else {
-                // Старая версия Android — просто сворачиваем
-                moveTaskToBack(true)
-            }
-        } catch (e: Exception) {
-            // При любой ошибке — отправляем в настройки
-            try {
-                val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${packageName}"))
-                startActivity(intent)
-            } catch (ex: Exception) {
-                moveTaskToBack(true)
-            }
-        }
+            } else { moveTaskToBack(true) }
+        } catch (e: Exception) { try { startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${packageName}"))) } catch (ex: Exception) { moveTaskToBack(true) } }
     }
 
     private fun switchToNeo() {
@@ -212,7 +221,16 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    private fun initMlKit() { if (!mlKitReady) try { labeler = ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS); mlKitReady = true } catch (e: Exception) { appendChat("[ГЛАЗ] ML Kit: ${e.message}") } }
+    private fun initMlKit() {
+        if (mlKitReady) return
+        try {
+            labeler = ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS)
+            faceDetector = FaceDetection.getClient(FaceDetectorOptions.Builder().setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST).setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL).setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL).setMinFaceSize(0.15f).build())
+            textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+            translator = Translation.getClient(TranslatorOptions.Builder().setSourceLanguage(TranslateLanguage.ENGLISH).setTargetLanguage(TranslateLanguage.RUSSIAN).build())
+            mlKitReady = true
+        } catch (e: Exception) { appendChat("[ГЛАЗ] ML Kit: ${e.message}") }
+    }
 
     private fun captureAndAnalyze() { try { photoAnalysisLauncher.launch(Intent(MediaStore.ACTION_IMAGE_CAPTURE)) } catch (e: Exception) { appendChat("[ERROR] Камера: ${e.message}") } }
 
@@ -221,15 +239,22 @@ class MainActivity : AppCompatActivity() {
             initMlKit(); if (!mlKitReady) { appendChat("[ГЛАЗ] Модуль не загружен."); return }
             setStatus("Анализ...", "yellow")
             val scaledBitmap = Bitmap.createScaledBitmap(bitmap, bitmap.width / 2, bitmap.height / 2, true)
-            labeler?.process(InputImage.fromBitmap(scaledBitmap, 0))?.addOnSuccessListener { labels ->
-                if (labels.isEmpty()) { appendChat("[АНАЛИЗ] Объекты не распознаны.") }
-                else {
-                    val sb = StringBuilder(); for (l in labels.take(5)) { sb.append("${translateLabel(l.text)} (${(l.confidence * 100).toInt()}%)\n") }
-                    appendChat("[АНАЛИЗ] На фото:\n${sb.toString().trim()}")
-                }
-                setStatus("Готов", "green")
-            }?.addOnFailureListener { e -> appendChat("[АНАЛИЗ] Ошибка: ${e.message}"); setStatus("Готов", "green") }
+            val inputImage = InputImage.fromBitmap(scaledBitmap, 0)
+            var facesCount = 0; val labelResults = mutableListOf<String>(); var textFound = false; var pendingTasks = 3
+
+            fun checkDone() { pendingTasks--; if (pendingTasks <= 0) { val sb = StringBuilder(); if (facesCount > 0) sb.append("[ЛИЦА] Найдено: $facesCount\n"); if (labelResults.isNotEmpty()) sb.append("[ОБЪЕКТЫ] ${labelResults.joinToString(", ")}\n"); if (textFound) sb.append("[ТЕКСТ] Обнаружен\n"); appendChat(if (sb.isEmpty()) "[АНАЛИЗ] Ничего не найдено." else sb.toString().trim()); setStatus("Готов", "green") } }
+
+            try { faceDetector?.process(inputImage)?.addOnSuccessListener { faces -> try { facesCount = faces.size; if (faces.isNotEmpty()) { val esb = StringBuilder(); for ((i, f) in faces.withIndex()) { if (faces.size > 1) esb.append("Лицо ${i + 1}:\n"); esb.append(emotionText(f)) }; appendChat("[ЭМОЦИИ]\n$esb") } } catch (e: Exception) { appendChat("[ЭМОЦИИ] Ошибка") }; checkDone() }?.addOnFailureListener { checkDone() } } catch (e: Exception) { checkDone() }
+
+            try { labeler?.process(inputImage)?.addOnSuccessListener { labels -> try { if (labels.isNotEmpty()) { for (l in labels.take(5)) { labelResults.add("${translateLabel(l.text)} (${(l.confidence * 100).toInt()}%)") } } } catch (e: Exception) { } ; checkDone() }?.addOnFailureListener { checkDone() } } catch (e: Exception) { checkDone() }
+
+            try { textRecognizer?.process(inputImage)?.addOnSuccessListener { v -> val t = v.text; if (t.isNotBlank()) { textFound = true; appendChat("[ТЕКСТ]\n\"$t\""); if (t.any { it in 'A'..'Z' || it in 'a'..'z' }) translateText(t) }; checkDone() }?.addOnFailureListener { checkDone() } } catch (e: Exception) { checkDone() }
         } catch (e: Exception) { appendChat("[ERROR] ${e.message}"); setStatus("Готов", "green") }
+    }
+
+    private fun translateText(text: String) {
+        if (!translatorReady) { translator?.downloadModelIfNeeded(DownloadConditions.Builder().build())?.addOnSuccessListener { translatorReady = true; translateText(text) }?.addOnFailureListener { appendChat("[ПЕРЕВОДЧИК] Ошибка загрузки модели.") }; return }
+        translator?.translate(text)?.addOnSuccessListener { appendChat("[ПЕРЕВОД] $it") }?.addOnFailureListener { appendChat("[ПЕРЕВОДЧИК] Ошибка перевода.") }
     }
 
     private fun setStatus(text: String, color: String) = runOnUiThread { try { statusText.text = text; statusDot.setBackgroundResource(when(color){"green"->R.drawable.status_dot_green;"yellow"->R.drawable.status_dot_yellow;"red"->R.drawable.status_dot_red;else->R.drawable.status_dot_gray}) } catch (_: Exception) {} }
