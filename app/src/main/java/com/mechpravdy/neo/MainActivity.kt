@@ -30,7 +30,6 @@ import com.google.mlkit.nl.translate.Translation
 import com.google.mlkit.nl.translate.TranslatorOptions
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.*
-import com.google.mlkit.vision.label.ImageLabeling
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import okhttp3.*
@@ -70,7 +69,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusDot: View
     private lateinit var matrixHeader: MatrixHeaderView
 
-    private var labeler: com.google.mlkit.vision.label.ImageLabeler? = null
     private var faceDetector: com.google.mlkit.vision.face.FaceDetector? = null
     private var textRecognizer: com.google.mlkit.vision.text.TextRecognizer? = null
     private var translator: com.google.mlkit.nl.translate.Translator? = null
@@ -78,20 +76,6 @@ class MainActivity : AppCompatActivity() {
     private var translatorReady = false
 
     private var lastAnalysisTime = 0L
-
-    private val translateMap = mapOf(
-        "hair" to "Волосы", "skin" to "Кожа", "beard" to "Борода",
-        "selfie" to "Селфи", "moustache" to "Усы", "face" to "Лицо",
-        "person" to "Человек", "man" to "Мужчина", "woman" to "Женщина",
-        "eyeglasses" to "Очки", "eye" to "Глаз", "nose" to "Нос",
-        "mouth" to "Рот", "car" to "Машина", "dog" to "Собака",
-        "cat" to "Кошка", "tree" to "Дерево", "house" to "Дом",
-        "phone" to "Телефон", "laptop" to "Ноутбук", "book" to "Книга",
-        "sky" to "Небо", "grass" to "Трава", "road" to "Дорога",
-        "building" to "Здание", "chair" to "Стул", "table" to "Стол"
-    )
-
-    private fun translateLabel(text: String) = translateMap[text.lowercase()] ?: text
 
     private fun emotionText(face: Face): String {
         val sb = StringBuilder()
@@ -148,7 +132,7 @@ class MainActivity : AppCompatActivity() {
             sendButton.setOnClickListener { appendChat("[ℹ] Отправка сообщения ИИ"); sendMessage() }
             voiceButton.setOnClickListener { appendChat("[ℹ] Голосовой ввод: говорите"); startVoiceInput() }
             cameraButton.setOnClickListener { appendChat("[ℹ] Фото: снимок сделан"); captureSinglePhoto() }
-            attachButton.setOnClickListener { appendChat("[ℹ] Анализ фото: лица, объекты, текст"); captureAndAnalyze() }
+            attachButton.setOnClickListener { appendChat("[ℹ] Анализ фото: лица, текст"); captureAndAnalyze() }
             checkButton.setOnClickListener { appendChat("[ℹ] Проверка токена"); checkToken() }
             capsuleButton.setOnClickListener { showCapsuleDialog() }
             pipButton.setOnClickListener { enterPipMode() }
@@ -220,8 +204,7 @@ class MainActivity : AppCompatActivity() {
     private fun initMlKit() {
         if (mlKitReady) return
         try {
-            labeler = ImageLabeling.getClient(com.google.mlkit.vision.label.ImageLabelerOptions.DEFAULT_OPTIONS)
-            faceDetector = FaceDetection.getClient(FaceDetectorOptions.Builder().setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST).setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL).setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL).setMinFaceSize(0.15f).build())
+            faceDetector = FaceDetection.getClient(FaceDetectorOptions.Builder().setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST).setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_NONE).setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL).setMinFaceSize(0.15f).build())
             textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
             translator = Translation.getClient(TranslatorOptions.Builder().setSourceLanguage(TranslateLanguage.ENGLISH).setTargetLanguage(TranslateLanguage.RUSSIAN).build())
             mlKitReady = true
@@ -234,15 +217,12 @@ class MainActivity : AppCompatActivity() {
         try {
             initMlKit(); if (!mlKitReady) { appendChat("[ГЛАЗ] Модуль не загружен."); return }
             setStatus("Анализ...", "yellow")
-            val scaledBitmap = Bitmap.createScaledBitmap(bitmap, bitmap.width / 2, bitmap.height / 2, true)
-            val inputImage = InputImage.fromBitmap(scaledBitmap, 0)
-            var facesCount = 0; val labelResults = mutableListOf<String>(); var textFound = false; var pendingTasks = 3
+            val inputImage = InputImage.fromBitmap(bitmap, 0)
+            var facesCount = 0; var textFound = false; var pendingTasks = 2
 
-            fun checkDone() { pendingTasks--; if (pendingTasks <= 0) { val sb = StringBuilder(); if (facesCount > 0) sb.append("[ЛИЦА] Найдено: $facesCount\n"); if (labelResults.isNotEmpty()) sb.append("[ОБЪЕКТЫ] ${labelResults.joinToString(", ")}\n"); if (textFound) sb.append("[ТЕКСТ] Обнаружен\n"); appendChat(if (sb.isEmpty()) "[АНАЛИЗ] Ничего не найдено." else sb.toString().trim()); setStatus("Готов", "green") } }
+            fun checkDone() { pendingTasks--; if (pendingTasks <= 0) { val sb = StringBuilder(); if (facesCount > 0) sb.append("[ЛИЦА] Найдено: $facesCount\n"); if (textFound) sb.append("[ТЕКСТ] Обнаружен\n"); appendChat(if (sb.isEmpty()) "[АНАЛИЗ] Лиц и текста не найдено." else sb.toString().trim()); setStatus("Готов", "green") } }
 
             try { faceDetector?.process(inputImage)?.addOnSuccessListener { faces -> try { facesCount = faces.size; if (faces.isNotEmpty()) { val esb = StringBuilder(); for ((i, f) in faces.withIndex()) { if (faces.size > 1) esb.append("Лицо ${i + 1}:\n"); esb.append(emotionText(f)) }; appendChat("[ЭМОЦИИ]\n$esb") } } catch (e: Exception) { appendChat("[ЭМОЦИИ] Ошибка") }; checkDone() }?.addOnFailureListener { checkDone() } } catch (e: Exception) { checkDone() }
-
-            try { labeler?.process(inputImage)?.addOnSuccessListener { labels -> try { if (labels.isNotEmpty()) { for (l in labels.take(5)) { labelResults.add("${translateLabel(l.text)} (${(l.confidence * 100).toInt()}%)") } } } catch (e: Exception) { } ; checkDone() }?.addOnFailureListener { checkDone() } } catch (e: Exception) { checkDone() }
 
             try { textRecognizer?.process(inputImage)?.addOnSuccessListener { v -> val t = v.text; if (t.isNotBlank()) { textFound = true; appendChat("[ТЕКСТ]\n\"$t\""); if (t.any { it in 'A'..'Z' || it in 'a'..'z' }) translateText(t) }; checkDone() }?.addOnFailureListener { checkDone() } } catch (e: Exception) { checkDone() }
         } catch (e: Exception) { appendChat("[ERROR] ${e.message}"); setStatus("Готов", "green") }
@@ -317,7 +297,7 @@ System Prompt — алгоритм души.
         appendChat("[BATYA] $msg"); messageInput.setText(""); setStatus("Обработка...", "yellow")
 
         if (isLocalMode) {
-            appendChat("[NEO] Локальный ИИ пока не загружен. Используйте ГИГАЧАТ.")
+            appendChat("[NEO] Локальный ИИ ожидает загрузки модели.")
             setStatus("Онлайн", "green")
         } else {
             val isNeo = msg.lowercase().contains(password); val prompt = selectPrompt(msg)
