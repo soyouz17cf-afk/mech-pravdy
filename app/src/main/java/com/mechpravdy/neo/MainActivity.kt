@@ -45,7 +45,6 @@ import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
-import kotlin.math.sqrt
 
 class MainActivity : AppCompatActivity() {
 
@@ -79,7 +78,6 @@ class MainActivity : AppCompatActivity() {
     private var mlKitReady = false
     private var translatorReady = false
 
-    private var localEngine: LocalAiEngine? = null
     private var lastAnalysisTime = 0L
 
     private val translateMap = mapOf(
@@ -192,7 +190,7 @@ class MainActivity : AppCompatActivity() {
         isLocalMode = false; currentApiUrl = apiUrlGigaChat
         matrixHeader.neoActive = true; matrixHeader.localActive = false; matrixHeader.connectionLost = false
         matrixHeader.invalidate()
-        appendChat("[РЕЖИМ] ГИГАЧАТ (GigaChat)"); setStatus("ГИГАЧАТ", "green")
+        appendChat("[РЕЖИМ] ГИГАЧАТ"); setStatus("ГИГАЧАТ", "green")
         checkConnection()
     }
 
@@ -200,18 +198,7 @@ class MainActivity : AppCompatActivity() {
         isLocalMode = true
         matrixHeader.localActive = true; matrixHeader.neoActive = false; matrixHeader.connectionLost = false
         matrixHeader.invalidate()
-        appendChat("[РЕЖИМ] ДИПСИК (локальный ИИ)")
-        setStatus("ДИПСИК", "yellow")
-
-        if (localEngine == null) localEngine = LocalAiEngine(this)
-        appendChat("[МОЗГ] Загружаю DeepSeek-R1...")
-        localEngine?.loadModel(
-            onProgress = { msg -> appendChat("[МОЗГ] $msg") },
-            onDone = { success ->
-                if (success) appendChat("[МОЗГ] Готов к бою.")
-                else appendChat("[МОЗГ] Не удалось загрузить.")
-            }
-        )
+        appendChat("[РЕЖИМ] ДИПСИК (ожидает локальный ИИ)"); setStatus("ДИПСИК", "yellow")
     }
 
     private fun checkConnection() {
@@ -331,11 +318,8 @@ System Prompt — алгоритм души.
         appendChat("[BATYA] $msg"); messageInput.setText(""); setStatus("Обработка...", "yellow")
 
         if (isLocalMode) {
-            localEngine?.generate(
-                prompt = msg,
-                onToken = { token -> appendChat("[NEO] $token") },
-                onDone = { setStatus("Онлайн", "green") }
-            )
+            appendChat("[NEO] Локальный ИИ пока не загружен. Используйте ГИГАЧАТ.")
+            setStatus("Онлайн", "green")
         } else {
             val isNeo = msg.lowercase().contains(password); val prompt = selectPrompt(msg)
             val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", prompt) }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", msg) }) }); addProperty("temperature", 0.7); addProperty("max_tokens", 1000) }
