@@ -31,12 +31,10 @@ class MatrixHeaderView @JvmOverloads constructor(
     private val subtitlePaint = Paint().apply { color = Color.parseColor("#CCFFCC"); textSize = 26f; typeface = Typeface.create("sans-serif-light", Typeface.NORMAL); isAntiAlias = true; textAlign = Paint.Align.CENTER }
     private val logoBgPaint = Paint().apply { color = Color.parseColor("#1A8A2E") }
 
-    // Состояния светофора
     var neoActive = true
     var localActive = false
     var connectionLost = false
 
-    // Кнопки (графические)
     private var neoButtonRect = RectF()
     private var localButtonRect = RectF()
     var onNeoClick: (() -> Unit)? = null
@@ -58,7 +56,6 @@ class MatrixHeaderView @JvmOverloads constructor(
         val logoW = w * 0.45f; val logoH = h * 0.55f
         logoRect = RectF((w - logoW) / 2f, (h - logoH) / 2f, (w + logoW) / 2f, (h + logoH) / 2f)
 
-        // Кнопки под логотипом
         val btnW = logoW * 0.42f; val btnH = logoH * 0.22f; val btnY = logoRect.bottom + 4f
         neoButtonRect = RectF(logoRect.left, btnY, logoRect.left + btnW, btnY + btnH)
         localButtonRect = RectF(logoRect.right - btnW, btnY, logoRect.right, btnY + btnH)
@@ -77,41 +74,39 @@ class MatrixHeaderView @JvmOverloads constructor(
 
         for (i in 0 until maxLines) { val line = lines[i] ?: continue; val y = lineY[i]; if (y > screenH + lineHeight || y < -lineHeight) continue; val limit = printed[i].coerceAtMost(line.length); for (c in 0 until limit) { val x = c * fontSize; if (x >= logoRect.left && x <= logoRect.right && y >= logoRect.top && y <= logoRect.bottom) continue; canvas.drawText(line[c].toString(), x, y, paint) } }
 
-        // Логотип
         canvas.drawRoundRect(logoRect, 16f, 16f, logoBgPaint)
         canvas.drawText("СБЕР", w / 2, logoRect.top + logoRect.height() * 0.45f, titlePaint)
         canvas.drawText("ГигаЧат", w / 2, logoRect.top + logoRect.height() * 0.75f, subtitlePaint)
 
-        // Кнопки под логотипом
         val btnPaint = Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 18f; typeface = Typeface.DEFAULT_BOLD }
         val btnTextPaint = Paint().apply { color = Color.WHITE; isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 18f; typeface = Typeface.DEFAULT_BOLD }
 
-        // НЕО
         btnPaint.color = if (neoActive) Color.parseColor("#21A038") else Color.parseColor("#555555")
         canvas.drawRoundRect(neoButtonRect, 8f, 8f, btnPaint)
         canvas.drawText("НЕО", neoButtonRect.centerX(), neoButtonRect.centerY() + 6f, btnTextPaint)
 
-        // ЛОКАЛЬ
         btnPaint.color = if (localActive) Color.parseColor("#FF8800") else Color.parseColor("#555555")
         canvas.drawRoundRect(localButtonRect, 8f, 8f, btnPaint)
         canvas.drawText("ЛОКАЛЬ", localButtonRect.centerX(), localButtonRect.centerY() + 6f, btnTextPaint)
 
-        // Светофор (справа от логотипа)
-        val trafficX = logoRect.right + 16f; val trafficY = logoRect.top + logoRect.height() * 0.3f
-        val dotRadius = 8f; val dotSpacing = 24f
+        // Светофор — крупные кружки 16dp
+        val trafficX = logoRect.right + 20f
+        val trafficY = logoRect.top + logoRect.height() * 0.25f
+        val dotRadius = 16f
+        val dotSpacing = 36f
         val dotPaint = Paint().apply { isAntiAlias = true }
 
-        // СВЯЗЬ — зелёный если есть связь, красный если нет
+        // СВЯЗЬ
         dotPaint.color = if (!connectionLost) Color.parseColor("#00FF00") else Color.parseColor("#FF0000")
         canvas.drawCircle(trafficX, trafficY, dotRadius, dotPaint)
 
-        // БЕДА — красный всегда когда connectionLost
+        // NO CONNECT
         dotPaint.color = if (connectionLost) Color.parseColor("#FF0000") else Color.parseColor("#555555")
         canvas.drawCircle(trafficX, trafficY + dotSpacing, dotRadius, dotPaint)
 
-        val labelPaint = Paint().apply { color = Color.parseColor("#888888"); textSize = 14f; typeface = Typeface.DEFAULT; isAntiAlias = true }
-        canvas.drawText("СВЯЗЬ", trafficX + 16f, trafficY + 6f, labelPaint)
-        canvas.drawText("БЕДА", trafficX + 16f, trafficY + dotSpacing + 6f, labelPaint)
+        val labelPaint = Paint().apply { color = Color.parseColor("#888888"); textSize = 15f; typeface = Typeface.DEFAULT; isAntiAlias = true }
+        canvas.drawText("СВЯЗЬ", trafficX + 22f, trafficY + 6f, labelPaint)
+        canvas.drawText("NO CONNECT", trafficX + 22f, trafficY + dotSpacing + 6f, labelPaint)
 
         postInvalidateDelayed(50)
     }
