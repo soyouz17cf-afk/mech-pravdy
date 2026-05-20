@@ -223,7 +223,8 @@ class MainActivity : AppCompatActivity() {
     private fun initMlKit() {
         if (mlKitReady) return
         try {
-            labeler = ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS)
+            // Используем полный путь к ImageLabelerOptions (без импорта)
+            labeler = ImageLabeling.getClient(com.google.mlkit.vision.label.ImageLabelerOptions.DEFAULT_OPTIONS)
             faceDetector = FaceDetection.getClient(FaceDetectorOptions.Builder().setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST).setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL).setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL).setMinFaceSize(0.15f).build())
             textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
             translator = Translation.getClient(TranslatorOptions.Builder().setSourceLanguage(TranslateLanguage.ENGLISH).setTargetLanguage(TranslateLanguage.RUSSIAN).build())
