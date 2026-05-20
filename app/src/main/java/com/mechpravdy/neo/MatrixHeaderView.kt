@@ -58,8 +58,8 @@ class MatrixHeaderView @JvmOverloads constructor(
         val logoW = w * 0.45f; val logoH = h * 0.55f
         logoRect = RectF((w - logoW) / 2f, (h - logoH) / 2f, (w + logoW) / 2f, (h + logoH) / 2f)
 
-        // Кнопки НЕО/ЛОКАЛЬ под логотипом
-        val btnW = logoW * 0.4f; val btnH = logoH * 0.2f; val btnY = logoRect.bottom + 4f
+        // Кнопки под логотипом
+        val btnW = logoW * 0.42f; val btnH = logoH * 0.22f; val btnY = logoRect.bottom + 4f
         neoButtonRect = RectF(logoRect.left, btnY, logoRect.left + btnW, btnY + btnH)
         localButtonRect = RectF(logoRect.right - btnW, btnY, logoRect.right, btnY + btnH)
     }
@@ -82,26 +82,30 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawText("СБЕР", w / 2, logoRect.top + logoRect.height() * 0.45f, titlePaint)
         canvas.drawText("ГигаЧат", w / 2, logoRect.top + logoRect.height() * 0.75f, subtitlePaint)
 
-        // Кнопки НЕО/ЛОКАЛЬ под логотипом
-        val btnPaint = Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 20f; typeface = Typeface.DEFAULT_BOLD }
-        val btnTextPaint = Paint().apply { color = Color.WHITE; isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 20f; typeface = Typeface.DEFAULT_BOLD }
+        // Кнопки под логотипом
+        val btnPaint = Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 18f; typeface = Typeface.DEFAULT_BOLD }
+        val btnTextPaint = Paint().apply { color = Color.WHITE; isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 18f; typeface = Typeface.DEFAULT_BOLD }
 
         // НЕО
         btnPaint.color = if (neoActive) Color.parseColor("#21A038") else Color.parseColor("#555555")
         canvas.drawRoundRect(neoButtonRect, 8f, 8f, btnPaint)
-        canvas.drawText("НЕО", neoButtonRect.centerX(), neoButtonRect.centerY() + 7f, btnTextPaint)
+        canvas.drawText("НЕО", neoButtonRect.centerX(), neoButtonRect.centerY() + 6f, btnTextPaint)
 
         // ЛОКАЛЬ
         btnPaint.color = if (localActive) Color.parseColor("#FF8800") else Color.parseColor("#555555")
         canvas.drawRoundRect(localButtonRect, 8f, 8f, btnPaint)
-        canvas.drawText("ЛОК", localButtonRect.centerX(), localButtonRect.centerY() + 7f, btnTextPaint)
+        canvas.drawText("ЛОКАЛЬ", localButtonRect.centerX(), localButtonRect.centerY() + 6f, btnTextPaint)
 
         // Светофор (справа от логотипа)
         val trafficX = logoRect.right + 16f; val trafficY = logoRect.top + logoRect.height() * 0.3f
         val dotRadius = 8f; val dotSpacing = 24f
         val dotPaint = Paint().apply { isAntiAlias = true }
-        dotPaint.color = if (neoActive || localActive) Color.parseColor("#00FF00") else Color.parseColor("#555555")
+
+        // СВЯЗЬ — зелёный если есть связь, красный если нет
+        dotPaint.color = if (!connectionLost) Color.parseColor("#00FF00") else Color.parseColor("#FF0000")
         canvas.drawCircle(trafficX, trafficY, dotRadius, dotPaint)
+
+        // БЕДА — красный всегда когда connectionLost
         dotPaint.color = if (connectionLost) Color.parseColor("#FF0000") else Color.parseColor("#555555")
         canvas.drawCircle(trafficX, trafficY + dotSpacing, dotRadius, dotPaint)
 
