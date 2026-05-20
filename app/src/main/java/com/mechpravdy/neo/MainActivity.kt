@@ -6,9 +6,11 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.*
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
+import android.provider.Settings
 import android.speech.RecognizerIntent
 import android.widget.Button
 import android.widget.EditText
@@ -86,13 +88,9 @@ class MainActivity : AppCompatActivity() {
         try {
             if (result.resultCode == RESULT_OK) {
                 val bitmap = result.data?.extras?.get("data") as? Bitmap
-                if (bitmap != null) {
-                    analyzeBitmap(bitmap)
-                }
+                if (bitmap != null) { analyzeBitmap(bitmap) }
             }
-        } catch (e: Exception) {
-            appendChat("[ERROR] Ошибка анализа фото: ${e.message}")
-        }
+        } catch (e: Exception) { appendChat("[ERROR] Ошибка анализа фото: ${e.message}") }
     }
 
     private val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager { override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}; override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}; override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf() })
@@ -155,8 +153,30 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun enterPipMode() {
-        try { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) { enterPictureInPictureMode(android.app.PictureInPictureParams.Builder().build()) } }
-        catch (e: Exception) { Toast.makeText(this, "Режим ОКНО не поддерживается", Toast.LENGTH_SHORT).show() }
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (Settings.canDrawOverlays(this)) {
+                    // Разрешение есть — пробуем PiP
+                    enterPictureInPictureMode(android.app.PictureInPictureParams.Builder().build())
+                } else {
+                    // Разрешения нет — отправляем в настройки
+                    Toast.makeText(this, "Дайте разрешение 'Поверх других окон'", Toast.LENGTH_LONG).show()
+                    val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${packageName}"))
+                    startActivity(intent)
+                }
+            } else {
+                // Старая версия Android — просто сворачиваем
+                moveTaskToBack(true)
+            }
+        } catch (e: Exception) {
+            // При любой ошибке — отправляем в настройки
+            try {
+                val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${packageName}"))
+                startActivity(intent)
+            } catch (ex: Exception) {
+                moveTaskToBack(true)
+            }
+        }
     }
 
     private fun switchToNeo() {
@@ -192,44 +212,23 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    private fun initMlKit() {
-        if (mlKitReady) return
-        try {
-            labeler = ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS)
-            mlKitReady = true
-        } catch (e: Exception) { appendChat("[ГЛАЗ] ML Kit: ${e.message}") }
-    }
+    private fun initMlKit() { if (!mlKitReady) try { labeler = ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS); mlKitReady = true } catch (e: Exception) { appendChat("[ГЛАЗ] ML Kit: ${e.message}") } }
 
-    private fun captureAndAnalyze() {
-        try {
-            val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-            photoAnalysisLauncher.launch(intent)
-        } catch (e: Exception) { appendChat("[ERROR] Камера: ${e.message}") }
-    }
+    private fun captureAndAnalyze() { try { photoAnalysisLauncher.launch(Intent(MediaStore.ACTION_IMAGE_CAPTURE)) } catch (e: Exception) { appendChat("[ERROR] Камера: ${e.message}") } }
 
     private fun analyzeBitmap(bitmap: Bitmap) {
         try {
-            initMlKit()
-            if (!mlKitReady) { appendChat("[ГЛАЗ] Модуль не загружен."); return }
+            initMlKit(); if (!mlKitReady) { appendChat("[ГЛАЗ] Модуль не загружен."); return }
             setStatus("Анализ...", "yellow")
             val scaledBitmap = Bitmap.createScaledBitmap(bitmap, bitmap.width / 2, bitmap.height / 2, true)
-            val inputImage = InputImage.fromBitmap(scaledBitmap, 0)
-            labeler?.process(inputImage)?.addOnSuccessListener { labels ->
+            labeler?.process(InputImage.fromBitmap(scaledBitmap, 0))?.addOnSuccessListener { labels ->
                 if (labels.isEmpty()) { appendChat("[АНАЛИЗ] Объекты не распознаны.") }
                 else {
-                    val sb = StringBuilder()
-                    for (l in labels.take(5)) {
-                        val name = translateLabel(l.text)
-                        val confPct = (l.confidence * 100).toInt()
-                        sb.append("$name ($confPct%)\n")
-                    }
+                    val sb = StringBuilder(); for (l in labels.take(5)) { sb.append("${translateLabel(l.text)} (${(l.confidence * 100).toInt()}%)\n") }
                     appendChat("[АНАЛИЗ] На фото:\n${sb.toString().trim()}")
                 }
                 setStatus("Готов", "green")
-            }?.addOnFailureListener { e ->
-                appendChat("[АНАЛИЗ] Ошибка: ${e.message}")
-                setStatus("Готов", "green")
-            }
+            }?.addOnFailureListener { e -> appendChat("[АНАЛИЗ] Ошибка: ${e.message}"); setStatus("Готов", "green") }
         } catch (e: Exception) { appendChat("[ERROR] ${e.message}"); setStatus("Готов", "green") }
     }
 
