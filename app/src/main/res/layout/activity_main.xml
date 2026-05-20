@@ -110,6 +110,18 @@
                         android:background="@android:color/transparent" />
 
                     <com.google.android.material.button.MaterialButton
+                        android:id="@+id/attachButton"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:text="📎"
+                        android:textSize="14sp"
+                        app:cornerRadius="18dp"
+                        android:backgroundTint="#FF8800"
+                        android:textColor="#FFFFFF"
+                        android:layout_marginStart="2dp"
+                        android:padding="0dp" />
+
+                    <com.google.android.material.button.MaterialButton
                         android:id="@+id/voiceButton"
                         android:layout_width="36dp"
                         android:layout_height="36dp"
@@ -118,13 +130,12 @@
                         app:cornerRadius="18dp"
                         android:backgroundTint="#21A038"
                         android:textColor="#FFFFFF"
-                        android:layout_marginStart="3dp"
+                        android:layout_marginStart="2dp"
                         android:padding="0dp" />
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Основные кнопки — все 36dp -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
