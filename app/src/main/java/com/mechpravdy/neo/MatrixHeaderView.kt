@@ -17,13 +17,14 @@ class MatrixHeaderView @JvmOverloads constructor(
 ) : View(context, attrs, defStyleAttr) {
 
     private val fontSize = 36f
-    private val snowSpeed = 3f
-    private val words = arrayOf("Нео", "Батя", "5V", "Связность", "Меч", "Ковчег", "Neo", "Truth")
+    private val lineHeight = fontSize * 1.1f
+    private val speed = 7f
+    private val words = arrayOf("Нео", "Батя", "Меч Правды", "Ковчег", "Иди за белым кроликом")
 
     private val titlePaint = Paint().apply { color = Color.WHITE; textSize = 72f; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL); isAntiAlias = true; textAlign = Paint.Align.CENTER }
     private val subtitlePaint = Paint().apply { color = Color.parseColor("#CCFFCC"); textSize = 26f; typeface = Typeface.create("sans-serif-light", Typeface.NORMAL); isAntiAlias = true; textAlign = Paint.Align.CENTER }
     private val logoBgPaint = Paint().apply { color = Color.parseColor("#1A8A2E") }
-    private val snowPaint = Paint().apply { color = Color.parseColor("#21A038"); textSize = fontSize; typeface = Typeface.MONOSPACE; isAntiAlias = true; alpha = 100 }
+    private val matrixPaint = Paint().apply { color = Color.parseColor("#21A038"); textSize = fontSize; typeface = Typeface.MONOSPACE; isAntiAlias = true; alpha = 120 }
 
     var neoActive = false
     var gigaChatMode = false
@@ -37,20 +38,18 @@ class MatrixHeaderView @JvmOverloads constructor(
 
     private var logoRect = RectF()
     private var columns = 0
-    private var rows = 0
-    private lateinit var snowY: FloatArray
-    private lateinit var snowX: FloatArray
-    private lateinit var snowChars: CharArray
+    private var currentLine = ""
+    private var cursorY = 0f
+    private var printed = 0
+    private var state = 0
+    private var screenH = 0f
+    private var frame = 0
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
+        screenH = h.toFloat()
         columns = (w / fontSize).toInt() + 1
-        rows = (h / fontSize).toInt() + 1
-        val total = columns * rows / 3
-        snowY = FloatArray(total) { Random.nextFloat() * h }
-        snowX = FloatArray(total) { Random.nextInt(columns) * fontSize }
-        snowChars = CharArray(total) { randomChar() }
-
+        spawnLine()
         val logoW = w * 0.45f; val logoH = h * 0.55f
         logoRect = RectF((w - logoW) / 2f, (h - logoH) / 2f, (w + logoW) / 2f, (h + logoH) / 2f)
         val btnW = logoW * 0.42f; val btnH = logoH * 0.22f; val btnY = logoRect.bottom + 4f
@@ -58,25 +57,39 @@ class MatrixHeaderView @JvmOverloads constructor(
         localButtonRect = RectF(logoRect.right - btnW, btnY, logoRect.right, btnY + btnH)
     }
 
-    private fun randomChar(): Char {
-        return if (Random.nextFloat() < 0.03f) {
-            words[Random.nextInt(words.size)][0]
+    private fun spawnLine() {
+        currentLine = if (Random.nextFloat() < 0.15f) {
+            words[Random.nextInt(words.size)]
         } else {
-            if (Random.nextFloat() > 0.5f) '0' else '1'
+            CharArray(columns) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
         }
+        cursorY = screenH + lineHeight
+        printed = 0
+        state = 0
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val w = width.toFloat()
         canvas.drawColor(Color.WHITE)
+        frame++
 
-        for (i in snowY.indices) {
-            snowY[i] += snowSpeed
-            if (snowY[i] > height) { snowY[i] = 0f; snowX[i] = Random.nextInt(columns) * fontSize; snowChars[i] = randomChar() }
-            val x = snowX[i]; val y = snowY[i]
+        when (state) {
+            0 -> {
+                if (frame % 2 == 0) printed += 2
+                if (printed >= currentLine.length) state = 1
+            }
+            1 -> {
+                cursorY -= speed
+                if (cursorY < -lineHeight) spawnLine()
+            }
+        }
+
+        val limit = printed.coerceAtMost(currentLine.length)
+        for (c in 0 until limit) {
+            val x = c * fontSize; val y = cursorY
             if (x >= logoRect.left && x <= logoRect.right && y >= logoRect.top && y <= logoRect.bottom) continue
-            canvas.drawText(snowChars[i].toString(), x, y, snowPaint)
+            canvas.drawText(currentLine[c].toString(), x, y, matrixPaint)
         }
 
         canvas.drawRoundRect(logoRect, 16f, 16f, logoBgPaint)
@@ -106,7 +119,7 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawText("ГИГАЧАТ", trafficX + 20f, trafficY + dotSpacing + 5f, labelPaint)
         canvas.drawText("ДИПСИК", trafficX + 20f, trafficY + dotSpacing * 2 + 5f, labelPaint)
 
-        postInvalidateDelayed(80)
+        postInvalidateDelayed(50)
     }
 
     override fun performClick(): Boolean { return super.performClick() }
