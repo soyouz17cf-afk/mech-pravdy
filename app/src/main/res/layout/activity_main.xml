@@ -197,21 +197,6 @@
                 app:cornerRadius="3dp"
                 android:backgroundTint="#21A038"
                 android:textColor="#FFFFFF"
-                android:layout_marginStart="1dp"
-                android:layout_marginEnd="1dp" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/pipButton"
-                android:layout_width="0dp"
-                android:layout_height="36dp"
-                android:layout_weight="1"
-                android:text="ОКНО"
-                android:textSize="6sp"
-                android:textStyle="bold"
-                app:cornerRadius="3dp"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:textColor="#FF8800"
-                app:strokeColor="#FF8800"
                 android:layout_marginStart="1dp" />
         </LinearLayout>
 
