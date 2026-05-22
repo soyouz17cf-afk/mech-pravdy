@@ -262,9 +262,9 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="SBER DEVICES • GigaChat API"
+            android:text="Powered by Father \u0026 Neo"
             android:textSize="7sp"
-            android:textColor="#AAAAAA"
+            android:textColor="#21A038"
             android:gravity="center"
             android:layout_marginTop="1dp" />
 
