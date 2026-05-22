@@ -21,7 +21,8 @@ class MatrixHeaderView @JvmOverloads constructor(
     private val bgPaint = Paint().apply { color = Color.WHITE }
 
     var neoActive = false
-    var localActive = false
+    var gigaChatMode = false
+    var localMode = false
     var connectionLost = false
 
     private var neoButtonRect = RectF()
@@ -51,25 +52,33 @@ class MatrixHeaderView @JvmOverloads constructor(
 
         val btnPaint = Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 18f; typeface = Typeface.DEFAULT_BOLD }
         val btnTextPaint = Paint().apply { color = Color.WHITE; isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 18f; typeface = Typeface.DEFAULT_BOLD }
-        btnPaint.color = if (neoActive) Color.parseColor("#21A038") else Color.parseColor("#555555")
+        btnPaint.color = if (gigaChatMode) Color.parseColor("#21A038") else Color.parseColor("#555555")
         canvas.drawRoundRect(neoButtonRect, 8f, 8f, btnPaint)
         canvas.drawText("ГИГАЧАТ", neoButtonRect.centerX(), neoButtonRect.centerY() + 6f, btnTextPaint)
-        btnPaint.color = if (localActive) Color.parseColor("#FF8800") else Color.parseColor("#555555")
+        btnPaint.color = if (localMode) Color.parseColor("#FF8800") else Color.parseColor("#555555")
         canvas.drawRoundRect(localButtonRect, 8f, 8f, btnPaint)
         canvas.drawText("ДИПСИК", localButtonRect.centerX(), localButtonRect.centerY() + 6f, btnTextPaint)
 
+        // Светофор
         val trafficX = logoRect.right + 20f
         val trafficY = logoRect.top + logoRect.height() * 0.15f
         val dotRadius = 14f; val dotSpacing = 30f
         val dotPaint = Paint().apply { isAntiAlias = true }
-        dotPaint.color = if (!connectionLost && (neoActive || localActive)) Color.parseColor("#00FF00") else Color.parseColor("#555555")
+
+        // НЕО — зелёный если neoActive (пароль Связность введён)
+        dotPaint.color = if (neoActive) Color.parseColor("#00FF00") else Color.parseColor("#555555")
         canvas.drawCircle(trafficX, trafficY, dotRadius, dotPaint)
-        dotPaint.color = if (neoActive && !connectionLost) Color.parseColor("#21A038") else Color.parseColor("#555555")
+
+        // ГИГАЧАТ — зелёный если gigaChatMode
+        dotPaint.color = if (gigaChatMode && !connectionLost) Color.parseColor("#21A038") else Color.parseColor("#555555")
         canvas.drawCircle(trafficX, trafficY + dotSpacing, dotRadius, dotPaint)
-        dotPaint.color = if (localActive) Color.parseColor("#FFCC00") else Color.parseColor("#555555")
+
+        // ДИПСИК — жёлтый если localMode
+        dotPaint.color = if (localMode) Color.parseColor("#FFCC00") else Color.parseColor("#555555")
         canvas.drawCircle(trafficX, trafficY + dotSpacing * 2, dotRadius, dotPaint)
+
         val labelPaint = Paint().apply { color = Color.parseColor("#888888"); textSize = 13f; typeface = Typeface.DEFAULT; isAntiAlias = true }
-        canvas.drawText("СВЯЗЬ", trafficX + 20f, trafficY + 5f, labelPaint)
+        canvas.drawText("НЕО", trafficX + 20f, trafficY + 5f, labelPaint)
         canvas.drawText("ГИГАЧАТ", trafficX + 20f, trafficY + dotSpacing + 5f, labelPaint)
         canvas.drawText("ДИПСИК", trafficX + 20f, trafficY + dotSpacing * 2 + 5f, labelPaint)
     }
