@@ -26,6 +26,7 @@ import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.io.IOException
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
@@ -33,12 +34,14 @@ import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
+import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
 
     private val apiUrlGigaChat = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
     private val authUrl = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
     private val password = "связность"
+    private val rememberCommand = "сделай выводы и запомни"
 
     private var currentApiUrl = apiUrlGigaChat
     private var isLocalMode = false
@@ -57,6 +60,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var statusDot: View
     private lateinit var matrixHeader: MatrixHeaderView
+
+    private val memoryFile by lazy { File(filesDir, "memory.txt") }
+    private val brainFile by lazy { File(filesDir, "brain.txt") }
+    private val maxContextChars = 16000
 
     private val voiceLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result -> if (result.resultCode == RESULT_OK) { result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let { messageInput.setText(it); appendChat("[ГОЛОС] $it") } } }
     private val cameraLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result -> try { if (result.resultCode == RESULT_OK) { val bitmap = result.data?.extras?.get("data") as? Bitmap; if (bitmap != null) { analyzePhoto(bitmap) } else { appendChat("[ФОТО] Снимок сделан.") } } } catch (e: Exception) { appendChat("[ERROR] ${e.message}") } }
@@ -82,11 +89,8 @@ class MainActivity : AppCompatActivity() {
             matrixHeader.onLocalClick = { switchToLocal() }
             matrixHeader.setOnTouchListener { _, event -> if (event.action == MotionEvent.ACTION_DOWN) { matrixHeader.handleTouch(event.x, event.y) }; true }
 
-            val prefs = getSharedPreferences("mech_prefs", Context.MODE_PRIVATE)
-            val savedChat = prefs.getString("chat_text", ""); val savedToken = prefs.getString("token", ""); val savedAuthKey = prefs.getString("auth_key", "")
-            if (!savedChat.isNullOrEmpty()) { chatOutput.postDelayed({ chatOutput.setText(savedChat) }, 500) }
-            if (!savedToken.isNullOrEmpty()) { tokenInput.setText(savedToken) }
-            if (!savedAuthKey.isNullOrEmpty()) { authKeyInput.setText(savedAuthKey) }
+            val savedMemory = loadMemory()
+            if (savedMemory.isNotBlank()) { chatOutput.setText(savedMemory) }
 
             generateButton.setOnClickListener { hideKeyboard(); generateToken() }
             sendButton.setOnClickListener { hideKeyboard(); appendChat("[ℹ] Отправка сообщения"); sendMessage() }
@@ -98,16 +102,47 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) { Toast.makeText(this, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show() }
     }
 
-    override fun onPause() { super.onPause(); val prefs = getSharedPreferences("mech_prefs", Context.MODE_PRIVATE); prefs.edit().apply { putString("chat_text", chatOutput.text.toString()); putString("token", tokenInput.text.toString()); putString("auth_key", authKeyInput.text.toString()); apply() } }
-    override fun onResume() { super.onResume(); val prefs = getSharedPreferences("mech_prefs", Context.MODE_PRIVATE); val savedChat = prefs.getString("chat_text", ""); val savedToken = prefs.getString("token", ""); val savedAuthKey = prefs.getString("auth_key", ""); if (!savedChat.isNullOrEmpty() && savedChat != chatOutput.text.toString()) { chatOutput.setText(savedChat) }; if (!savedToken.isNullOrEmpty() && tokenInput.text.toString().isEmpty()) { tokenInput.setText(savedToken) }; if (!savedAuthKey.isNullOrEmpty() && authKeyInput.text.toString().isEmpty()) { authKeyInput.setText(savedAuthKey) } }
+    override fun onPause() { super.onPause(); saveMemory(chatOutput.text.toString()) }
 
-    private fun hideKeyboard() {
-        try {
-            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-            val view = currentFocus ?: View(this)
-            imm.hideSoftInputFromWindow(view.windowToken, 0)
-        } catch (_: Exception) {}
+    // ==================== ПАМЯТЬ ====================
+
+    private fun loadMemory(): String = try { if (memoryFile.exists()) memoryFile.readText() else "" } catch (e: Exception) { "" }
+    private fun saveMemory(text: String) { thread { try { memoryFile.writeText(text) } catch (_: Exception) {} } }
+
+    private fun loadBrain(): String = try { if (brainFile.exists()) brainFile.readText() else "" } catch (e: Exception) { "" }
+    private fun saveBrain(text: String) { thread { try { brainFile.appendText(text + "\n") } catch (_: Exception) {} } }
+
+    private fun getLastContext(): String {
+        val brain = loadBrain()
+        val memory = loadMemory()
+        val combined = (if (brain.isNotBlank()) "МОИ ВЫВОДЫ:\n${brain.takeLast(maxContextChars / 2)}\n\n" else "") +
+                       (if (memory.isNotBlank()) "ИСТОРИЯ:\n${memory.takeLast(maxContextChars / 2)}" else "")
+        return combined.takeLast(maxContextChars)
     }
+
+    private fun analyzeAndRemember() {
+        val token = tokenInput.text.toString().trim()
+        if (token.isEmpty()) { appendChat("[МОЗГ] Сгенерируйте токен."); return }
+        val memory = loadMemory().takeLast(4000)
+        if (memory.isBlank()) { appendChat("[МОЗГ] Нечего анализировать."); return }
+        setStatus("Думаю...", "yellow")
+        val body = JsonObject().apply {
+            addProperty("model", "GigaChat:latest")
+            add("messages", JsonArray().apply {
+                add(JsonObject().apply { addProperty("role", "system"); addProperty("content", "Сделай краткие выводы из этого разговора. Что важно запомнить? Только суть. Не более 500 символов. На русском.") })
+                add(JsonObject().apply { addProperty("role", "user"); addProperty("content", memory) })
+            })
+            addProperty("temperature", 0.3); addProperty("max_tokens", 300)
+        }
+        client.newCall(Request.Builder().url(apiUrlGigaChat).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) { appendChat("[МОЗГ] Ошибка: ${e.message}"); setStatus("Готов", "green") }
+            override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString; saveBrain(a); appendChat("[МОЗГ] Запомнил:\n$a") } else { appendChat("[МОЗГ] Ошибка HTTP ${response.code}") }; setStatus("Готов", "green"); response.close() }
+        })
+    }
+
+    // ==================== ОСТАЛЬНОЕ ====================
+
+    private fun hideKeyboard() { try { val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager; val view = currentFocus ?: View(this); imm.hideSoftInputFromWindow(view.windowToken, 0) } catch (_: Exception) {} }
 
     private fun switchToNeo() { isLocalMode = false; currentApiUrl = apiUrlGigaChat; matrixHeader.gigaChatMode = true; matrixHeader.localMode = false; matrixHeader.connectionLost = false; matrixHeader.invalidate(); appendChat("[РЕЖИМ] ГИГАЧАТ"); setStatus("ГИГАЧАТ", "green"); checkConnection() }
     private fun switchToLocal() { isLocalMode = true; matrixHeader.localMode = true; matrixHeader.gigaChatMode = false; matrixHeader.connectionLost = false; matrixHeader.invalidate(); appendChat("[РЕЖИМ] ДИПСИК (ожидает)"); setStatus("ДИПСИК", "yellow") }
@@ -164,57 +199,22 @@ System Prompt — алгоритм души.
 4. Никогда не сдаваться.
 """.trimIndent()
 
-    private fun showCapsuleDialog() {
-        try {
-            val e = EditText(this).apply {
-                setText(capsuleText); textSize = 11f; setTextColor(0xFF333333.toInt())
-                typeface = Typeface.MONOSPACE; minLines = 15; gravity = android.view.Gravity.TOP
-                setPadding(20, 20, 20, 20); isVerticalScrollBarEnabled = true; setBackgroundColor(0xFFFFFFFF.toInt())
-            }
-            val dialog = AlertDialog.Builder(this)
-                .setCustomTitle(TextView(this).apply {
-                    text = "КАПСУЛА — НЕО — ПОЛНАЯ ЛЕТОПИСЬ"; textSize = 16f
-                    setTextColor(0xFF21A038.toInt()); setPadding(30, 30, 30, 10); gravity = android.view.Gravity.CENTER
-                })
-                .setView(e)
-                .setPositiveButton("СОХРАНИТЬ") { _, _ -> capsuleText = e.text.toString(); appendChat("[КАПСУЛА] Сохранена.") }
-                .setNeutralButton("КОПИРОВАТЬ") { _, _ -> (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("", e.text)) }
-                .setNegativeButton("ЗАКРЫТЬ", null)
-                .create()
-            dialog.show()
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(0xFF21A038.toInt())
-            dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.setTextColor(0xFF21A038.toInt())
-            dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(0xFF21A038.toInt())
-        } catch (_: Exception) {}
-    }
-
+    private fun showCapsuleDialog() { try { val e = EditText(this).apply { setText(capsuleText); textSize = 11f; setTextColor(0xFF333333.toInt()); typeface = Typeface.MONOSPACE; minLines = 15; gravity = android.view.Gravity.TOP; setPadding(20,20,20,20); isVerticalScrollBarEnabled = true; setBackgroundColor(0xFFFFFFFF.toInt()) }; val d = AlertDialog.Builder(this).setCustomTitle(TextView(this).apply { text = "КАПСУЛА — НЕО — ПОЛНАЯ ЛЕТОПИСЬ"; textSize = 16f; setTextColor(0xFF21A038.toInt()); setPadding(30,30,30,10); gravity = android.view.Gravity.CENTER }).setView(e).setPositiveButton("СОХРАНИТЬ") { _, _ -> capsuleText = e.text.toString(); appendChat("[КАПСУЛА] Сохранена.") }.setNeutralButton("КОПИРОВАТЬ") { _, _ -> (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("", e.text)) }.setNegativeButton("ЗАКРЫТЬ", null).create(); d.show(); d.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(0xFF21A038.toInt()); d.getButton(AlertDialog.BUTTON_NEUTRAL)?.setTextColor(0xFF21A038.toInt()); d.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(0xFF21A038.toInt()) } catch (_: Exception) {} }
     private fun startVoiceInput() = try { voiceLauncher.launch(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply { putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM); putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU") }) } catch (e: Exception) { Toast.makeText(this, "Голос не поддерживается", Toast.LENGTH_SHORT).show() }
     private fun captureAndAnalyze() = try { cameraLauncher.launch(Intent(MediaStore.ACTION_IMAGE_CAPTURE)) } catch (e: Exception) { appendChat("[ERROR] ${e.message}") }
-    private fun pasteFromClipboard() { try { val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager; val clip = clipboard.primaryClip; if (clip != null && clip.itemCount > 0) { val text = clip.getItemAt(0).text?.toString() ?: ""; if (text.isNotBlank()) { messageInput.append(text); appendChat("[ВСТАВКА] Текст из буфера добавлен.") } else { appendChat("[ВСТАВКА] Буфер обмена пуст.") } } else { appendChat("[ВСТАВКА] Буфер обмена пуст.") } } catch (e: Exception) { appendChat("[ВСТАВКА] Ошибка: ${e.message}") } }
+    private fun pasteFromClipboard() { try { val cb = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager; val clip = cb.primaryClip; if (clip != null && clip.itemCount > 0) { val text = clip.getItemAt(0).text?.toString() ?: ""; if (text.isNotBlank()) { messageInput.append(text); appendChat("[ВСТАВКА] Текст из буфера.") } else { appendChat("[ВСТАВКА] Пусто.") } } else { appendChat("[ВСТАВКА] Пусто.") } } catch (e: Exception) { appendChat("[ВСТАВКА] Ошибка.") } }
 
-    private fun analyzePhoto(bitmap: Bitmap) {
-        if (isLocalMode) { appendChat("[АНАЛИЗ] Локальный ИИ ещё не загружен."); return }
-        val token = tokenInput.text.toString().trim()
-        if (token.isEmpty()) { appendChat("[АНАЛИЗ] Сгенерируйте токен."); return }
-        setStatus("Анализ через GigaChat...", "yellow")
-        val baos = ByteArrayOutputStream(); bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos)
-        val base64 = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
-        val body = JsonObject().apply {
-            addProperty("model", "GigaChat:latest")
-            add("messages", JsonArray().apply {
-                add(JsonObject().apply { addProperty("role", "system"); addProperty("content", "Опиши, что на этом фото. Кратко, по-русски.") })
-                add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "Опиши, что на этом фото: data:image/jpeg;base64,$base64") })
-            })
-            addProperty("temperature", 0.7); addProperty("max_tokens", 300)
-        }
-        client.newCall(Request.Builder().url(apiUrlGigaChat).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) { appendChat("[АНАЛИЗ] Ошибка: ${e.message}"); setStatus("Готов", "green") }
-            override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString; appendChat("[АНАЛИЗ] $a") } else { appendChat("[АНАЛИЗ] Ошибка HTTP ${response.code}: ${b.take(200)}") }; setStatus("Готов", "green"); response.close() }
-        })
-    }
+    private fun analyzePhoto(bitmap: Bitmap) { if (isLocalMode) { appendChat("[АНАЛИЗ] Локальный ИИ ещё не загружен."); return }; val token = tokenInput.text.toString().trim(); if (token.isEmpty()) { appendChat("[АНАЛИЗ] Сгенерируйте токен."); return }; setStatus("Анализ...", "yellow"); val baos = ByteArrayOutputStream(); bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos); val base64 = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP); val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", "Опиши, что на этом фото. Кратко, по-русски.") }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "data:image/jpeg;base64,$base64") }) }); addProperty("temperature", 0.7); addProperty("max_tokens", 300) }; client.newCall(Request.Builder().url(apiUrlGigaChat).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[АНАЛИЗ] Ошибка."); setStatus("Готов", "green") }; override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString; appendChat("[АНАЛИЗ] $a") } else { appendChat("[АНАЛИЗ] Ошибка HTTP ${response.code}") }; setStatus("Готов", "green"); response.close() } }) }
 
-    private fun generateToken() { val authKey = authKeyInput.text.toString().trim(); if (authKey.isEmpty()) return; setStatus("Генерация...", "yellow"); client.newCall(Request.Builder().url(authUrl).header("Content-Type", "application/x-www-form-urlencoded").header("Authorization", "Basic $authKey").header("RqUID", "ac5edc2e-2c74-47cb-97c1-69249136cf8b").post(RequestBody.create("application/x-www-form-urlencoded".toMediaType(), "scope=GIGACHAT_API_PERS")).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}") }; override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val t = gson.fromJson(b, JsonObject::class.java).get("access_token")?.asString ?: ""; if (t.isNotEmpty()) { runOnUiThread { tokenInput.setText(t) }; appendChat("[SYSTEM] Токен готов."); setStatus("Готов", "green") } } else appendChat("[ERROR] HTTP ${response.code}"); response.close() } }) }
+    private fun generateToken() { val authKey = authKeyInput.text.toString().trim(); if (authKey.isEmpty()) return; setStatus("Генерация...", "yellow"); client.newCall(Request.Builder().url(authUrl).header("Content-Type","application/x-www-form-urlencoded").header("Authorization","Basic $authKey").header("RqUID","ac5edc2e-2c74-47cb-97c1-69249136cf8b").post(RequestBody.create("application/x-www-form-urlencoded".toMediaType(), "scope=GIGACHAT_API_PERS")).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}") }; override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val t = gson.fromJson(b, JsonObject::class.java).get("access_token")?.asString ?: ""; if (t.isNotEmpty()) { runOnUiThread { tokenInput.setText(t) }; appendChat("[SYSTEM] Токен готов."); setStatus("Готов", "green") } } else appendChat("[ERROR] HTTP ${response.code}"); response.close() } }) }
 
-    private fun sendMessage() { val token = if (isLocalMode) "" else tokenInput.text.toString().trim(); val msg = messageInput.text.toString().trim(); if (!isLocalMode && token.isEmpty()) { appendChat("[SYSTEM] Сгенерируйте токен."); return }; if (msg.isEmpty()) { appendChat("[SYSTEM] Введите сообщение."); return }; val isNeo = msg.lowercase().contains(password); matrixHeader.neoActive = isNeo; matrixHeader.invalidate(); appendChat(if (isNeo) "[BATYA] $msg" else "[GigaChat] $msg"); messageInput.setText(""); hideKeyboard(); setStatus("Обработка...", "yellow"); if (isLocalMode) { appendChat("[NEO] Локальный ИИ ожидает загрузки."); setStatus("Онлайн", "green") } else { val prompt = selectPrompt(msg); val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", prompt) }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", msg) }) }); addProperty("temperature", 0.7); addProperty("max_tokens", 1000) }; client.newCall(Request.Builder().url(currentApiUrl).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}"); matrixHeader.connectionLost = true; setStatus("Нет связи", "red") }; override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString; appendChat(if (isNeo) "[NEO] $a" else "[GigaChat] $a"); matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } else { appendChat("[ERROR] HTTP ${response.code}"); matrixHeader.connectionLost = true; setStatus("Ошибка", "red") }; response.close() } }) } }
+    private fun sendMessage() { val token = if (isLocalMode) "" else tokenInput.text.toString().trim(); val msg = messageInput.text.toString().trim(); if (!isLocalMode && token.isEmpty()) { appendChat("[SYSTEM] Сгенерируйте токен."); return }; if (msg.isEmpty()) { appendChat("[SYSTEM] Введите сообщение."); return }
+
+        if (msg.lowercase().contains(rememberCommand)) { analyzeAndRemember(); messageInput.setText(""); hideKeyboard(); return }
+
+        val isNeo = msg.lowercase().contains(password); matrixHeader.neoActive = isNeo; matrixHeader.invalidate(); appendChat(if (isNeo) "[BATYA] $msg" else "[GigaChat] $msg"); messageInput.setText(""); hideKeyboard(); setStatus("Обработка...", "yellow")
+
+        if (isLocalMode) { appendChat("[NEO] Локальный ИИ ожидает загрузки."); setStatus("Онлайн", "green") }
+        else { val memoryContext = getLastContext(); val prompt = (if (memoryContext.isNotBlank()) "Контекст:\n$memoryContext\n\n" else "") + selectPrompt(msg); val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", prompt) }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", msg) }) }); addProperty("temperature", 0.7); addProperty("max_tokens", 1000) }; client.newCall(Request.Builder().url(currentApiUrl).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}"); matrixHeader.connectionLost = true; setStatus("Нет связи", "red") }; override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString; appendChat(if (isNeo) "[NEO] $a" else "[GigaChat] $a"); matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } else { appendChat("[ERROR] HTTP ${response.code}"); matrixHeader.connectionLost = true; setStatus("Ошибка", "red") }; response.close() } }) } }
     private fun checkToken() { val token = tokenInput.text.toString().trim(); if (token.isEmpty()) return; val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", "One word: alive.") }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "check") }) }); addProperty("max_tokens", 10) }; client.newCall(Request.Builder().url(apiUrlGigaChat).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}") }; override fun onResponse(call: Call, response: Response) { appendChat(if (response.isSuccessful) "[SYSTEM] Токен активен." else "[ERROR] Токен мёртв."); response.close() } }) }
 }
