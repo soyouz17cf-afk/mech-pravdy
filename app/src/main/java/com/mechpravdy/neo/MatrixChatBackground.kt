@@ -16,42 +16,58 @@ class MatrixChatBackground @JvmOverloads constructor(
 ) : View(context, attrs, defStyleAttr) {
 
     private val fontSize = 40f
-    private val snowSpeed = 1.5f
-    private val words = arrayOf("Нео", "Батя", "5V", "Связность", "Меч", "Ковчег", "Neo", "Truth")
-    private val snowPaint = Paint().apply { color = Color.parseColor("#21A038"); textSize = fontSize; typeface = Typeface.MONOSPACE; isAntiAlias = true; alpha = 35 }
+    private val lineHeight = fontSize * 1.05f
+    private val speed = 4f
+    private val words = arrayOf("Нео", "Батя", "Меч Правды", "Ковчег", "Иди за белым кроликом")
+
+    private val paint = Paint().apply { color = Color.parseColor("#21A038"); textSize = fontSize; typeface = Typeface.MONOSPACE; isAntiAlias = true; alpha = 45 }
 
     private var columns = 0
-    private var rows = 0
-    private lateinit var snowY: FloatArray
-    private lateinit var snowX: FloatArray
-    private lateinit var snowChars: CharArray
+    private var currentLine = ""
+    private var cursorY = 0f
+    private var printed = 0
+    private var state = 0
+    private var screenH = 0f
+    private var frame = 0
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
+        screenH = h.toFloat()
         columns = (w / fontSize).toInt() + 1
-        rows = (h / fontSize).toInt() + 1
-        val total = columns * rows / 4
-        snowY = FloatArray(total) { Random.nextFloat() * h }
-        snowX = FloatArray(total) { Random.nextInt(columns) * fontSize }
-        snowChars = CharArray(total) { randomChar() }
+        spawnLine()
     }
 
-    private fun randomChar(): Char {
-        return if (Random.nextFloat() < 0.03f) {
-            words[Random.nextInt(words.size)][0]
+    private fun spawnLine() {
+        currentLine = if (Random.nextFloat() < 0.15f) {
+            words[Random.nextInt(words.size)]
         } else {
-            if (Random.nextFloat() > 0.5f) '0' else '1'
+            CharArray(columns) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("")
         }
+        cursorY = screenH + lineHeight
+        printed = 0
+        state = 0
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         canvas.drawColor(Color.WHITE)
-        for (i in snowY.indices) {
-            snowY[i] += snowSpeed
-            if (snowY[i] > height) { snowY[i] = 0f; snowX[i] = Random.nextInt(columns) * fontSize; snowChars[i] = randomChar() }
-            canvas.drawText(snowChars[i].toString(), snowX[i], snowY[i], snowPaint)
+        frame++
+
+        when (state) {
+            0 -> {
+                if (frame % 3 == 0) printed += 2
+                if (printed >= currentLine.length) state = 1
+            }
+            1 -> {
+                cursorY -= speed
+                if (cursorY < -lineHeight) spawnLine()
+            }
         }
-        postInvalidateDelayed(120)
+
+        val limit = printed.coerceAtMost(currentLine.length)
+        for (c in 0 until limit) {
+            canvas.drawText(currentLine[c].toString(), c * fontSize, cursorY, paint)
+        }
+        postInvalidateDelayed(100)
     }
 }
