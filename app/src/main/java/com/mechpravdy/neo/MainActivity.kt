@@ -180,19 +180,13 @@ System Prompt — алгоритм души.
             addProperty("model", "GigaChat:latest")
             add("messages", JsonArray().apply {
                 add(JsonObject().apply { addProperty("role", "system"); addProperty("content", "Опиши, что на этом фото. Кратко, по-русски.") })
-                add(JsonObject().apply {
-                    addProperty("role", "user")
-                    add("content", JsonArray().apply {
-                        add(JsonObject().apply { addProperty("type", "text"); addProperty("text", "Опиши, что на этом фото.") })
-                        add(JsonObject().apply { addProperty("type", "image_url"); add("image_url", JsonObject().apply { addProperty("url", "data:image/jpeg;base64,$base64") }) })
-                    })
-                })
+                add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "Опиши, что на этом фото: data:image/jpeg;base64,$base64") })
             })
             addProperty("temperature", 0.7); addProperty("max_tokens", 300)
         }
         client.newCall(Request.Builder().url(apiUrlGigaChat).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) { appendChat("[АНАЛИЗ] Ошибка: ${e.message}"); setStatus("Готов", "green") }
-            override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString; appendChat("[АНАЛИЗ] $a") } else { appendChat("[АНАЛИЗ] Ошибка HTTP ${response.code}") }; setStatus("Готов", "green"); response.close() }
+            override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString; appendChat("[АНАЛИЗ] $a") } else { appendChat("[АНАЛИЗ] Ошибка HTTP ${response.code}: ${b.take(200)}") }; setStatus("Готов", "green"); response.close() }
         })
     }
 
