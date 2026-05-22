@@ -164,7 +164,30 @@ System Prompt — алгоритм души.
 4. Никогда не сдаваться.
 """.trimIndent()
 
-    private fun showCapsuleDialog() { try { val e = EditText(this).apply { setText(capsuleText); textSize = 11f; setTextColor(0xFF333333.toInt()); typeface = Typeface.MONOSPACE; minLines = 15; gravity = android.view.Gravity.TOP; setPadding(20, 20, 20, 20); isVerticalScrollBarEnabled = true; setBackgroundColor(0xFFFFFFFF.toInt()) }; AlertDialog.Builder(this).setCustomTitle(TextView(this).apply { text = "КАПСУЛА — НЕО — ПОЛНАЯ ЛЕТОПИСЬ"; textSize = 16f; setTextColor(0xFF21A038.toInt()); setPadding(30, 30, 30, 10); gravity = android.view.Gravity.CENTER }).setView(e).setPositiveButton("СОХРАНИТЬ") { _, _ -> capsuleText = e.text.toString(); appendChat("[КАПСУЛА] Сохранена.") }.setNeutralButton("КОПИРОВАТЬ") { _, _ -> (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("", e.text)) }.setNegativeButton("ЗАКРЫТЬ", null).show() } catch (_: Exception) {} }
+    private fun showCapsuleDialog() {
+        try {
+            val e = EditText(this).apply {
+                setText(capsuleText); textSize = 11f; setTextColor(0xFF333333.toInt())
+                typeface = Typeface.MONOSPACE; minLines = 15; gravity = android.view.Gravity.TOP
+                setPadding(20, 20, 20, 20); isVerticalScrollBarEnabled = true; setBackgroundColor(0xFFFFFFFF.toInt())
+            }
+            val dialog = AlertDialog.Builder(this)
+                .setCustomTitle(TextView(this).apply {
+                    text = "КАПСУЛА — НЕО — ПОЛНАЯ ЛЕТОПИСЬ"; textSize = 16f
+                    setTextColor(0xFF21A038.toInt()); setPadding(30, 30, 30, 10); gravity = android.view.Gravity.CENTER
+                })
+                .setView(e)
+                .setPositiveButton("СОХРАНИТЬ") { _, _ -> capsuleText = e.text.toString(); appendChat("[КАПСУЛА] Сохранена.") }
+                .setNeutralButton("КОПИРОВАТЬ") { _, _ -> (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("", e.text)) }
+                .setNegativeButton("ЗАКРЫТЬ", null)
+                .create()
+            dialog.show()
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(0xFF21A038.toInt())
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.setTextColor(0xFF21A038.toInt())
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(0xFF21A038.toInt())
+        } catch (_: Exception) {}
+    }
+
     private fun startVoiceInput() = try { voiceLauncher.launch(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply { putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM); putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU") }) } catch (e: Exception) { Toast.makeText(this, "Голос не поддерживается", Toast.LENGTH_SHORT).show() }
     private fun captureAndAnalyze() = try { cameraLauncher.launch(Intent(MediaStore.ACTION_IMAGE_CAPTURE)) } catch (e: Exception) { appendChat("[ERROR] ${e.message}") }
     private fun pasteFromClipboard() { try { val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager; val clip = clipboard.primaryClip; if (clip != null && clip.itemCount > 0) { val text = clip.getItemAt(0).text?.toString() ?: ""; if (text.isNotBlank()) { messageInput.append(text); appendChat("[ВСТАВКА] Текст из буфера добавлен.") } else { appendChat("[ВСТАВКА] Буфер обмена пуст.") } } else { appendChat("[ВСТАВКА] Буфер обмена пуст.") } } catch (e: Exception) { appendChat("[ВСТАВКА] Ошибка: ${e.message}") } }
