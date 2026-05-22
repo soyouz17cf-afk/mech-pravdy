@@ -6,7 +6,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.*
-import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.speech.RecognizerIntent
@@ -135,7 +134,18 @@ class MainActivity : AppCompatActivity() {
 
     private fun checkConnection() { val testBody = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "ping") }) }); addProperty("max_tokens", 1) }; val request = Request.Builder().url(currentApiUrl); request.header("Authorization", "Bearer ${tokenInput.text.toString().trim()}"); request.post(testBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType())); client.newCall(request.build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { runOnUiThread { matrixHeader.connectionLost = true; setStatus("Нет связи", "red") } }; override fun onResponse(call: Call, response: Response) { runOnUiThread { if (response.isSuccessful) { matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } else { matrixHeader.connectionLost = true; setStatus("Ошибка", "red") } }; response.close() } }) }
 
-    private fun initMlKit() { if (mlKitReady) return; try { labeler = ImageLabeling.getClient(com.google.mlkit.vision.label.ImageLabelerOptions.DEFAULT_OPTIONS); textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS); translator = Translation.getClient(TranslatorOptions.Builder().setSourceLanguage(TranslateLanguage.ENGLISH).setTargetLanguage(TranslateLanguage.RUSSIAN).build()); mlKitReady = true } catch (e: Exception) { appendChat("[ГЛАЗ] ML Kit: ${e.message}") } }
+    private fun initMlKit() {
+        if (mlKitReady) return
+        try {
+            val options = com.google.mlkit.vision.label.defaults.ImageLabelerOptions.Builder()
+                .setConfidenceThreshold(0.5f)
+                .build()
+            labeler = ImageLabeling.getClient(options)
+            textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+            translator = Translation.getClient(TranslatorOptions.Builder().setSourceLanguage(TranslateLanguage.ENGLISH).setTargetLanguage(TranslateLanguage.RUSSIAN).build())
+            mlKitReady = true
+        } catch (e: Exception) { appendChat("[ГЛАЗ] ML Kit: ${e.message}") }
+    }
 
     private fun captureAndAnalyze() { try { photoAnalysisLauncher.launch(Intent(MediaStore.ACTION_IMAGE_CAPTURE)) } catch (e: Exception) { appendChat("[ERROR] Камера: ${e.message}") } }
 
