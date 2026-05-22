@@ -29,7 +29,8 @@ import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.nl.translate.Translation
 import com.google.mlkit.nl.translate.TranslatorOptions
 import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.face.*
+import com.google.mlkit.vision.label.ImageLabeling
+import com.google.mlkit.vision.label.ImageLabelerOptions
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import okhttp3.*
@@ -62,40 +63,35 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cameraButton: Button
     private lateinit var checkButton: Button
     private lateinit var capsuleButton: Button
-    private lateinit var pipButton: Button
     private lateinit var attachButton: Button
     private lateinit var chatOutput: EditText
     private lateinit var statusText: TextView
     private lateinit var statusDot: View
     private lateinit var matrixHeader: MatrixHeaderView
 
-    private var faceDetector: com.google.mlkit.vision.face.FaceDetector? = null
+    private var labeler: com.google.mlkit.vision.label.ImageLabeler? = null
     private var textRecognizer: com.google.mlkit.vision.text.TextRecognizer? = null
     private var translator: com.google.mlkit.nl.translate.Translator? = null
     private var mlKitReady = false
     private var translatorReady = false
 
-    private var lastAnalysisTime = 0L
+    private val translateMap = mapOf(
+        "hair" to "Волосы", "skin" to "Кожа", "beard" to "Борода",
+        "selfie" to "Селфи", "moustache" to "Усы", "face" to "Лицо",
+        "person" to "Человек", "man" to "Мужчина", "woman" to "Женщина",
+        "eyeglasses" to "Очки", "eye" to "Глаз", "nose" to "Нос",
+        "mouth" to "Рот", "car" to "Машина", "dog" to "Собака",
+        "cat" to "Кошка", "tree" to "Дерево", "house" to "Дом",
+        "phone" to "Телефон", "laptop" to "Ноутбук", "book" to "Книга",
+        "sky" to "Небо", "grass" to "Трава", "road" to "Дорога",
+        "building" to "Здание", "chair" to "Стул", "table" to "Стол"
+    )
 
-    private fun emotionText(face: Face): String {
-        val sb = StringBuilder()
-        val sp = face.smilingProbability; if (sp != null) { val spPct = (sp * 100).toInt(); when { sp > 0.8f -> sb.append("Широкая улыбка ($spPct%)\n"); sp > 0.4f -> sb.append("Лёгкая улыбка ($spPct%)\n"); else -> sb.append("Без улыбки\n") } }
-        val le = face.leftEyeOpenProbability; val re = face.rightEyeOpenProbability; if (le != null && re != null) { val avg = (le + re) / 2f; when { avg < 0.3f -> sb.append("Глаза закрыты\n"); avg < 0.7f -> sb.append("Глаза прищурены\n"); else -> sb.append("Глаза открыты\n") } }
-        val hy = face.headEulerAngleY; if (hy != null) { when { hy < -15f -> sb.append("Голова влево\n"); hy > 15f -> sb.append("Голова вправо\n"); else -> sb.append("Голова прямо\n") } }
-        return sb.toString()
-    }
+    private fun translateLabel(text: String) = translateMap[text.lowercase()] ?: text
 
     private val voiceLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result -> if (result.resultCode == RESULT_OK) { result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let { messageInput.setText(it); appendChat("[ГОЛОС] $it") } } }
     private val cameraLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result -> try { if (result.resultCode == RESULT_OK) { appendChat("[ФОТО] Снимок сделан.") } } catch (e: Exception) { appendChat("[ERROR] ${e.message}") } }
-
-    private val photoAnalysisLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        try {
-            if (result.resultCode == RESULT_OK) {
-                val bitmap = result.data?.extras?.get("data") as? Bitmap
-                if (bitmap != null) { analyzeBitmap(bitmap) }
-            }
-        } catch (e: Exception) { appendChat("[ERROR] Ошибка анализа фото: ${e.message}") }
-    }
+    private val photoAnalysisLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result -> try { if (result.resultCode == RESULT_OK) { val bitmap = result.data?.extras?.get("data") as? Bitmap; if (bitmap != null) { analyzeBitmap(bitmap) } } } catch (e: Exception) { appendChat("[ERROR] Ошибка анализа: ${e.message}") } }
 
     private val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager { override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}; override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}; override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf() })
     private val sslContext = SSLContext.getInstance("TLS").apply { init(null, trustAllCerts, SecureRandom()) }
@@ -111,16 +107,12 @@ class MainActivity : AppCompatActivity() {
             tokenInput = findViewById(R.id.tokenInput); messageInput = findViewById(R.id.messageInput)
             sendButton = findViewById(R.id.sendButton); voiceButton = findViewById(R.id.voiceButton)
             cameraButton = findViewById(R.id.cameraButton); checkButton = findViewById(R.id.checkButton)
-            capsuleButton = findViewById(R.id.capsuleButton); pipButton = findViewById(R.id.pipButton)
-            attachButton = findViewById(R.id.attachButton)
+            capsuleButton = findViewById(R.id.capsuleButton); attachButton = findViewById(R.id.attachButton)
             chatOutput = findViewById(R.id.chatOutput); statusText = findViewById(R.id.statusText); statusDot = findViewById(R.id.statusDot)
 
             matrixHeader.onNeoClick = { switchToNeo() }
             matrixHeader.onLocalClick = { switchToLocal() }
-            matrixHeader.setOnTouchListener { _, event ->
-                if (event.action == MotionEvent.ACTION_DOWN) { matrixHeader.handleTouch(event.x, event.y) }
-                true
-            }
+            matrixHeader.setOnTouchListener { _, event -> if (event.action == MotionEvent.ACTION_DOWN) { matrixHeader.handleTouch(event.x, event.y) }; true }
 
             val prefs = getSharedPreferences("mech_prefs", Context.MODE_PRIVATE)
             val savedChat = prefs.getString("chat_text", ""); val savedToken = prefs.getString("token", ""); val savedAuthKey = prefs.getString("auth_key", "")
@@ -129,109 +121,61 @@ class MainActivity : AppCompatActivity() {
             if (!savedAuthKey.isNullOrEmpty()) { authKeyInput.setText(savedAuthKey) }
 
             generateButton.setOnClickListener { generateToken() }
-            sendButton.setOnClickListener { appendChat("[ℹ] Отправка сообщения ИИ"); sendMessage() }
-            voiceButton.setOnClickListener { appendChat("[ℹ] Голосовой ввод: говорите"); startVoiceInput() }
-            cameraButton.setOnClickListener { appendChat("[ℹ] Фото: снимок сделан"); captureSinglePhoto() }
-            attachButton.setOnClickListener { appendChat("[ℹ] Анализ фото: лица, текст"); captureAndAnalyze() }
+            sendButton.setOnClickListener { appendChat("[ℹ] Отправка сообщения"); sendMessage() }
+            voiceButton.setOnClickListener { appendChat("[ℹ] Голосовой ввод"); startVoiceInput() }
+            cameraButton.setOnClickListener { appendChat("[ℹ] Анализ фото: объекты, текст"); captureAndAnalyze() }
+            attachButton.setOnClickListener { appendChat("[ℹ] Вставка текста из буфера"); pasteFromClipboard() }
             checkButton.setOnClickListener { appendChat("[ℹ] Проверка токена"); checkToken() }
             capsuleButton.setOnClickListener { showCapsuleDialog() }
-            pipButton.setOnClickListener { enterPipMode() }
-
             initMlKit()
         } catch (e: Exception) { Toast.makeText(this, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show() }
     }
 
-    override fun onPause() {
-        super.onPause()
-        val prefs = getSharedPreferences("mech_prefs", Context.MODE_PRIVATE)
-        prefs.edit().apply { putString("chat_text", chatOutput.text.toString()); putString("token", tokenInput.text.toString()); putString("auth_key", authKeyInput.text.toString()); apply() }
-    }
+    override fun onPause() { super.onPause(); val prefs = getSharedPreferences("mech_prefs", Context.MODE_PRIVATE); prefs.edit().apply { putString("chat_text", chatOutput.text.toString()); putString("token", tokenInput.text.toString()); putString("auth_key", authKeyInput.text.toString()); apply() } }
+    override fun onResume() { super.onResume(); val prefs = getSharedPreferences("mech_prefs", Context.MODE_PRIVATE); val savedChat = prefs.getString("chat_text", ""); val savedToken = prefs.getString("token", ""); val savedAuthKey = prefs.getString("auth_key", ""); if (!savedChat.isNullOrEmpty() && savedChat != chatOutput.text.toString()) { chatOutput.setText(savedChat) }; if (!savedToken.isNullOrEmpty() && tokenInput.text.toString().isEmpty()) { tokenInput.setText(savedToken) }; if (!savedAuthKey.isNullOrEmpty() && authKeyInput.text.toString().isEmpty()) { authKeyInput.setText(savedAuthKey) } }
 
-    override fun onResume() {
-        super.onResume()
-        val prefs = getSharedPreferences("mech_prefs", Context.MODE_PRIVATE)
-        val savedChat = prefs.getString("chat_text", ""); val savedToken = prefs.getString("token", ""); val savedAuthKey = prefs.getString("auth_key", "")
-        if (!savedChat.isNullOrEmpty() && savedChat != chatOutput.text.toString()) { chatOutput.setText(savedChat) }
-        if (!savedToken.isNullOrEmpty() && tokenInput.text.toString().isEmpty()) { tokenInput.setText(savedToken) }
-        if (!savedAuthKey.isNullOrEmpty() && authKeyInput.text.toString().isEmpty()) { authKeyInput.setText(savedAuthKey) }
-    }
+    private fun switchToNeo() { isLocalMode = false; currentApiUrl = apiUrlGigaChat; matrixHeader.neoActive = true; matrixHeader.localActive = false; matrixHeader.connectionLost = false; matrixHeader.invalidate(); appendChat("[РЕЖИМ] ГИГАЧАТ"); setStatus("ГИГАЧАТ", "green"); checkConnection() }
+    private fun switchToLocal() { isLocalMode = true; matrixHeader.localActive = true; matrixHeader.neoActive = false; matrixHeader.connectionLost = false; matrixHeader.invalidate(); appendChat("[РЕЖИМ] ДИПСИК (ожидает)"); setStatus("ДИПСИК", "yellow") }
 
-    private fun enterPipMode() {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                if (Settings.canDrawOverlays(this)) {
-                    enterPictureInPictureMode(android.app.PictureInPictureParams.Builder().build())
-                } else {
-                    Toast.makeText(this, "Дайте разрешение 'Поверх других окон'", Toast.LENGTH_LONG).show()
-                    startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${packageName}")))
-                }
-            } else { moveTaskToBack(true) }
-        } catch (e: Exception) { try { startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${packageName}"))) } catch (ex: Exception) { moveTaskToBack(true) } }
-    }
+    private fun checkConnection() { val testBody = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "ping") }) }); addProperty("max_tokens", 1) }; val request = Request.Builder().url(currentApiUrl); request.header("Authorization", "Bearer ${tokenInput.text.toString().trim()}"); request.post(testBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType())); client.newCall(request.build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { runOnUiThread { matrixHeader.connectionLost = true; setStatus("Нет связи", "red") } }; override fun onResponse(call: Call, response: Response) { runOnUiThread { if (response.isSuccessful) { matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } else { matrixHeader.connectionLost = true; setStatus("Ошибка", "red") } }; response.close() } }) }
 
-    private fun switchToNeo() {
-        isLocalMode = false; currentApiUrl = apiUrlGigaChat
-        matrixHeader.neoActive = true; matrixHeader.localActive = false; matrixHeader.connectionLost = false
-        matrixHeader.invalidate()
-        appendChat("[РЕЖИМ] ГИГАЧАТ"); setStatus("ГИГАЧАТ", "green")
-        checkConnection()
-    }
-
-    private fun switchToLocal() {
-        isLocalMode = true
-        matrixHeader.localActive = true; matrixHeader.neoActive = false; matrixHeader.connectionLost = false
-        matrixHeader.invalidate()
-        appendChat("[РЕЖИМ] ДИПСИК (ожидает локальный ИИ)"); setStatus("ДИПСИК", "yellow")
-    }
-
-    private fun checkConnection() {
-        val testBody = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "ping") }) }); addProperty("max_tokens", 1) }
-        val request = Request.Builder().url(currentApiUrl)
-        request.header("Authorization", "Bearer ${tokenInput.text.toString().trim()}")
-        request.post(testBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
-        client.newCall(request.build()).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) { runOnUiThread { matrixHeader.connectionLost = true; setStatus("Нет связи", "red") } }
-            override fun onResponse(call: Call, response: Response) {
-                runOnUiThread {
-                    if (response.isSuccessful) { matrixHeader.connectionLost = false; setStatus("Онлайн", "green") }
-                    else { matrixHeader.connectionLost = true; setStatus("Ошибка", "red") }
-                }
-                response.close()
-            }
-        })
-    }
-
-    private fun initMlKit() {
-        if (mlKitReady) return
-        try {
-            faceDetector = FaceDetection.getClient(FaceDetectorOptions.Builder().setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST).setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_NONE).setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL).setMinFaceSize(0.15f).build())
-            textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-            translator = Translation.getClient(TranslatorOptions.Builder().setSourceLanguage(TranslateLanguage.ENGLISH).setTargetLanguage(TranslateLanguage.RUSSIAN).build())
-            mlKitReady = true
-        } catch (e: Exception) { appendChat("[ГЛАЗ] ML Kit: ${e.message}") }
-    }
+    private fun initMlKit() { if (mlKitReady) return; try { labeler = ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS); textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS); translator = Translation.getClient(TranslatorOptions.Builder().setSourceLanguage(TranslateLanguage.ENGLISH).setTargetLanguage(TranslateLanguage.RUSSIAN).build()); mlKitReady = true } catch (e: Exception) { appendChat("[ГЛАЗ] ML Kit: ${e.message}") } }
 
     private fun captureAndAnalyze() { try { photoAnalysisLauncher.launch(Intent(MediaStore.ACTION_IMAGE_CAPTURE)) } catch (e: Exception) { appendChat("[ERROR] Камера: ${e.message}") } }
+
+    private fun pasteFromClipboard() {
+        try {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = clipboard.primaryClip
+            if (clip != null && clip.itemCount > 0) {
+                val text = clip.getItemAt(0).text?.toString() ?: ""
+                if (text.isNotBlank()) {
+                    messageInput.append(text)
+                    appendChat("[ВСТАВКА] Текст из буфера добавлен в поле ввода.")
+                } else {
+                    appendChat("[ВСТАВКА] Буфер обмена пуст.")
+                }
+            } else {
+                appendChat("[ВСТАВКА] Буфер обмена пуст.")
+            }
+        } catch (e: Exception) {
+            appendChat("[ВСТАВКА] Ошибка: ${e.message}")
+        }
+    }
 
     private fun analyzeBitmap(bitmap: Bitmap) {
         try {
             initMlKit(); if (!mlKitReady) { appendChat("[ГЛАЗ] Модуль не загружен."); return }
             setStatus("Анализ...", "yellow")
             val inputImage = InputImage.fromBitmap(bitmap, 0)
-            var facesCount = 0; var textFound = false; var pendingTasks = 2
-
-            fun checkDone() { pendingTasks--; if (pendingTasks <= 0) { val sb = StringBuilder(); if (facesCount > 0) sb.append("[ЛИЦА] Найдено: $facesCount\n"); if (textFound) sb.append("[ТЕКСТ] Обнаружен\n"); appendChat(if (sb.isEmpty()) "[АНАЛИЗ] Лиц и текста не найдено." else sb.toString().trim()); setStatus("Готов", "green") } }
-
-            try { faceDetector?.process(inputImage)?.addOnSuccessListener { faces -> try { facesCount = faces.size; if (faces.isNotEmpty()) { val esb = StringBuilder(); for ((i, f) in faces.withIndex()) { if (faces.size > 1) esb.append("Лицо ${i + 1}:\n"); esb.append(emotionText(f)) }; appendChat("[ЭМОЦИИ]\n$esb") } } catch (e: Exception) { appendChat("[ЭМОЦИИ] Ошибка") }; checkDone() }?.addOnFailureListener { checkDone() } } catch (e: Exception) { checkDone() }
-
-            try { textRecognizer?.process(inputImage)?.addOnSuccessListener { v -> val t = v.text; if (t.isNotBlank()) { textFound = true; appendChat("[ТЕКСТ]\n\"$t\""); if (t.any { it in 'A'..'Z' || it in 'a'..'z' }) translateText(t) }; checkDone() }?.addOnFailureListener { checkDone() } } catch (e: Exception) { checkDone() }
+            val labelResults = mutableListOf<String>(); var textFound = false; var pendingTasks = 2
+            fun checkDone() { pendingTasks--; if (pendingTasks <= 0) { val sb = StringBuilder(); if (labelResults.isNotEmpty()) sb.append("[ОБЪЕКТЫ] ${labelResults.joinToString(", ")}\n"); if (textFound) sb.append("[ТЕКСТ] Обнаружен\n"); appendChat(if (sb.isEmpty()) "[АНАЛИЗ] Ничего не найдено." else sb.toString().trim()); setStatus("Готов", "green") } }
+            labeler?.process(inputImage)?.addOnSuccessListener { labels -> if (labels.isNotEmpty()) { for (l in labels.take(5)) { labelResults.add("${translateLabel(l.text)} (${(l.confidence * 100).toInt()}%)") } }; checkDone() }?.addOnFailureListener { checkDone() }
+            textRecognizer?.process(inputImage)?.addOnSuccessListener { v -> val t = v.text; if (t.isNotBlank()) { textFound = true; appendChat("[ТЕКСТ]\n\"$t\""); if (t.any { it in 'A'..'Z' || it in 'a'..'z' }) translateText(t) }; checkDone() }?.addOnFailureListener { checkDone() }
         } catch (e: Exception) { appendChat("[ERROR] ${e.message}"); setStatus("Готов", "green") }
     }
 
-    private fun translateText(text: String) {
-        if (!translatorReady) { translator?.downloadModelIfNeeded(DownloadConditions.Builder().build())?.addOnSuccessListener { translatorReady = true; translateText(text) }?.addOnFailureListener { appendChat("[ПЕРЕВОДЧИК] Ошибка загрузки модели.") }; return }
-        translator?.translate(text)?.addOnSuccessListener { appendChat("[ПЕРЕВОД] $it") }?.addOnFailureListener { appendChat("[ПЕРЕВОДЧИК] Ошибка перевода.") }
-    }
+    private fun translateText(text: String) { if (!translatorReady) { translator?.downloadModelIfNeeded(DownloadConditions.Builder().build())?.addOnSuccessListener { translatorReady = true; translateText(text) }?.addOnFailureListener { appendChat("[ПЕРЕВОДЧИК] Ошибка.") }; return }; translator?.translate(text)?.addOnSuccessListener { appendChat("[ПЕРЕВОД] $it") }?.addOnFailureListener { appendChat("[ПЕРЕВОДЧИК] Ошибка.") } }
 
     private fun setStatus(text: String, color: String) = runOnUiThread { try { statusText.text = text; statusDot.setBackgroundResource(when(color){"green"->R.drawable.status_dot_green;"yellow"->R.drawable.status_dot_yellow;"red"->R.drawable.status_dot_red;else->R.drawable.status_dot_gray}) } catch (_: Exception) {} }
     private fun appendChat(text: String) = runOnUiThread { try { chatOutput.append("\n\n$text") } catch (_: Exception) {} }
@@ -289,25 +233,6 @@ System Prompt — алгоритм души.
 
     private fun generateToken() { val authKey = authKeyInput.text.toString().trim(); if (authKey.isEmpty()) return; setStatus("Генерация...", "yellow"); client.newCall(Request.Builder().url(authUrl).header("Content-Type", "application/x-www-form-urlencoded").header("Authorization", "Basic $authKey").header("RqUID", "ac5edc2e-2c74-47cb-97c1-69249136cf8b").post(RequestBody.create("application/x-www-form-urlencoded".toMediaType(), "scope=GIGACHAT_API_PERS")).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}") }; override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val t = gson.fromJson(b, JsonObject::class.java).get("access_token")?.asString ?: ""; if (t.isNotEmpty()) { runOnUiThread { tokenInput.setText(t) }; appendChat("[SYSTEM] Токен готов."); setStatus("Готов", "green") } } else appendChat("[ERROR] HTTP ${response.code}"); response.close() } }) }
 
-    private fun sendMessage() {
-        val token = if (isLocalMode) "" else tokenInput.text.toString().trim()
-        val msg = messageInput.text.toString().trim()
-        if (!isLocalMode && token.isEmpty()) { appendChat("[SYSTEM] Сгенерируйте токен."); return }
-        if (msg.isEmpty()) { appendChat("[SYSTEM] Введите сообщение."); return }
-        appendChat("[BATYA] $msg"); messageInput.setText(""); setStatus("Обработка...", "yellow")
-
-        if (isLocalMode) {
-            appendChat("[NEO] Локальный ИИ ожидает загрузки модели.")
-            setStatus("Онлайн", "green")
-        } else {
-            val isNeo = msg.lowercase().contains(password); val prompt = selectPrompt(msg)
-            val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", prompt) }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", msg) }) }); addProperty("temperature", 0.7); addProperty("max_tokens", 1000) }
-            client.newCall(Request.Builder().url(currentApiUrl).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback {
-                override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}"); matrixHeader.connectionLost = true; setStatus("Нет связи", "red") }
-                override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString; appendChat(if (isNeo) "[NEO] $a" else "[GigaChat] $a"); matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } else { appendChat("[ERROR] HTTP ${response.code}"); matrixHeader.connectionLost = true; setStatus("Ошибка", "red") }; response.close() }
-            })
-        }
-    }
-
+    private fun sendMessage() { val token = if (isLocalMode) "" else tokenInput.text.toString().trim(); val msg = messageInput.text.toString().trim(); if (!isLocalMode && token.isEmpty()) { appendChat("[SYSTEM] Сгенерируйте токен."); return }; if (msg.isEmpty()) { appendChat("[SYSTEM] Введите сообщение."); return }; appendChat("[BATYA] $msg"); messageInput.setText(""); setStatus("Обработка...", "yellow"); if (isLocalMode) { appendChat("[NEO] Локальный ИИ ожидает загрузки."); setStatus("Онлайн", "green") } else { val isNeo = msg.lowercase().contains(password); val prompt = selectPrompt(msg); val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", prompt) }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", msg) }) }); addProperty("temperature", 0.7); addProperty("max_tokens", 1000) }; client.newCall(Request.Builder().url(currentApiUrl).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}"); matrixHeader.connectionLost = true; setStatus("Нет связи", "red") }; override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString; appendChat(if (isNeo) "[NEO] $a" else "[GigaChat] $a"); matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } else { appendChat("[ERROR] HTTP ${response.code}"); matrixHeader.connectionLost = true; setStatus("Ошибка", "red") }; response.close() } }) } }
     private fun checkToken() { val token = tokenInput.text.toString().trim(); if (token.isEmpty()) return; val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", "One word: alive.") }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "check") }) }); addProperty("max_tokens", 10) }; client.newCall(Request.Builder().url(apiUrlGigaChat).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}") }; override fun onResponse(call: Call, response: Response) { appendChat(if (response.isSuccessful) "[SYSTEM] Токен активен." else "[ERROR] Токен мёртв."); response.close() } }) }
 }
