@@ -20,7 +20,7 @@ class MatrixHeaderView @JvmOverloads constructor(
     private val lineHeight = fontSize * 1.1f
     private val speed = 7f
     private val maxLines = 5
-    private val maxPoolSize = 10 // пул строк, не больше 10 одновременно
+    private val maxPoolSize = 10
 
     private val easterEggs = arrayOf(
         "Здравствуй, Нео", "Меч Правды", "Пойдём за белым кроликом",
@@ -32,7 +32,7 @@ class MatrixHeaderView @JvmOverloads constructor(
     private val subtitlePaint = Paint().apply { color = Color.parseColor("#CCFFCC"); textSize = 26f; typeface = Typeface.create("sans-serif-light", Typeface.NORMAL); isAntiAlias = true; textAlign = Paint.Align.CENTER }
     private val logoBgPaint = Paint().apply { color = Color.parseColor("#1A8A2E") }
 
-    var neoActive = true
+    var neoActive = false
     var localActive = false
     var connectionLost = false
 
@@ -42,11 +42,10 @@ class MatrixHeaderView @JvmOverloads constructor(
     var onLocalClick: (() -> Unit)? = null
 
     private var columns = 0
-    // Пул строк — фиксированный размер
     private val linePool = arrayOfNulls<String>(maxPoolSize)
     private val lineY = FloatArray(maxLines)
     private val printed = IntArray(maxLines)
-    private var lineIndex = 0 // индекс в пуле
+    private var lineIndex = 0
     private var logoRect = RectF()
     private var screenH = 0f
     private var frame = 0
@@ -72,24 +71,18 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawColor(Color.WHITE)
         frame++
 
-        // Двигаем строки
         for (i in 0 until maxLines) {
             if (frame % 2 == 0 && printed[i] < (linePool[(lineIndex + i) % maxPoolSize]?.length ?: 0)) printed[i] += 2
             lineY[i] -= speed
         }
-        // Если верхняя ушла — сдвигаем
         if (lineY[0] < -lineHeight) {
-            for (i in 0 until maxLines - 1) {
-                lineY[i] = lineY[i + 1]
-                printed[i] = printed[i + 1]
-            }
+            for (i in 0 until maxLines - 1) { lineY[i] = lineY[i + 1]; printed[i] = printed[i + 1] }
             lineIndex = (lineIndex + maxLines) % maxPoolSize
             linePool[lineIndex] = generateLine()
             lineY[maxLines - 1] = lineY[maxLines - 2] + lineHeight
             printed[maxLines - 1] = 0
         }
 
-        // Рисуем
         for (i in 0 until maxLines) {
             val line = linePool[(lineIndex + i) % maxPoolSize] ?: continue
             val y = lineY[i]
@@ -102,7 +95,6 @@ class MatrixHeaderView @JvmOverloads constructor(
             }
         }
 
-        // Логотип и кнопки
         canvas.drawRoundRect(logoRect, 16f, 16f, logoBgPaint)
         canvas.drawText("СБЕР", w / 2, logoRect.top + logoRect.height() * 0.45f, titlePaint)
         canvas.drawText("ГигаЧат", w / 2, logoRect.top + logoRect.height() * 0.75f, subtitlePaint)
@@ -116,17 +108,29 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRoundRect(localButtonRect, 8f, 8f, btnPaint)
         canvas.drawText("ДИПСИК", localButtonRect.centerX(), localButtonRect.centerY() + 6f, btnTextPaint)
 
-        // Светофор
-        val trafficX = logoRect.right + 20f; val trafficY = logoRect.top + logoRect.height() * 0.25f
-        val dotRadius = 16f; val dotSpacing = 36f
+        // Светофор — три кружка
+        val trafficX = logoRect.right + 20f
+        val trafficY = logoRect.top + logoRect.height() * 0.15f
+        val dotRadius = 14f
+        val dotSpacing = 30f
         val dotPaint = Paint().apply { isAntiAlias = true }
-        dotPaint.color = if (!connectionLost) Color.parseColor("#00FF00") else Color.parseColor("#FF0000")
+
+        // 1. СВЯЗЬ — зелёный если есть активное соединение
+        dotPaint.color = if (!connectionLost && (neoActive || localActive)) Color.parseColor("#00FF00") else Color.parseColor("#555555")
         canvas.drawCircle(trafficX, trafficY, dotRadius, dotPaint)
-        dotPaint.color = if (connectionLost) Color.parseColor("#FF0000") else Color.parseColor("#555555")
+
+        // 2. ГИГАЧАТ — зелёный если neoActive
+        dotPaint.color = if (neoActive && !connectionLost) Color.parseColor("#21A038") else Color.parseColor("#555555")
         canvas.drawCircle(trafficX, trafficY + dotSpacing, dotRadius, dotPaint)
-        val labelPaint = Paint().apply { color = Color.parseColor("#888888"); textSize = 15f; typeface = Typeface.DEFAULT; isAntiAlias = true }
-        canvas.drawText("СВЯЗЬ", trafficX + 22f, trafficY + 6f, labelPaint)
-        canvas.drawText("NO CONNECT", trafficX + 22f, trafficY + dotSpacing + 6f, labelPaint)
+
+        // 3. ДИПСИК — жёлтый если localActive
+        dotPaint.color = if (localActive) Color.parseColor("#FFCC00") else Color.parseColor("#555555")
+        canvas.drawCircle(trafficX, trafficY + dotSpacing * 2, dotRadius, dotPaint)
+
+        val labelPaint = Paint().apply { color = Color.parseColor("#888888"); textSize = 13f; typeface = Typeface.DEFAULT; isAntiAlias = true }
+        canvas.drawText("СВЯЗЬ", trafficX + 20f, trafficY + 5f, labelPaint)
+        canvas.drawText("ГИГАЧАТ", trafficX + 20f, trafficY + dotSpacing + 5f, labelPaint)
+        canvas.drawText("ДИПСИК", trafficX + 20f, trafficY + dotSpacing * 2 + 5f, labelPaint)
 
         postInvalidateDelayed(50)
     }
