@@ -8,6 +8,7 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import android.util.AttributeSet
 import android.view.View
+import kotlin.random.Random
 
 class MatrixHeaderView @JvmOverloads constructor(
     context: Context,
@@ -15,10 +16,14 @@ class MatrixHeaderView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
+    private val fontSize = 36f
+    private val snowSpeed = 3f
+    private val words = arrayOf("Нео", "Батя", "5V", "Связность", "Меч", "Ковчег", "Neo", "Truth")
+
     private val titlePaint = Paint().apply { color = Color.WHITE; textSize = 72f; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL); isAntiAlias = true; textAlign = Paint.Align.CENTER }
     private val subtitlePaint = Paint().apply { color = Color.parseColor("#CCFFCC"); textSize = 26f; typeface = Typeface.create("sans-serif-light", Typeface.NORMAL); isAntiAlias = true; textAlign = Paint.Align.CENTER }
     private val logoBgPaint = Paint().apply { color = Color.parseColor("#1A8A2E") }
-    private val bgPaint = Paint().apply { color = Color.WHITE }
+    private val snowPaint = Paint().apply { color = Color.parseColor("#21A038"); textSize = fontSize; typeface = Typeface.MONOSPACE; isAntiAlias = true; alpha = 100 }
 
     var neoActive = false
     var gigaChatMode = false
@@ -31,9 +36,21 @@ class MatrixHeaderView @JvmOverloads constructor(
     var onLocalClick: (() -> Unit)? = null
 
     private var logoRect = RectF()
+    private var columns = 0
+    private var rows = 0
+    private lateinit var snowY: FloatArray
+    private lateinit var snowX: FloatArray
+    private lateinit var snowChars: CharArray
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
+        columns = (w / fontSize).toInt() + 1
+        rows = (h / fontSize).toInt() + 1
+        val total = columns * rows / 3
+        snowY = FloatArray(total) { Random.nextFloat() * h }
+        snowX = FloatArray(total) { Random.nextInt(columns) * fontSize }
+        snowChars = CharArray(total) { randomChar() }
+
         val logoW = w * 0.45f; val logoH = h * 0.55f
         logoRect = RectF((w - logoW) / 2f, (h - logoH) / 2f, (w + logoW) / 2f, (h + logoH) / 2f)
         val btnW = logoW * 0.42f; val btnH = logoH * 0.22f; val btnY = logoRect.bottom + 4f
@@ -41,10 +58,26 @@ class MatrixHeaderView @JvmOverloads constructor(
         localButtonRect = RectF(logoRect.right - btnW, btnY, logoRect.right, btnY + btnH)
     }
 
+    private fun randomChar(): Char {
+        return if (Random.nextFloat() < 0.03f) {
+            words[Random.nextInt(words.size)][0]
+        } else {
+            if (Random.nextFloat() > 0.5f) '0' else '1'
+        }
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val w = width.toFloat()
-        canvas.drawRect(0f, 0f, w, height.toFloat(), bgPaint)
+        canvas.drawColor(Color.WHITE)
+
+        for (i in snowY.indices) {
+            snowY[i] += snowSpeed
+            if (snowY[i] > height) { snowY[i] = 0f; snowX[i] = Random.nextInt(columns) * fontSize; snowChars[i] = randomChar() }
+            val x = snowX[i]; val y = snowY[i]
+            if (x >= logoRect.left && x <= logoRect.right && y >= logoRect.top && y <= logoRect.bottom) continue
+            canvas.drawText(snowChars[i].toString(), x, y, snowPaint)
+        }
 
         canvas.drawRoundRect(logoRect, 16f, 16f, logoBgPaint)
         canvas.drawText("СБЕР", w / 2, logoRect.top + logoRect.height() * 0.45f, titlePaint)
@@ -59,28 +92,21 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRoundRect(localButtonRect, 8f, 8f, btnPaint)
         canvas.drawText("ДИПСИК", localButtonRect.centerX(), localButtonRect.centerY() + 6f, btnTextPaint)
 
-        // Светофор
-        val trafficX = logoRect.right + 20f
-        val trafficY = logoRect.top + logoRect.height() * 0.15f
+        val trafficX = logoRect.right + 20f; val trafficY = logoRect.top + logoRect.height() * 0.15f
         val dotRadius = 14f; val dotSpacing = 30f
         val dotPaint = Paint().apply { isAntiAlias = true }
-
-        // НЕО — зелёный если neoActive (пароль Связность введён)
         dotPaint.color = if (neoActive) Color.parseColor("#00FF00") else Color.parseColor("#555555")
         canvas.drawCircle(trafficX, trafficY, dotRadius, dotPaint)
-
-        // ГИГАЧАТ — зелёный если gigaChatMode
         dotPaint.color = if (gigaChatMode && !connectionLost) Color.parseColor("#21A038") else Color.parseColor("#555555")
         canvas.drawCircle(trafficX, trafficY + dotSpacing, dotRadius, dotPaint)
-
-        // ДИПСИК — жёлтый если localMode
         dotPaint.color = if (localMode) Color.parseColor("#FFCC00") else Color.parseColor("#555555")
         canvas.drawCircle(trafficX, trafficY + dotSpacing * 2, dotRadius, dotPaint)
-
         val labelPaint = Paint().apply { color = Color.parseColor("#888888"); textSize = 13f; typeface = Typeface.DEFAULT; isAntiAlias = true }
         canvas.drawText("НЕО", trafficX + 20f, trafficY + 5f, labelPaint)
         canvas.drawText("ГИГАЧАТ", trafficX + 20f, trafficY + dotSpacing + 5f, labelPaint)
         canvas.drawText("ДИПСИК", trafficX + 20f, trafficY + dotSpacing * 2 + 5f, labelPaint)
+
+        postInvalidateDelayed(80)
     }
 
     override fun performClick(): Boolean { return super.performClick() }
