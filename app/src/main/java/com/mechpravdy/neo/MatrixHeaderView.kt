@@ -19,8 +19,8 @@ class MatrixHeaderView @JvmOverloads constructor(
     private val fontSize = 36f
     private val lineHeight = fontSize * 1.1f
     private val speed = 7f
-    private val maxLines = 3
-    private val maxPoolSize = 6
+    private val maxLines = 6
+    private val maxPoolSize = 12
     private val words = arrayOf("Нео", "Батя", "Меч Правды", "Ковчег", "Иди за белым кроликом")
 
     private val titlePaint = Paint().apply { color = Color.WHITE; textSize = 72f; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL); isAntiAlias = true; textAlign = Paint.Align.CENTER }
@@ -40,7 +40,6 @@ class MatrixHeaderView @JvmOverloads constructor(
 
     private var logoRect = RectF()
     private var columns = 0
-    // Каждая строка хранит СВОЙ индекс в пуле
     private val linePool = arrayOfNulls<String>(maxPoolSize)
     private val linePoolIndex = IntArray(maxLines) { -1 }
     private val lineY = FloatArray(maxLines)
@@ -53,12 +52,10 @@ class MatrixHeaderView @JvmOverloads constructor(
         super.onSizeChanged(w, h, oldw, oldh)
         screenH = h.toFloat()
         columns = (w / fontSize).toInt() + 1
-        // Заполняем пул
         for (i in 0 until maxPoolSize) { linePool[i] = generateLine() }
-        // Раздаём начальные индексы
         for (i in 0 until maxLines) {
             linePoolIndex[i] = i % maxPoolSize
-            lineY[i] = screenH + i * lineHeight
+            lineY[i] = i * lineHeight * 2f
             printed[i] = 0
         }
         nextPoolSlot = maxLines % maxPoolSize
@@ -78,7 +75,6 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawColor(Color.WHITE)
         frame++
 
-        // Печать и движение
         for (i in 0 until maxLines) {
             val poolIdx = linePoolIndex[i]
             if (poolIdx < 0) continue
@@ -87,14 +83,12 @@ class MatrixHeaderView @JvmOverloads constructor(
             lineY[i] -= speed
         }
 
-        // Если верхняя строка ушла — сдвигаем
         if (lineY[0] < -lineHeight) {
             for (i in 0 until maxLines - 1) {
                 linePoolIndex[i] = linePoolIndex[i + 1]
                 lineY[i] = lineY[i + 1]
                 printed[i] = printed[i + 1]
             }
-            // Новая строка снизу — берём свежий слот из пула
             linePool[nextPoolSlot] = generateLine()
             linePoolIndex[maxLines - 1] = nextPoolSlot
             lineY[maxLines - 1] = lineY[maxLines - 2] + lineHeight
@@ -102,7 +96,6 @@ class MatrixHeaderView @JvmOverloads constructor(
             nextPoolSlot = (nextPoolSlot + 1) % maxPoolSize
         }
 
-        // Рисуем
         for (i in 0 until maxLines) {
             val poolIdx = linePoolIndex[i]
             if (poolIdx < 0) continue
@@ -117,12 +110,10 @@ class MatrixHeaderView @JvmOverloads constructor(
             }
         }
 
-        // Логотип
         canvas.drawRoundRect(logoRect, 16f, 16f, logoBgPaint)
         canvas.drawText("СБЕР", w / 2, logoRect.top + logoRect.height() * 0.45f, titlePaint)
         canvas.drawText("ГигаЧат", w / 2, logoRect.top + logoRect.height() * 0.75f, subtitlePaint)
 
-        // Кнопки
         val btnPaint = Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 18f; typeface = Typeface.DEFAULT_BOLD }
         val btnTextPaint = Paint().apply { color = Color.WHITE; isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 18f; typeface = Typeface.DEFAULT_BOLD }
         btnPaint.color = if (gigaChatMode) Color.parseColor("#21A038") else Color.parseColor("#555555")
@@ -132,7 +123,6 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRoundRect(localButtonRect, 8f, 8f, btnPaint)
         canvas.drawText("ДИПСИК", localButtonRect.centerX(), localButtonRect.centerY() + 6f, btnTextPaint)
 
-        // Светофор
         val trafficX = logoRect.right + 20f; val trafficY = logoRect.top + logoRect.height() * 0.15f
         val dotRadius = 14f; val dotSpacing = 30f
         val dotPaint = Paint().apply { isAntiAlias = true }
