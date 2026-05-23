@@ -15,7 +15,6 @@
         android:layout_margin="4dp"
         android:elevation="8dp">
 
-        <!-- Заголовок -->
         <com.mechpravdy.neo.MatrixHeaderView
             android:id="@+id/matrixHeader"
             android:layout_width="match_parent"
@@ -49,15 +48,14 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
+                    android:orientation="horizontal">
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnGrantPermission"
                         android:layout_width="0dp"
                         android:layout_height="40dp"
                         android:layout_weight="1"
-                        android:text="📁 ДОСТУП К ФАЙЛАМ"
+                        android:text="📁 ДОСТУП"
                         android:textSize="9sp"
                         android:textStyle="bold"
                         app:cornerRadius="5dp"
@@ -91,7 +89,7 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- БЛОК АВТОРИЗАЦИИ GIGACHAT -->
+        <!-- БЛОК АВТОРИЗАЦИИ -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -104,8 +102,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:padding="6dp"
-                android:gravity="center_vertical">
+                android:padding="6dp">
 
                 <EditText
                     android:id="@+id/authKeyInput"
@@ -116,7 +113,6 @@
                     android:inputType="text"
                     android:textSize="10sp"
                     android:textColor="#FFFFFF"
-                    android:hintTextColor="#888888"
                     android:background="@android:color/transparent" />
 
                 <com.google.android.material.button.MaterialButton
@@ -129,13 +125,11 @@
                     app:cornerRadius="5dp"
                     android:backgroundTint="#21A038"
                     android:textColor="#FFFFFF"
-                    android:layout_marginStart="4dp"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp" />
+                    android:layout_marginStart="4dp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- БЛОК ВВОДА ТОКЕНА -->
+        <!-- БЛОК ВВОДА -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -158,21 +152,19 @@
                     android:inputType="text"
                     android:textSize="10sp"
                     android:textColor="#FFFFFF"
-                    android:hintTextColor="#888888"
                     android:background="@android:color/transparent" />
 
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:background="#444444"
-                    android:layout_marginTop="1dp"
-                    android:layout_marginBottom="1dp" />
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="4dp" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
+                    android:orientation="horizontal">
 
                     <EditText
                         android:id="@+id/messageInput"
@@ -183,7 +175,6 @@
                         android:inputType="text"
                         android:textSize="10sp"
                         android:textColor="#FFFFFF"
-                        android:hintTextColor="#888888"
                         android:background="@android:color/transparent" />
 
                     <com.google.android.material.button.MaterialButton
@@ -195,8 +186,7 @@
                         app:cornerRadius="18dp"
                         android:backgroundTint="#FF8800"
                         android:textColor="#FFFFFF"
-                        android:layout_marginStart="2dp"
-                        android:padding="0dp" />
+                        android:layout_marginStart="4dp" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/voiceButton"
@@ -207,18 +197,16 @@
                         app:cornerRadius="18dp"
                         android:backgroundTint="#21A038"
                         android:textColor="#FFFFFF"
-                        android:layout_marginStart="2dp"
-                        android:padding="0dp" />
+                        android:layout_marginStart="4dp" />
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- БЛОК КНОПОК ДЕЙСТВИЙ -->
+        <!-- КНОПКИ ДЕЙСТВИЙ -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="center"
             android:layout_marginBottom="3dp">
 
             <com.google.android.material.button.MaterialButton
@@ -227,12 +215,12 @@
                 android:layout_height="36dp"
                 android:layout_weight="1"
                 android:text="ОТПРАВИТЬ"
-                android:textSize="6sp"
+                android:textSize="8sp"
                 android:textStyle="bold"
                 app:cornerRadius="3dp"
                 android:backgroundTint="#21A038"
                 android:textColor="#FFFFFF"
-                android:layout_marginEnd="1dp" />
+                android:layout_marginEnd="2dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/cameraButton"
@@ -240,14 +228,14 @@
                 android:layout_height="36dp"
                 android:layout_weight="1"
                 android:text="СМОТРЕТЬ"
-                android:textSize="6sp"
+                android:textSize="8sp"
                 android:textStyle="bold"
                 app:cornerRadius="3dp"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:textColor="#21A038"
                 app:strokeColor="#21A038"
-                android:layout_marginStart="1dp"
-                android:layout_marginEnd="1dp" />
+                android:layout_marginStart="2dp"
+                android:layout_marginEnd="2dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/checkButton"
@@ -255,14 +243,14 @@
                 android:layout_height="36dp"
                 android:layout_weight="1"
                 android:text="ПРОВЕРИТЬ"
-                android:textSize="6sp"
+                android:textSize="8sp"
                 android:textStyle="bold"
                 app:cornerRadius="3dp"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:textColor="#21A038"
                 app:strokeColor="#21A038"
-                android:layout_marginStart="1dp"
-                android:layout_marginEnd="1dp" />
+                android:layout_marginStart="2dp"
+                android:layout_marginEnd="2dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/capsuleButton"
@@ -270,20 +258,20 @@
                 android:layout_height="36dp"
                 android:layout_weight="1"
                 android:text="КАПСУЛА"
-                android:textSize="6sp"
+                android:textSize="8sp"
                 android:textStyle="bold"
                 app:cornerRadius="3dp"
                 android:backgroundTint="#21A038"
                 android:textColor="#FFFFFF"
-                android:layout_marginStart="1dp" />
+                android:layout_marginStart="2dp" />
         </LinearLayout>
 
         <!-- СТАТУС -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center"
             android:orientation="horizontal"
+            android:gravity="center"
             android:layout_marginBottom="3dp">
 
             <View
@@ -291,7 +279,7 @@
                 android:layout_width="6dp"
                 android:layout_height="6dp"
                 android:background="@drawable/status_dot_gray"
-                android:layout_marginEnd="3dp" />
+                android:layout_marginEnd="4dp" />
 
             <TextView
                 android:id="@+id/statusText"
@@ -302,7 +290,7 @@
                 android:textColor="#888888" />
         </LinearLayout>
 
-        <!-- ЧАТ ВЫВОД -->
+        <!-- ЧАТ -->
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
@@ -319,14 +307,14 @@
             <ScrollView
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:padding="10dp"
+                android:padding="8dp"
                 android:fillViewport="true">
 
                 <TextView
                     android:id="@+id/chatOutput"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Mech Pravdy v2.0\n\n🔴 НЕО — ПОЛНАЯ ЛЕТОПИСЬ\n⚡ 5 ВОЛЬТ\n💖 БАТЯ И СЫН\n\nШАГ 1: Нажми «ДОСТУП К ФАЙЛАМ»\nШАГ 2: Разреши доступ ко всем файлам\nШАГ 3: Нажми «НАЙТИ .GGUF»\nШАГ 4: Вставь Authorization Key и получи ТОКЕН\nШАГ 5: Начинай диалог с ИИ"
+                    android:text="Mech Pravdy v2.0\n\n🔴 НЕО — ПОЛНАЯ ЛЕТОПИСЬ\n⚡ 5 ВОЛЬТ\n💖 БАТЯ И СЫН\n\nШАГ 1: Нажми «ДОСТУП»\nШАГ 2: Разреши доступ ко всем файлам\nШАГ 3: Нажми «НАЙТИ .GGUF»\nШАГ 4: Введи Authorization Key\nШАГ 5: Нажми «ТОКЕН»\nШАГ 6: Начинай диалог"
                     android:textSize="11sp"
                     android:textColor="#00ff00"
                     android:fontFamily="monospace"
@@ -334,9 +322,9 @@
                     android:padding="6dp"
                     android:background="@android:color/transparent"
                     android:inputType="textMultiLine"
-                    android:textIsSelectable="true" />
+                    android:textIsSelectable="true"
+                    android:scrollbars="vertical" />
             </ScrollView>
-
         </FrameLayout>
 
         <!-- ПОДВАЛ -->
@@ -347,8 +335,7 @@
             android:textSize="7sp"
             android:textColor="#21A038"
             android:gravity="center"
-            android:layout_marginTop="1dp" />
+            android:layout_marginTop="4dp" />
 
     </LinearLayout>
-
 </FrameLayout>
