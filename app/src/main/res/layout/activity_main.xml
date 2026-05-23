@@ -22,14 +22,14 @@
             android:layout_height="100dp"
             android:layout_marginBottom="3dp" />
 
-        <!-- БЛОК ДОСТУПА К ФАЙЛАМ (НОВЫЙ) -->
+        <!-- БЛОК ДОСТУПА К ФАЙЛАМ -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="3dp"
             app:cardElevation="2dp"
             app:cardCornerRadius="6dp"
-            android:backgroundTint="#2a2a2a">
+            app:cardBackgroundColor="#2a2a2a">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -98,7 +98,7 @@
             android:layout_marginBottom="3dp"
             app:cardElevation="1dp"
             app:cardCornerRadius="6dp"
-            android:backgroundTint="#2a2a2a">
+            app:cardBackgroundColor="#2a2a2a">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -142,7 +142,7 @@
             android:layout_marginBottom="3dp"
             app:cardElevation="1dp"
             app:cardCornerRadius="6dp"
-            android:backgroundTint="#2a2a2a">
+            app:cardBackgroundColor="#2a2a2a">
 
             <LinearLayout
                 android:layout_width="match_parent"
