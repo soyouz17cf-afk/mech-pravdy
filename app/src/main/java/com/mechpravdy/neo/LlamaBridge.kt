@@ -10,10 +10,26 @@ class LlamaBridge {
 
     fun loadModel(onProgress: (String) -> Unit, onDone: (Boolean) -> Unit) {
         try {
-            onProgress("Ищу модель Mistral 3B...")
+            onProgress("Ищу модель...")
             val modelPath = findModelFile()
             if (modelPath == null) {
-                onProgress("Модель .gguf не найдена. Положите файл в MyDocuments/for fone")
+                onProgress("Модель не найдена. Проверял папки:")
+                val paths = getSearchPaths()
+                for (p in paths) {
+                    onProgress("  ${p}")
+                    val dir = File(p)
+                    if (dir.exists()) {
+                        val allFiles = dir.listFiles()
+                        if (allFiles != null) {
+                            for (f in allFiles) {
+                                onProgress("    ${f.name}")
+                            }
+                        }
+                    } else {
+                        onProgress("    (папка не существует)")
+                    }
+                }
+                onProgress("Положите файл .gguf в MyDocuments/for fone")
                 onDone(false)
                 return
             }
@@ -45,19 +61,29 @@ class LlamaBridge {
         isLoaded = false
     }
 
-    private fun findModelFile(): String? {
-        val paths = listOf(
+    private fun getSearchPaths(): List<String> {
+        return listOf(
             "${Environment.getExternalStorageDirectory().absolutePath}/MyDocuments/for fone",
-            "${Environment.getExternalStorageDirectory().absolutePath}/Download"
+            "${Environment.getExternalStorageDirectory().absolutePath}/Download",
+            "${Environment.getExternalStorageDirectory().absolutePath}",
+            "/storage/emulated/0/MyDocuments/for fone",
+            "/storage/emulated/0/Download"
         )
+    }
+
+    private fun findModelFile(): String? {
+        val paths = getSearchPaths()
         for (path in paths) {
             val dir = File(path)
             if (dir.exists()) {
                 val files = dir.listFiles { f -> f.name.endsWith(".gguf") }
                 if (!files.isNullOrEmpty()) {
-                    val mistral = files.firstOrNull { it.name.contains("Mistral", ignoreCase = true) || it.name.contains("mistral", ignoreCase = true) }
-                    if (mistral != null) return mistral.absolutePath
-                    return files.first().absolutePath
+                    // Ищем любой файл с mistral или llava
+                    val found = files.firstOrNull {
+                        it.name.contains("mistral", ignoreCase = true) ||
+                        it.name.contains("llava", ignoreCase = true)
+                    }
+                    if (found != null) return found.absolutePath
                 }
             }
         }
