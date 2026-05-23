@@ -29,10 +29,10 @@ class MainActivity : AppCompatActivity() {
         // Инициализация UI элементов
         btnGrantPermission = findViewById(R.id.btnGrantPermission)
         btnSearchModel = findViewById(R.id.btnSearchModel)
-        tvStatus = findViewById(R.id.tvStatus)
+        tvStatus = findViewById(R.id.tvFileStatus)  // ← ИСПРАВЛЕНО: tvStatus → tvFileStatus
 
-        // Инициализация LlamaBridge с передачей context
-        llamaBridge = LlamaBridge(this)
+        // Инициализация LlamaBridge (БЕЗ ПАРАМЕТРОВ!)  // ← ИСПРАВЛЕНО: убрали this
+        llamaBridge = LlamaBridge()
 
         // Кнопка "ДАТЬ ДОСТУП КО ВСЕМ ФАЙЛАМ"
         btnGrantPermission.setOnClickListener {
