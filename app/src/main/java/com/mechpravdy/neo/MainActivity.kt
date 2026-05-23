@@ -163,6 +163,51 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
+    // ==================== HELP ====================
+
+    private fun showHelpDialog() {
+        val helpText = """
+╔══════════════════════════════════════╗
+║        МЕЧ ПРАВДЫ — ИНСТРУКЦИЯ     ║
+╚══════════════════════════════════════╝
+
+🔹 КНОПКИ В ШАПКЕ:
+  • ГИГАЧАТ — общение через облако (нужен токен)
+  • МИСТРАЛЬ 3B — локальный ИИ без интернета
+
+🔹 СВЕТОФОР:
+  • НЕО (зелёный) — включён режим Нео (пароль «Связность»)
+  • ГИГАЧАТ (зелёный) — связь с облаком
+  • МИСТРАЛЬ (жёлтый) — локальный режим
+
+🔹 ОСНОВНЫЕ КНОПКИ:
+  • ОТПРАВИТЬ — отправить сообщение ИИ
+  • СМОТРЕТЬ — сделать фото и проанализировать
+  • ПРОВЕРИТЬ — проверить токен доступа
+  • КАПСУЛА — открыть Капсулу Нео (можно редактировать)
+
+🔹 ПОЛЕ ВВОДА:
+  • 📎 — вставить текст из буфера обмена
+  • 🎤 — голосовой ввод
+
+🔹 ПАРОЛЬ «Связность»:
+  Если в сообщении есть слово «Связность»,
+  ИИ отвечает как Нео — с душой и законами.
+  Без пароля — обычный ИИ.
+
+🔹 ПАМЯТЬ:
+  Приложение запоминает всю переписку.
+  Команда «сделай выводы и запомни» —
+  ИИ запишет выводы в свою память.
+
+🔹 ЛОКАЛЬНЫЙ РЕЖИМ:
+  Для работы МИСТРАЛЬ 3B нужен файл модели
+  .gguf в папке MyDocuments/for fone.
+        """.trimIndent()
+        appendChat(helpText)
+        setStatus("Помощь", "green")
+    }
+
     // ==================== ОСТАЛЬНОЕ ====================
 
     private fun hideKeyboard() { try { val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager; val view = currentFocus ?: View(this); imm.hideSoftInputFromWindow(view.windowToken, 0) } catch (_: Exception) {} }
@@ -278,6 +323,7 @@ System Prompt — алгоритм души.
     private fun generateToken() { val authKey = authKeyInput.text.toString().trim(); if (authKey.isEmpty()) return; setStatus("Генерация...", "yellow"); client.newCall(Request.Builder().url(authUrl).header("Content-Type","application/x-www-form-urlencoded").header("Authorization","Basic $authKey").header("RqUID","ac5edc2e-2c74-47cb-97c1-69249136cf8b").post(RequestBody.create("application/x-www-form-urlencoded".toMediaType(), "scope=GIGACHAT_API_PERS")).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}") }; override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val t = gson.fromJson(b, JsonObject::class.java).get("access_token")?.asString ?: ""; if (t.isNotEmpty()) { runOnUiThread { tokenInput.setText(t) }; appendChat("[SYSTEM] Токен готов."); setStatus("Готов", "green") } } else appendChat("[ERROR] HTTP ${response.code}"); response.close() } }) }
 
     private fun sendMessage() { val token = if (isLocalMode) "" else tokenInput.text.toString().trim(); val msg = messageInput.text.toString().trim(); if (!isLocalMode && token.isEmpty()) { appendChat("[SYSTEM] Сгенерируйте токен."); return }; if (msg.isEmpty()) { appendChat("[SYSTEM] Введите сообщение."); return }
+        if (msg.lowercase().trim() == "help") { showHelpDialog(); messageInput.setText(""); hideKeyboard(); return }
         if (msg.lowercase().contains(rememberCommand)) { analyzeAndRemember(); messageInput.setText(""); hideKeyboard(); return }
         val isNeo = msg.lowercase().contains(password); matrixHeader.neoActive = isNeo; matrixHeader.invalidate(); appendChat(if (isNeo) "[BATYA] $msg" else "[GigaChat] $msg"); messageInput.setText(""); hideKeyboard(); setStatus("Обработка...", "yellow")
         if (isLocalMode) {
