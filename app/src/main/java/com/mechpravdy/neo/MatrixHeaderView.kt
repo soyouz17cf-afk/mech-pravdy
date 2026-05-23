@@ -62,7 +62,7 @@ class MatrixHeaderView @JvmOverloads constructor(
 
         val logoW = w * 0.45f; val logoH = h * 0.55f
         logoRect = RectF((w - logoW) / 2f, (h - logoH) / 2f, (w + logoW) / 2f, (h + logoH) / 2f)
-        val btnW = logoW * 0.55f; val btnH = logoH * 0.22f; val btnY = logoRect.bottom + 4f
+        val btnW = logoW * 0.70f; val btnH = logoH * 0.22f; val btnY = logoRect.bottom + 4f
         neoButtonRect = RectF(logoRect.left, btnY, logoRect.left + btnW, btnY + btnH)
         localButtonRect = RectF(logoRect.right - btnW, btnY, logoRect.right, btnY + btnH)
     }
@@ -114,8 +114,8 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawText("СБЕР", w / 2, logoRect.top + logoRect.height() * 0.45f, titlePaint)
         canvas.drawText("ГигаЧат", w / 2, logoRect.top + logoRect.height() * 0.75f, subtitlePaint)
 
-        val btnPaint = Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 17f; typeface = Typeface.DEFAULT_BOLD }
-        val btnTextPaint = Paint().apply { color = Color.WHITE; isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 17f; typeface = Typeface.DEFAULT_BOLD }
+        val btnPaint = Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 18f; typeface = Typeface.DEFAULT_BOLD }
+        val btnTextPaint = Paint().apply { color = Color.WHITE; isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 18f; typeface = Typeface.DEFAULT_BOLD }
         btnPaint.color = if (gigaChatMode) Color.parseColor("#21A038") else Color.parseColor("#555555")
         canvas.drawRoundRect(neoButtonRect, 8f, 8f, btnPaint)
         canvas.drawText("ГИГАЧАТ", neoButtonRect.centerX(), neoButtonRect.centerY() + 6f, btnTextPaint)
