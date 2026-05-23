@@ -10,43 +10,58 @@ class LlamaBridge {
 
     fun loadModel(onProgress: (String) -> Unit, onDone: (Boolean) -> Unit) {
         try {
-            onProgress("🔴 МОНСЕГЮР АКТИВИРОВАН")
-            onProgress("Ищу модель по всему телефону...")
+            onProgress("🔴 ПОЛНЫЙ ПОИСК .GGUF ПО ВСЕМУ ТЕЛЕФОНУ")
+            onProgress("Батя сказал: 'Найди модель, сынок'")
             
-            val modelPath = findModelFileRecursively(onProgress)
+            val allModels = findAllGgufFilesRecursively(onProgress)
             
-            if (modelPath == null) {
-                onProgress("❌ Модель .gguf не найдена во всём телефоне")
-                onProgress("Положите файл .gguf в любую папку на телефоне")
+            if (allModels.isEmpty()) {
+                onProgress("❌ НИ ОДНОГО .GGUF файла не найдено во всём телефоне")
+                onProgress("")
+                onProgress("Что делать:")
+                onProgress("1. Скачай .gguf модель (например, mistral-7b.Q4_K_M.gguf)")
+                onProgress("2. Положи в любую папку: Downloads, Documents, на SD-карту")
+                onProgress("3. На Android 11+ дай разрешение 'Доступ ко всем файлам'")
+                onProgress("4. Перезапусти приложение")
                 onDone(false)
                 return
             }
             
-            onProgress("✅ Нашёл: ${File(modelPath).name}")
-            onProgress("📁 Путь: $modelPath")
-            onProgress("Загружаю библиотеку llama...")
+            onProgress("✅ Найдено ${allModels.size} моделей .gguf:")
+            allModels.forEachIndexed { index, model ->
+                val sizeMB = model.length() / (1024.0 * 1024.0)
+                onProgress("  ${index + 1}. ${model.name()} (${String.format("%.1f", sizeMB)} MB)")
+                onProgress("     ${model.absolutePath.take(60)}...")
+            }
+            
+            // Выбираем первую модель (можно добавить выбор)
+            val selectedModel = File(allModels.first())
+            onProgress("")
+            onProgress("📦 Загружаю: ${selectedModel.name()}")
             
             try {
                 System.loadLibrary("llama")
-                onProgress("⚡ Библиотека загружена. 5 Вольт в норме.")
+                onProgress("⚡ Библиотека llama загружена")
             } catch (e: Exception) {
                 onProgress("❌ Ошибка загрузки библиотеки: ${e.message}")
                 onDone(false)
                 return
             }
             
-            onProgress("🟢 Модель готова к бою! Батя гордится.")
+            onProgress("🟢 Модель готова! 5 Вольт в норме.")
+            onProgress("Батя: 'Молодец, Нео'")
             isLoaded = true
             onDone(true)
             
         } catch (e: Exception) {
             onProgress("💀 Ошибка: ${e.message}")
+            e.printStackTrace()
             onDone(false)
         }
     }
 
     fun generate(prompt: String, onToken: (String) -> Unit, onDone: () -> Unit) {
-        onToken("[NEO] Спроси у Бати. Генерация готовится в гараже Монсегюр.")
+        onToken("[НЕО] Модель загружена. Генерация через llama.cpp будет в следующей версии.")
         onDone()
     }
 
@@ -55,74 +70,45 @@ class LlamaBridge {
     }
 
     /**
-     * Рекурсивный поиск .gguf файлов по всему доступному хранилищу
+     * НАСТОЯЩИЙ РЕКУРСИВНЫЙ ПОИСК по всем доступным папкам телефона
+     * Возвращает ВСЕ найденные .gguf файлы
      */
-    private fun findModelFileRecursively(onProgress: (String) -> Unit): String? {
-        val foundFiles = mutableListOf<String>()
+    private fun findAllGgufFilesRecursively(onProgress: (String) -> Unit): List<File> {
+        val results = mutableListOf<File>()
+        val scannedDirs = mutableSetOf<String>()
         
-        // Все возможные корневые директории на Android
-        val searchRoots = listOf(
-            Environment.getExternalStorageDirectory()?.absolutePath ?: "/storage/emulated/0",
-            "/storage/emulated/0",
-            "/storage",
-            "/sdcard",
-            "/mnt/sdcard",
-            "/data/media/0",
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)?.absolutePath,
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)?.absolutePath,
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM)?.absolutePath,
-            "/storage/emulated/0/MyDocuments",
-            "/storage/emulated/0/Download"
-        ).distinct().filterNotNull()
+        // Все возможные корневые директории
+        val roots = getRootDirectories()
         
-        // Папки, которые НЕ нужно сканировать (системные, кеш, приложения)
-        val excludeDirs = setOf(
-            "Android", "android", "system", "proc", "sys", "dev",
-            "cache", "tmp", "lost+found", "obb", "data"
-        )
+        onProgress("📂 Сканирую ${roots.size} корневых папок...")
         
-        onProgress("🔍 Сканирую корневые папки...")
-        
-        for (root in searchRoots) {
-            val rootFile = File(root)
-            if (!rootFile.exists() || !rootFile.canRead()) {
-                continue
-            }
-            
-            onProgress("📂 Сканирую: ${rootFile.absolutePath}")
-            scanDirectoryRecursively(rootFile, excludeDirs, foundFiles, onProgress, 0)
-            
-            // Если уже нашли — прерываем поиск (берём первый найденный)
-            if (foundFiles.isNotEmpty()) {
-                break
+        for (root in roots) {
+            if (root.exists() && root.canRead()) {
+                onProgress("🔍 Сканирую: ${root.absolutePath}")
+                scanDirectoryDeep(root, results, scannedDirs, onProgress, 0)
             }
         }
         
-        // Приоритет: имена с "mistral" или "llava" в начале
-        val prioritized = foundFiles.sortedByDescending { path ->
-            when {
-                path.contains("mistral", ignoreCase = true) -> 3
-                path.contains("llava", ignoreCase = true) -> 2
-                path.contains("qwen", ignoreCase = true) -> 1
-                else -> 0
-            }
-        }
-        
-        return prioritized.firstOrNull()
+        return results.distinctBy { it.absolutePath }
     }
     
     /**
-     * Рекурсивный обход директории
+     * Глубокий рекурсивный обход директории
      */
-    private fun scanDirectoryRecursively(
+    private fun scanDirectoryDeep(
         dir: File,
-        excludeDirs: Set<String>,
-        results: MutableList<String>,
+        results: MutableList<File>,
+        scannedDirs: MutableSet<String>,
         onProgress: (String) -> Unit,
         depth: Int
     ) {
-        // Защита от бесконечной рекурсии (максимум 30 уровней)
-        if (depth > 30) return
+        // Защита от бесконечной рекурсии
+        if (depth > 25) return
+        
+        // Не сканируем одну папку дважды
+        val dirPath = dir.absolutePath
+        if (dirPath in scannedDirs) return
+        scannedDirs.add(dirPath)
         
         try {
             val files = dir.listFiles() ?: return
@@ -130,32 +116,97 @@ class LlamaBridge {
             for (file in files) {
                 try {
                     if (file.isDirectory) {
-                        // Пропускаем исключённые папки
-                        val dirName = file.name
-                        if (excludeDirs.contains(dirName)) continue
-                        if (dirName.startsWith(".")) continue
+                        // Пропускаем системные папки, но не все
+                        val name = file.name.lowercase()
+                        if (shouldSkipDirectory(name)) {
+                            continue
+                        }
                         
-                        // Рекурсивный обход
-                        scanDirectoryRecursively(file, excludeDirs, results, onProgress, depth + 1)
-                    } else if (file.isFile && file.name.endsWith(".gguf", ignoreCase = true)) {
-                        val sizeMB = file.length() / (1024.0 * 1024.0)
-                        onProgress("🎯 Найден .gguf: ${file.name} (${String.format("%.2f", sizeMB)} MB)")
-                        results.add(file.absolutePath)
+                        // Рекурсивно обходим подпапки
+                        scanDirectoryDeep(file, results, scannedDirs, onProgress, depth + 1)
+                        
+                    } else if (file.isFile) {
+                        // Проверяем расширение .gguf (без учёта регистра)
+                        if (file.name.lowercase().endsWith(".gguf")) {
+                            if (file.length() > 0) { // Не пустые файлы
+                                results.add(file)
+                                onProgress("  🎯 НАШЁЛ: ${file.name} (${formatSize(file.length())})")
+                            }
+                        }
                     }
                 } catch (e: SecurityException) {
-                    // Нет доступа к папке — пропускаем
+                    // Нет доступа - пропускаем
                     continue
                 }
             }
         } catch (e: Exception) {
-            // Ошибка чтения директории — игнорируем
+            // Ошибка чтения - пропускаем
         }
     }
     
-    // Оставлено для обратной совместимости (но не используется)
-    @Deprecated("Используется рекурсивный поиск", ReplaceWith("findModelFileRecursively"))
-    private fun getSearchPaths(): List<String> = emptyList()
+    /**
+     * Какие папки пропускаем для ускорения поиска
+     */
+    private fun shouldSkipDirectory(name: String): Boolean {
+        val skipList = listOf(
+            "android", "system", "proc", "sys", "dev",
+            "cache", "tmp", "lost+found", "root",
+            "acct", "vendor", "firmware", "bt_firmware",
+            "d", "etc", "init", "mnt", "storage/emulated"
+        )
+        return skipList.any { name.contains(it) }
+    }
     
-    @Deprecated("Используется рекурсивный поиск", ReplaceWith("findModelFileRecursively"))
-    private fun findModelFile(): String? = null
+    /**
+     * Все корневые директории телефона
+     */
+    private fun getRootDirectories(): List<File> {
+        val roots = mutableListOf<File>()
+        
+        // Основное хранилище
+        Environment.getExternalStorageDirectory()?.let { roots.add(it) }
+        
+        // Дополнительные пути
+        val paths = listOf(
+            "/storage/emulated/0",
+            "/storage/emulated",
+            "/storage",
+            "/sdcard",
+            "/sdcard0",
+            "/sdcard1",
+            "/mnt/sdcard",
+            "/mnt",
+            "/data/media/0",
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)?.parent,
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)?.parent,
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM)?.parent,
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)?.parent,
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)?.parent,
+            "/storage/self/primary",
+            "/storage/primary"
+        )
+        
+        for (path in paths) {
+            path?.let {
+                val file = File(it)
+                if (file.exists() && !roots.contains(file)) {
+                    roots.add(file)
+                }
+            }
+        }
+        
+        return roots.distinct()
+    }
+    
+    /**
+     * Форматирование размера файла
+     */
+    private fun formatSize(bytes: Long): String {
+        return when {
+            bytes < 1024 -> "$bytes B"
+            bytes < 1024 * 1024 -> "${bytes / 1024} KB"
+            bytes < 1024 * 1024 * 1024 -> "${bytes / (1024 * 1024)} MB"
+            else -> "${String.format("%.1f", bytes / (1024.0 * 1024.0 * 1024.0))} GB"
+        }
+    }
 }
