@@ -173,20 +173,20 @@ class MainActivity : AppCompatActivity() {
         isLocalMode = true
         matrixHeader.localMode = true; matrixHeader.gigaChatMode = false; matrixHeader.connectionLost = false
         matrixHeader.invalidate()
-        appendChat("[РЕЖИМ] ДИПСИК (локальный)")
-        setStatus("ДИПСИК", "yellow")
+        appendChat("[РЕЖИМ] МИСТРАЛЬ 3B (локальный)")
+        setStatus("МИСТРАЛЬ", "yellow")
 
         llamaBridge = LlamaBridge()
-        appendChat("[МОЗГ] Загружаю Mistral 3B...")
+        appendChat("[МОЗГ] Инициализация...")
         llamaBridge?.loadModel(
             onProgress = { msg -> appendChat("[МОЗГ] $msg") },
             onDone = { success ->
                 if (success) {
                     appendChat("[МОЗГ] Mistral 3B готов к бою!")
-                    setStatus("ДИПСИК", "green")
+                    setStatus("МИСТРАЛЬ", "green")
                 } else {
-                    appendChat("[МОЗГ] Не удалось загрузить. Проверьте файл .gguf.")
-                    setStatus("ДИПСИК", "yellow")
+                    appendChat("[МОЗГ] Не удалось загрузить модель.")
+                    setStatus("МИСТРАЛЬ", "yellow")
                 }
             }
         )
