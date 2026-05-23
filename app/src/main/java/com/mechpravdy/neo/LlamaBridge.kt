@@ -30,14 +30,14 @@ class LlamaBridge {
             onProgress("✅ Найдено ${allModels.size} моделей .gguf:")
             allModels.forEachIndexed { index, model ->
                 val sizeMB = model.length() / (1024.0 * 1024.0)
-                onProgress("  ${index + 1}. ${model.name()} (${String.format("%.1f", sizeMB)} MB)")
+                onProgress("  ${index + 1}. ${model.name} (${String.format("%.1f", sizeMB)} MB)")
                 onProgress("     ${model.absolutePath.take(60)}...")
             }
             
             // Выбираем первую модель (можно добавить выбор)
-            val selectedModel = File(allModels.first())
+            val selectedModel = allModels.first()
             onProgress("")
-            onProgress("📦 Загружаю: ${selectedModel.name()}")
+            onProgress("📦 Загружаю: ${selectedModel.name}")
             
             try {
                 System.loadLibrary("llama")
@@ -117,8 +117,8 @@ class LlamaBridge {
                 try {
                     if (file.isDirectory) {
                         // Пропускаем системные папки, но не все
-                        val name = file.name.lowercase()
-                        if (shouldSkipDirectory(name)) {
+                        val nameLower = file.name.lowercase()
+                        if (shouldSkipDirectory(nameLower)) {
                             continue
                         }
                         
@@ -151,8 +151,7 @@ class LlamaBridge {
         val skipList = listOf(
             "android", "system", "proc", "sys", "dev",
             "cache", "tmp", "lost+found", "root",
-            "acct", "vendor", "firmware", "bt_firmware",
-            "d", "etc", "init", "mnt", "storage/emulated"
+            "acct", "vendor", "firmware", "bt_firmware"
         )
         return skipList.any { name.contains(it) }
     }
@@ -177,21 +176,14 @@ class LlamaBridge {
             "/mnt/sdcard",
             "/mnt",
             "/data/media/0",
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)?.parent,
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)?.parent,
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM)?.parent,
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)?.parent,
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)?.parent,
             "/storage/self/primary",
             "/storage/primary"
         )
         
         for (path in paths) {
-            path?.let {
-                val file = File(it)
-                if (file.exists() && !roots.contains(file)) {
-                    roots.add(file)
-                }
+            val file = File(path)
+            if (file.exists() && !roots.contains(file)) {
+                roots.add(file)
             }
         }
         
