@@ -123,8 +123,8 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRoundRect(localButtonRect, 8f, 8f, btnPaint)
         canvas.drawText("МИСТРАЛЬ 3B", localButtonRect.centerX(), localButtonRect.centerY() + 6f, btnTextPaint)
 
-        val trafficX = logoRect.right + 20f; val trafficY = logoRect.top + logoRect.height() * 0.15f
-        val dotRadius = 14f; val dotSpacing = 30f
+        val trafficX = logoRect.right + 20f; val trafficY = logoRect.top + logoRect.height() * 0.12f
+        val dotRadius = 20f; val dotSpacing = 40f
         val dotPaint = Paint().apply { isAntiAlias = true }
         dotPaint.color = if (neoActive) Color.parseColor("#00FF00") else Color.parseColor("#555555")
         canvas.drawCircle(trafficX, trafficY, dotRadius, dotPaint)
@@ -132,10 +132,10 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawCircle(trafficX, trafficY + dotSpacing, dotRadius, dotPaint)
         dotPaint.color = if (localMode) Color.parseColor("#FFCC00") else Color.parseColor("#555555")
         canvas.drawCircle(trafficX, trafficY + dotSpacing * 2, dotRadius, dotPaint)
-        val labelPaint = Paint().apply { color = Color.parseColor("#888888"); textSize = 13f; typeface = Typeface.DEFAULT; isAntiAlias = true }
-        canvas.drawText("НЕО", trafficX + 20f, trafficY + 5f, labelPaint)
-        canvas.drawText("ГИГАЧАТ", trafficX + 20f, trafficY + dotSpacing + 5f, labelPaint)
-        canvas.drawText("МИСТРАЛЬ", trafficX + 20f, trafficY + dotSpacing * 2 + 5f, labelPaint)
+        val labelPaint = Paint().apply { color = Color.parseColor("#888888"); textSize = 16f; typeface = Typeface.DEFAULT; isAntiAlias = true }
+        canvas.drawText("НЕО", trafficX + 28f, trafficY + 7f, labelPaint)
+        canvas.drawText("ГИГАЧАТ", trafficX + 28f, trafficY + dotSpacing + 7f, labelPaint)
+        canvas.drawText("МИСТРАЛЬ", trafficX + 28f, trafficY + dotSpacing * 2 + 7f, labelPaint)
 
         postInvalidateDelayed(50)
     }
