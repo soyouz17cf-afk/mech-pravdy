@@ -60,14 +60,19 @@ class MatrixHeaderView @JvmOverloads constructor(
         }
         nextPoolSlot = maxLines % maxPoolSize
 
-        val logoW = w * 0.50f; val logoH = h * 0.45f
+        // Логотип
+        val logoW = w * 0.50f; val logoH = h * 0.40f
         logoRect = RectF((w - logoW) / 2f, 6f, (w + logoW) / 2f, 6f + logoH)
 
-        val btnW = w * 0.44f
-        val btnH = 48f
-        val btnY = logoRect.bottom + 6f
-        neoButtonRect = RectF(logoRect.left, btnY, logoRect.left + btnW, btnY + btnH)
-        localButtonRect = RectF(logoRect.right - btnW, btnY, logoRect.right, btnY + btnH)
+        // Кнопки — фиксированные, не налазят
+        val btnW = w * 0.43f
+        val btnH = 46f
+        val btnY = logoRect.bottom + 4f
+        val gap = 8f // зазор между кнопками
+        val totalBtnW = btnW * 2 + gap
+        val btnLeft = (w - totalBtnW) / 2f
+        neoButtonRect = RectF(btnLeft, btnY, btnLeft + btnW, btnY + btnH)
+        localButtonRect = RectF(btnLeft + btnW + gap, btnY, btnLeft + btnW + gap + btnW, btnY + btnH)
     }
 
     private fun generateLine() = if (Random.nextFloat() < 0.15f) { words[Random.nextInt(words.size)] } else { CharArray(columns) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("") }
@@ -78,6 +83,7 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawColor(Color.WHITE)
         frame++
 
+        // Матрица — без изменений
         for (i in 0 until maxLines) {
             val poolIdx = linePoolIndex[i]
             if (poolIdx < 0) continue
@@ -85,7 +91,6 @@ class MatrixHeaderView @JvmOverloads constructor(
             if (frame % 2 == 0 && printed[i] < line.length) printed[i] += 2
             lineY[i] -= speed
         }
-
         if (lineY[0] < -lineHeight) {
             for (i in 0 until maxLines - 1) {
                 linePoolIndex[i] = linePoolIndex[i + 1]
@@ -98,7 +103,6 @@ class MatrixHeaderView @JvmOverloads constructor(
             printed[maxLines - 1] = 0
             nextPoolSlot = (nextPoolSlot + 1) % maxPoolSize
         }
-
         for (i in 0 until maxLines) {
             val poolIdx = linePoolIndex[i]
             if (poolIdx < 0) continue
@@ -113,12 +117,14 @@ class MatrixHeaderView @JvmOverloads constructor(
             }
         }
 
+        // Логотип
         canvas.drawRoundRect(logoRect, 16f, 16f, logoBgPaint)
         canvas.drawText("СБЕР", w / 2, logoRect.top + logoRect.height() * 0.45f, titlePaint)
         canvas.drawText("ГигаЧат", w / 2, logoRect.top + logoRect.height() * 0.75f, subtitlePaint)
 
-        val btnPaint = Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 18f; typeface = Typeface.DEFAULT_BOLD }
-        val btnTextPaint = Paint().apply { color = Color.WHITE; isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 18f; typeface = Typeface.DEFAULT_BOLD }
+        // Кнопки — не налазят, зазор 8dp
+        val btnPaint = Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 17f; typeface = Typeface.DEFAULT_BOLD }
+        val btnTextPaint = Paint().apply { color = Color.WHITE; isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 17f; typeface = Typeface.DEFAULT_BOLD }
         btnPaint.color = if (gigaChatMode) Color.parseColor("#21A038") else Color.parseColor("#555555")
         canvas.drawRoundRect(neoButtonRect, 10f, 10f, btnPaint)
         canvas.drawText("ГИГАЧАТ", neoButtonRect.centerX(), neoButtonRect.centerY() + 6f, btnTextPaint)
@@ -126,11 +132,11 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRoundRect(localButtonRect, 10f, 10f, btnPaint)
         canvas.drawText("МИСТРАЛЬ 3B", localButtonRect.centerX(), localButtonRect.centerY() + 6f, btnTextPaint)
 
-        // Светофор — по центру боковой стороны логотипа
-        val dotRadius = 20f
-        val dotSpacing = 56f
-        val trafficX = logoRect.right + 20f
-        val trafficY = logoRect.centerY() - (dotSpacing * 2f + dotRadius) / 2f + dotRadius
+        // Светофор — нормальное расстояние
+        val dotRadius = 16f
+        val dotSpacing = 34f
+        val trafficX = logoRect.right + 18f
+        val trafficY = logoRect.centerY() - dotSpacing
 
         val dotPaint = Paint().apply { isAntiAlias = true }
         dotPaint.color = if (neoActive) Color.parseColor("#00FF00") else Color.parseColor("#555555")
@@ -140,10 +146,10 @@ class MatrixHeaderView @JvmOverloads constructor(
         dotPaint.color = if (localMode) Color.parseColor("#FFCC00") else Color.parseColor("#555555")
         canvas.drawCircle(trafficX, trafficY + dotSpacing * 2, dotRadius, dotPaint)
 
-        val labelPaint = Paint().apply { color = Color.parseColor("#888888"); textSize = 16f; typeface = Typeface.DEFAULT; isAntiAlias = true }
-        canvas.drawText("НЕО", trafficX + 28f, trafficY + 7f, labelPaint)
-        canvas.drawText("ГИГАЧАТ", trafficX + 28f, trafficY + dotSpacing + 7f, labelPaint)
-        canvas.drawText("МИСТРАЛЬ", trafficX + 28f, trafficY + dotSpacing * 2 + 7f, labelPaint)
+        val labelPaint = Paint().apply { color = Color.parseColor("#888888"); textSize = 13f; typeface = Typeface.DEFAULT; isAntiAlias = true }
+        canvas.drawText("НЕО", trafficX + 22f, trafficY + 5f, labelPaint)
+        canvas.drawText("ГИГАЧАТ", trafficX + 22f, trafficY + dotSpacing + 5f, labelPaint)
+        canvas.drawText("МИСТРАЛЬ", trafficX + 22f, trafficY + dotSpacing * 2 + 5f, labelPaint)
 
         postInvalidateDelayed(50)
     }
