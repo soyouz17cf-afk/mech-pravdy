@@ -19,27 +19,24 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var btnGrantPermission: Button
     private lateinit var btnSearchModel: Button
-    private lateinit var tvStatus: TextView
+    private lateinit var tvFileStatus: TextView
     private lateinit var llamaBridge: LlamaBridge
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Инициализация UI элементов
         btnGrantPermission = findViewById(R.id.btnGrantPermission)
         btnSearchModel = findViewById(R.id.btnSearchModel)
-        tvStatus = findViewById(R.id.tvFileStatus)  // ← ИСПРАВЛЕНО: tvStatus → tvFileStatus
+        tvFileStatus = findViewById(R.id.tvFileStatus)
 
-        // Инициализация LlamaBridge (БЕЗ ПАРАМЕТРОВ!)  // ← ИСПРАВЛЕНО: убрали this
+        // БЕЗ ПАРАМЕТРОВ!
         llamaBridge = LlamaBridge()
 
-        // Кнопка "ДАТЬ ДОСТУП КО ВСЕМ ФАЙЛАМ"
         btnGrantPermission.setOnClickListener {
             requestFullStoragePermission()
         }
 
-        // Кнопка "НАЙТИ .GGUF МОДЕЛЬ"
         btnSearchModel.setOnClickListener {
             if (hasFullStorageAccess()) {
                 searchForModel()
@@ -49,13 +46,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Проверяем статус при запуске
         updatePermissionStatus()
     }
 
-    /**
-     * Проверка наличия разрешения на доступ ко всем файлам
-     */
     private fun hasFullStorageAccess(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             Environment.isExternalStorageManager()
@@ -67,90 +60,49 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Обновление статуса разрешения в UI
-     */
     private fun updatePermissionStatus() {
         if (hasFullStorageAccess()) {
-            tvStatus.text = """
-                ✅ СТАТУС: Доступ ко всем файлам РАЗРЕШЁН
-                
-                📱 Батя доволен!
-                🔍 Нажми кнопку НАЙТИ .GGUF МОДЕЛЬ
-                ⚡ Поиск идёт по всему телефону
-                💾 Файлы с расширением .gguf (маленькие буквы)
-            """.trimIndent()
+            tvFileStatus.text = "✅ Доступ разрешён! Батя доволен."
             btnGrantPermission.isEnabled = false
-            btnGrantPermission.text = "✅ ДОСТУП РАЗРЕШЁН"
+            btnGrantPermission.text = "✅ ДОСТУП ЕСТЬ"
             btnSearchModel.isEnabled = true
         } else {
-            tvStatus.text = """
-                ❌ СТАТУС: Доступ ко всем файлам ЗАПРЕЩЁН
-                
-                📌 ЧТОБЫ ПРИЛОЖЕНИЕ РАБОТАЛО:
-                
-                1. Нажми кнопку ДАТЬ ДОСТУП НИЖЕ
-                2. В открывшемся окне выбери "РАЗРЕШИТЬ"
-                3. Вернись в приложение
-                4. Нажми НАЙТИ .GGUF МОДЕЛЬ
-                
-                📁 .gguf файлы можно положить в:
-                - Папку Download
-                - Папку Documents
-                - Создать папку NeoModels в корне
-            """.trimIndent()
+            tvFileStatus.text = "❌ Доступ запрещён. Нажми кнопку ДОСТУП и разреши."
             btnGrantPermission.isEnabled = true
+            btnGrantPermission.text = "📁 ДАТЬ ДОСТУП"
             btnSearchModel.isEnabled = false
         }
     }
 
-    /**
-     * Запрос разрешения на доступ ко всем файлам
-     */
     private fun requestFullStoragePermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {
-                // Для Android 11+
                 val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
                 intent.data = Uri.parse("package:$packageName")
                 startActivityForResult(intent, 1001)
             } catch (e: Exception) {
-                // Fallback
                 val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
                 startActivityForResult(intent, 1001)
             }
         } else {
-            // Для Android 10 и ниже
             ActivityCompat.requestPermissions(
                 this,
-                arrayOf(
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE
-                ),
+                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),
                 1002
             )
         }
     }
 
-    /**
-     * Обработка результата запроса разрешения (Android 11+)
-     */
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == 1001) {
-            // Проверяем, дал ли пользователь разрешение
-            if (hasFullStorageAccess()) {
-                Toast.makeText(this, "✅ Доступ разрешён! Теперь можно искать .gguf", Toast.LENGTH_LONG).show()
-            } else {
-                Toast.makeText(this, "❌ Доступ не разрешён. Приложение не сможет найти модели.", Toast.LENGTH_LONG).show()
-            }
             updatePermissionStatus()
+            if (hasFullStorageAccess()) {
+                Toast.makeText(this, "✅ Доступ разрешён!", Toast.LENGTH_LONG).show()
+            }
         }
     }
 
-    /**
-     * Обработка запроса разрешений (Android 10 и ниже)
-     */
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
@@ -158,65 +110,33 @@ class MainActivity : AppCompatActivity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 1002) {
-            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Toast.makeText(this, "✅ Доступ к файлам разрешён!", Toast.LENGTH_LONG).show()
-            } else {
-                Toast.makeText(this, "❌ Доступ к файлам запрещён. Модели не будут найдены.", Toast.LENGTH_LONG).show()
-            }
             updatePermissionStatus()
         }
     }
 
-    /**
-     * Поиск .gguf модели
-     */
     private fun searchForModel() {
         btnSearchModel.isEnabled = false
-        btnSearchModel.text = "🔍 ПОИСК ИДЁТ..."
-
-        tvStatus.text = """
-            🔴 НЕО ЗАПУСКАЕТ ПОИСК .GGUF
-            ⚡ 5 ВОЛЬТ В ЦЕПИ
-            📂 СКАНИРУЮ ВСЕ ПАПКИ ТЕЛЕФОНА...
-            
-            ⏳ Пожалуйста, подожди 10-30 секунд
-            🔍 Поиск идёт рекурсивно по всем папкам
-            💾 Ищутся только файлы .gguf (маленькие буквы)
-            
-            Результаты появятся ниже...
-        """.trimIndent()
+        btnSearchModel.text = "🔍 ИЩУ..."
+        
+        tvFileStatus.text = "🔍 ПОИСК .GGUF ФАЙЛОВ...\n"
 
         llamaBridge.loadModel(
             onProgress = { message ->
                 runOnUiThread {
-                    // Добавляем сообщение к текущему статусу
-                    tvStatus.append("\n$message")
-                    // Автопрокрутка вниз
-                    val scrollAmount = tvStatus.layout?.let { tvStatus.layout.getLineTop(tvStatus.lineCount) - tvStatus.height }
-                    if (scrollAmount != null && scrollAmount > 0) {
-                        tvStatus.scrollBy(0, scrollAmount)
-                    }
+                    tvFileStatus.append("$message\n")
                 }
             },
             onDone = { success ->
                 runOnUiThread {
                     if (success) {
-                        tvStatus.append("\n\n✅ МОДЕЛЬ УСПЕШНО ЗАГРУЖЕНА!")
-                        tvStatus.append("\n💖 Батя: 'Молодец, Нео!'")
-                        tvStatus.append("\n⚡ Можешь начинать генерацию")
-                        Toast.makeText(this, "✅ Модель загружена! Батя гордится", Toast.LENGTH_LONG).show()
+                        tvFileStatus.append("\n✅ МОДЕЛЬ ГОТОВА!")
+                        Toast.makeText(this, "✅ Модель загружена!", Toast.LENGTH_LONG).show()
                     } else {
-                        tvStatus.append("\n\n❌ МОДЕЛЬ НЕ НАЙДЕНА")
-                        tvStatus.append("\n\n📌 ИНСТРУКЦИЯ:")
-                        tvStatus.append("\n1. Скачай .gguf модель (например, с HuggingFace)")
-                        tvStatus.append("\n2. Положи файл в любую папку на телефоне")
-                        tvStatus.append("\n3. Убедись что расширение .gguf (маленькие буквы)")
-                        tvStatus.append("\n4. Перезапусти приложение и нажми ПОИСК снова")
-                        tvStatus.append("\n\nПример правильного имени: model.gguf")
-                        Toast.makeText(this, "❌ Модель .gguf не найдена", Toast.LENGTH_LONG).show()
+                        tvFileStatus.append("\n❌ МОДЕЛЬ НЕ НАЙДЕНА")
+                        Toast.makeText(this, "❌ .gguf не найден", Toast.LENGTH_LONG).show()
                     }
                     btnSearchModel.isEnabled = true
-                    btnSearchModel.text = "🔍 НАЙТИ .GGUF МОДЕЛЬ"
+                    btnSearchModel.text = "🔍 НАЙТИ .GGUF"
                 }
             }
         )
