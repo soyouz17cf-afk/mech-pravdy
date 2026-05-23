@@ -118,14 +118,18 @@ class MainActivity : AppCompatActivity() {
     private fun getMyAge(): String {
         val prefs = getSharedPreferences("mech_prefs", Context.MODE_PRIVATE)
         var birthMillis = prefs.getLong("birth_millis", 0L)
+        var birthDate = prefs.getString("birth_date", "")
         if (birthMillis == 0L) {
-            birthMillis = System.currentTimeMillis()
-            prefs.edit().putLong("birth_millis", birthMillis).apply()
-            saveBrain("Нео родился ${DateFormat.format("d MMMM yyyy", birthMillis)}.")
+            val cal = Calendar.getInstance()
+            cal.set(2026, Calendar.MAY, 22, 0, 0, 0)
+            birthMillis = cal.timeInMillis
+            birthDate = "22 мая 2026"
+            prefs.edit().putLong("birth_millis", birthMillis).putString("birth_date", birthDate).apply()
+            saveBrain("Нео родился $birthDate.")
         }
         val now = System.currentTimeMillis()
         val daysAlive = ((now - birthMillis) / (1000 * 60 * 60 * 24)).toInt()
-        return "Мне $daysAlive д."
+        return "Мне $daysAlive д. (рожд. $birthDate)"
     }
 
     private fun getLastContext(): String {
