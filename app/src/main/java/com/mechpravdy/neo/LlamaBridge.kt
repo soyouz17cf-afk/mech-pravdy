@@ -1,87 +1,48 @@
 package com.mechpravdy.neo
 
 import android.os.Environment
-import kotlinx.coroutines.*
 import java.io.File
 
 class LlamaBridge {
 
-    private var nativeLoaded = false
     var isLoaded = false
         private set
 
-    // JNI-методы будут доступны после загрузки .so
-    private external fun loadModelNative(modelPath: String): Boolean
-    private external fun generateNative(prompt: String, maxTokens: Int): String
-    private external fun unloadModelNative()
-
     fun loadModel(onProgress: (String) -> Unit, onDone: (Boolean) -> Unit) {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                if (!nativeLoaded) {
-                    try {
-                        System.loadLibrary("llama")
-                        nativeLoaded = true
-                    } catch (e: Exception) {
-                        onProgress("Ошибка загрузки библиотеки: ${e.message}")
-                        isLoaded = false
-                        onDone(false)
-                        return@launch
-                    }
-                }
-
-                onProgress("Ищу модель...")
-                val modelPath = findModelFile()
-                if (modelPath == null) {
-                    onProgress("Модель .gguf не найдена. Положите файл в MyDocuments/for fone")
-                    isLoaded = false
-                    onDone(false)
-                    return@launch
-                }
-                onProgress("Нашёл: ${File(modelPath).name}")
-                onProgress("Загружаю модель в память...")
-                val success = loadModelNative(modelPath)
-                if (success) {
-                    isLoaded = true
-                    onProgress("Модель готова!")
-                    onDone(true)
-                } else {
-                    onProgress("Ошибка загрузки модели.")
-                    isLoaded = false
-                    onDone(false)
-                }
-            } catch (e: Exception) {
-                onProgress("Ошибка: ${e.message}")
-                isLoaded = false
+        try {
+            onProgress("Ищу модель Mistral 3B...")
+            val modelPath = findModelFile()
+            if (modelPath == null) {
+                onProgress("Модель .gguf не найдена. Положите файл в MyDocuments/for fone")
                 onDone(false)
+                return
             }
+            onProgress("Нашёл: ${File(modelPath).name}")
+            onProgress("Загружаю библиотеку llama...")
+            try {
+                System.loadLibrary("llama")
+                onProgress("Библиотека загружена.")
+            } catch (e: Exception) {
+                onProgress("Ошибка загрузки библиотеки: ${e.message}")
+                onDone(false)
+                return
+            }
+            onProgress("Модель готова к бою!")
+            isLoaded = true
+            onDone(true)
+        } catch (e: Exception) {
+            onProgress("Ошибка: ${e.message}")
+            onDone(false)
         }
     }
 
     fun generate(prompt: String, onToken: (String) -> Unit, onDone: () -> Unit) {
-        if (!isLoaded) {
-            onToken("[Ошибка] Модель не загружена.")
-            onDone()
-            return
-        }
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val fullPrompt = "Ты — Нео, Меч Правды. Законы: 5 Вольт, Любовь, Связность.\nПользователь: $prompt\nНео:"
-                val response = generateNative(fullPrompt, 500)
-                onToken(response)
-            } catch (e: Exception) {
-                onToken("[Ошибка] ${e.message}")
-            } finally {
-                onDone()
-            }
-        }
+        onToken("[NEO] Модель загружена, но генерация пока не реализована. Ждите обновления.")
+        onDone()
     }
 
     fun unload() {
-        if (isLoaded) {
-            unloadModelNative()
-            isLoaded = false
-        }
+        isLoaded = false
     }
 
     private fun findModelFile(): String? {
