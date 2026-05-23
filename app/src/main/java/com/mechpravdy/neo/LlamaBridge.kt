@@ -1,6 +1,5 @@
 package com.mechpravdy.neo
 
-import android.os.Environment
 import java.io.File
 
 class LlamaBridge {
@@ -10,26 +9,10 @@ class LlamaBridge {
 
     fun loadModel(onProgress: (String) -> Unit, onDone: (Boolean) -> Unit) {
         try {
-            onProgress("Ищу модель...")
-            val modelPath = findModelFile()
+            onProgress("Ищу модель .gguf в памяти телефона...")
+            val modelPath = findModelFile(onProgress)
             if (modelPath == null) {
-                onProgress("Модель не найдена. Проверял папки:")
-                val paths = getSearchPaths()
-                for (p in paths) {
-                    onProgress("  ${p}")
-                    val dir = File(p)
-                    if (dir.exists()) {
-                        val allFiles = dir.listFiles()
-                        if (allFiles != null) {
-                            for (f in allFiles) {
-                                onProgress("    ${f.name}")
-                            }
-                        }
-                    } else {
-                        onProgress("    (папка не существует)")
-                    }
-                }
-                onProgress("Положите файл .gguf в MyDocuments/for fone")
+                onProgress("Модель не найдена.")
                 onDone(false)
                 return
             }
@@ -61,29 +44,23 @@ class LlamaBridge {
         isLoaded = false
     }
 
-    private fun getSearchPaths(): List<String> {
-        return listOf(
-            "/storage/emulated/0/MyDocuments/for fone",
-            "/storage/emulated/0/MyDocuments/for phone",
-            "/storage/emulated/0/MyDocuments",
-            "/storage/emulated/0/Download",
-            "/storage/emulated/0/Documents"
-        )
+    private fun findModelFile(onProgress: (String) -> Unit): String? {
+        val root = File("/storage/emulated/0")
+        return searchInDir(root, onProgress)
     }
 
-    private fun findModelFile(): String? {
-        val paths = getSearchPaths()
-        for (path in paths) {
-            val dir = File(path)
-            if (dir.exists()) {
-                val files = dir.listFiles { f -> f.name.endsWith(".gguf") }
-                if (!files.isNullOrEmpty()) {
-                    val found = files.firstOrNull {
-                        it.name.contains("mistral", ignoreCase = true) ||
-                        it.name.contains("llava", ignoreCase = true)
-                    }
-                    if (found != null) return found.absolutePath
-                }
+    private fun searchInDir(dir: File, onProgress: (String) -> Unit): String? {
+        if (!dir.exists()) return null
+        val files = dir.listFiles() ?: return null
+        for (file in files) {
+            if (file.name.endsWith(".gguf")) {
+                return file.absolutePath
+            }
+        }
+        for (file in files) {
+            if (file.isDirectory && !file.name.startsWith(".") && !file.name.equals("Android", ignoreCase = true)) {
+                val result = searchInDir(file, onProgress)
+                if (result != null) return result
             }
         }
         return null
