@@ -63,11 +63,11 @@ class LlamaBridge {
 
     private fun getSearchPaths(): List<String> {
         return listOf(
-            "${Environment.getExternalStorageDirectory().absolutePath}/MyDocuments/for fone",
-            "${Environment.getExternalStorageDirectory().absolutePath}/Download",
-            "${Environment.getExternalStorageDirectory().absolutePath}",
             "/storage/emulated/0/MyDocuments/for fone",
-            "/storage/emulated/0/Download"
+            "/storage/emulated/0/MyDocuments/for phone",
+            "/storage/emulated/0/MyDocuments",
+            "/storage/emulated/0/Download",
+            "/storage/emulated/0/Documents"
         )
     }
 
@@ -78,7 +78,6 @@ class LlamaBridge {
             if (dir.exists()) {
                 val files = dir.listFiles { f -> f.name.endsWith(".gguf") }
                 if (!files.isNullOrEmpty()) {
-                    // Ищем любой файл с mistral или llava
                     val found = files.firstOrNull {
                         it.name.contains("mistral", ignoreCase = true) ||
                         it.name.contains("llava", ignoreCase = true)
