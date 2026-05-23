@@ -1,10 +1,9 @@
-
 package com.mechpravdy.neo
 
 import android.content.Context
 import android.os.Environment
-import com.arthenica.mobilellm.LlamaAndroid
-import com.arthenica.mobilellm.ModelConfig
+import com.arthenica.llama.LlamaAndroid
+import com.arthenica.llama.ModelConfig
 import kotlinx.coroutines.*
 import java.io.File
 
@@ -14,15 +13,13 @@ class LocalAiEngine(private val context: Context) {
     var isLoaded = false
         private set
 
-    data class AiResponse(val text: String, val isFinal: Boolean)
-
     fun loadModel(onProgress: (String) -> Unit, onDone: (Boolean) -> Unit) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 onProgress("Ищу модель DeepSeek...")
                 val modelPath = findModelFile()
                 if (modelPath == null) {
-                    onProgress("Модель не найдена. Положите файл в папку MyDocuments/for fone")
+                    onProgress("Модель не найдена. Положите файл .gguf в папку MyDocuments/for fone")
                     onDone(false)
                     return@launch
                 }
@@ -70,7 +67,6 @@ class LocalAiEngine(private val context: Context) {
     }
 
     private fun findModelFile(): String? {
-        // Ищем на внутренней памяти
         val paths = listOf(
             "${Environment.getExternalStorageDirectory().absolutePath}/MyDocuments/for fone",
             "${Environment.getExternalStorageDirectory().absolutePath}/Download",
