@@ -10,7 +10,7 @@ class LlamaBridge {
     var isLoaded = false
         private set
 
-    // JNI-методы
+    // JNI-методы будут доступны после загрузки .so
     private external fun loadModelNative(modelPath: String): Boolean
     private external fun generateNative(prompt: String, maxTokens: Int): String
     private external fun unloadModelNative()
@@ -18,21 +18,19 @@ class LlamaBridge {
     fun loadModel(onProgress: (String) -> Unit, onDone: (Boolean) -> Unit) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // Загружаем .so библиотеку
                 if (!nativeLoaded) {
                     try {
                         System.loadLibrary("llama")
                         nativeLoaded = true
                     } catch (e: Exception) {
-                        // Если .so нет — пробуем через AbodeLLM API
-                        onProgress("Библиотека llama не найдена. Использую AbodeLLM.")
+                        onProgress("Ошибка загрузки библиотеки: ${e.message}")
                         isLoaded = false
                         onDone(false)
                         return@launch
                     }
                 }
 
-                onProgress("Ищу модель Mistral 3B...")
+                onProgress("Ищу модель...")
                 val modelPath = findModelFile()
                 if (modelPath == null) {
                     onProgress("Модель .gguf не найдена. Положите файл в MyDocuments/for fone")
@@ -96,10 +94,8 @@ class LlamaBridge {
             if (dir.exists()) {
                 val files = dir.listFiles { f -> f.name.endsWith(".gguf") }
                 if (!files.isNullOrEmpty()) {
-                    // Ищем Mistral
                     val mistral = files.firstOrNull { it.name.contains("Mistral", ignoreCase = true) || it.name.contains("mistral", ignoreCase = true) }
                     if (mistral != null) return mistral.absolutePath
-                    // Если нет — берём первый попавшийся
                     return files.first().absolutePath
                 }
             }
