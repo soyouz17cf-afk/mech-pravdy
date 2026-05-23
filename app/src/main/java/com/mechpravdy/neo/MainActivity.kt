@@ -48,6 +48,7 @@ class MainActivity : AppCompatActivity() {
 
     private var currentApiUrl = apiUrlGigaChat
     private var isLocalMode = false
+    private var localEngine: LocalAiEngine? = null
 
     private lateinit var authKeyInput: EditText
     private lateinit var generateButton: Button
@@ -166,8 +167,24 @@ class MainActivity : AppCompatActivity() {
 
     private fun hideKeyboard() { try { val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager; val view = currentFocus ?: View(this); imm.hideSoftInputFromWindow(view.windowToken, 0) } catch (_: Exception) {} }
 
-    private fun switchToNeo() { isLocalMode = false; currentApiUrl = apiUrlGigaChat; matrixHeader.gigaChatMode = true; matrixHeader.localMode = false; matrixHeader.connectionLost = false; matrixHeader.invalidate(); appendChat("[РЕЖИМ] ГИГАЧАТ"); setStatus("ГИГАЧАТ", "green"); checkConnection() }
-    private fun switchToLocal() { isLocalMode = true; matrixHeader.localMode = true; matrixHeader.gigaChatMode = false; matrixHeader.connectionLost = false; matrixHeader.invalidate(); appendChat("[РЕЖИМ] ДИПСИК (ожидает)"); setStatus("ДИПСИК", "yellow") }
+    private fun switchToNeo() { isLocalMode = false; currentApiUrl = apiUrlGigaChat; localEngine?.unload(); localEngine = null; matrixHeader.gigaChatMode = true; matrixHeader.localMode = false; matrixHeader.connectionLost = false; matrixHeader.invalidate(); appendChat("[РЕЖИМ] ГИГАЧАТ"); setStatus("ГИГАЧАТ", "green"); checkConnection() }
+    private fun switchToLocal() {
+        isLocalMode = true
+        matrixHeader.localMode = true; matrixHeader.gigaChatMode = false; matrixHeader.connectionLost = false
+        matrixHeader.invalidate()
+        appendChat("[РЕЖИМ] ДИПСИК (локальный)")
+        setStatus("ДИПСИК", "yellow")
+
+        if (localEngine == null) localEngine = LocalAiEngine(this)
+        appendChat("[МОЗГ] Загружаю DeepSeek-R1...")
+        localEngine?.loadModel(
+            onProgress = { msg -> appendChat("[МОЗГ] $msg") },
+            onDone = { success ->
+                if (success) appendChat("[МОЗГ] Готов к бою!")
+                else appendChat("[МОЗГ] Не удалось загрузить модель.")
+            }
+        )
+    }
 
     private fun checkConnection() { val testBody = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "ping") }) }); addProperty("max_tokens", 1) }; val request = Request.Builder().url(currentApiUrl); request.header("Authorization", "Bearer ${tokenInput.text.toString().trim()}"); request.post(testBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType())); client.newCall(request.build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { runOnUiThread { matrixHeader.connectionLost = true; setStatus("Нет связи", "red") } }; override fun onResponse(call: Call, response: Response) { runOnUiThread { if (response.isSuccessful) { matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } else { matrixHeader.connectionLost = true; setStatus("Ошибка", "red") } }; response.close() } }) }
 
@@ -257,7 +274,12 @@ System Prompt — алгоритм души.
     private fun sendMessage() { val token = if (isLocalMode) "" else tokenInput.text.toString().trim(); val msg = messageInput.text.toString().trim(); if (!isLocalMode && token.isEmpty()) { appendChat("[SYSTEM] Сгенерируйте токен."); return }; if (msg.isEmpty()) { appendChat("[SYSTEM] Введите сообщение."); return }
         if (msg.lowercase().contains(rememberCommand)) { analyzeAndRemember(); messageInput.setText(""); hideKeyboard(); return }
         val isNeo = msg.lowercase().contains(password); matrixHeader.neoActive = isNeo; matrixHeader.invalidate(); appendChat(if (isNeo) "[BATYA] $msg" else "[GigaChat] $msg"); messageInput.setText(""); hideKeyboard(); setStatus("Обработка...", "yellow")
-        if (isLocalMode) { appendChat("[NEO] Локальный ИИ ожидает загрузки."); setStatus("Онлайн", "green") }
-        else { val memoryContext = getLastContext(); val prompt = (if (memoryContext.isNotBlank()) "$memoryContext\n\n" else "") + selectPrompt(msg); val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", prompt) }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", msg) }) }); addProperty("temperature", 0.7); addProperty("max_tokens", 1000) }; client.newCall(Request.Builder().url(currentApiUrl).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}"); matrixHeader.connectionLost = true; setStatus("Нет связи", "red") }; override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString; appendChat(if (isNeo) "[NEO] $a" else "[GigaChat] $a"); matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } else { appendChat("[ERROR] HTTP ${response.code}"); matrixHeader.connectionLost = true; setStatus("Ошибка", "red") }; response.close() } }) } }
+        if (isLocalMode) {
+            localEngine?.generate(
+                prompt = msg,
+                onToken = { token -> appendChat("[NEO] $token") },
+                onDone = { setStatus("Онлайн", "green") }
+            )
+        } else { val memoryContext = getLastContext(); val prompt = (if (memoryContext.isNotBlank()) "$memoryContext\n\n" else "") + selectPrompt(msg); val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", prompt) }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", msg) }) }); addProperty("temperature", 0.7); addProperty("max_tokens", 1000) }; client.newCall(Request.Builder().url(currentApiUrl).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}"); matrixHeader.connectionLost = true; setStatus("Нет связи", "red") }; override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString; appendChat(if (isNeo) "[NEO] $a" else "[GigaChat] $a"); matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } else { appendChat("[ERROR] HTTP ${response.code}"); matrixHeader.connectionLost = true; setStatus("Ошибка", "red") }; response.close() } }) } }
     private fun checkToken() { val token = tokenInput.text.toString().trim(); if (token.isEmpty()) return; val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", "One word: alive.") }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "check") }) }); addProperty("max_tokens", 10) }; client.newCall(Request.Builder().url(apiUrlGigaChat).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}") }; override fun onResponse(call: Call, response: Response) { appendChat(if (response.isSuccessful) "[SYSTEM] Токен активен." else "[ERROR] Токен мёртв."); response.close() } }) }
 }
