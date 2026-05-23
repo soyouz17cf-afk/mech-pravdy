@@ -60,9 +60,14 @@ class MatrixHeaderView @JvmOverloads constructor(
         }
         nextPoolSlot = maxLines % maxPoolSize
 
-        val logoW = w * 0.45f; val logoH = h * 0.55f
-        logoRect = RectF((w - logoW) / 2f, (h - logoH) / 2f, (w + logoW) / 2f, (h + logoH) / 2f)
-        val btnW = logoW * 0.70f; val btnH = logoH * 0.22f; val btnY = logoRect.bottom + 4f
+        // Логотип — фиксированные координаты
+        val logoW = w * 0.50f; val logoH = h * 0.45f
+        logoRect = RectF((w - logoW) / 2f, 6f, (w + logoW) / 2f, 6f + logoH)
+
+        // Кнопки — фиксированные координаты, не привязаны к логотипу
+        val btnW = w * 0.44f
+        val btnH = 48f
+        val btnY = logoRect.bottom + 6f
         neoButtonRect = RectF(logoRect.left, btnY, logoRect.left + btnW, btnY + btnH)
         localButtonRect = RectF(logoRect.right - btnW, btnY, logoRect.right, btnY + btnH)
     }
@@ -117,10 +122,10 @@ class MatrixHeaderView @JvmOverloads constructor(
         val btnPaint = Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 18f; typeface = Typeface.DEFAULT_BOLD }
         val btnTextPaint = Paint().apply { color = Color.WHITE; isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 18f; typeface = Typeface.DEFAULT_BOLD }
         btnPaint.color = if (gigaChatMode) Color.parseColor("#21A038") else Color.parseColor("#555555")
-        canvas.drawRoundRect(neoButtonRect, 8f, 8f, btnPaint)
+        canvas.drawRoundRect(neoButtonRect, 10f, 10f, btnPaint)
         canvas.drawText("ГИГАЧАТ", neoButtonRect.centerX(), neoButtonRect.centerY() + 6f, btnTextPaint)
         btnPaint.color = if (localMode) Color.parseColor("#FF8800") else Color.parseColor("#555555")
-        canvas.drawRoundRect(localButtonRect, 8f, 8f, btnPaint)
+        canvas.drawRoundRect(localButtonRect, 10f, 10f, btnPaint)
         canvas.drawText("МИСТРАЛЬ 3B", localButtonRect.centerX(), localButtonRect.centerY() + 6f, btnTextPaint)
 
         val trafficX = logoRect.right + 20f; val trafficY = logoRect.top + logoRect.height() * 0.12f
