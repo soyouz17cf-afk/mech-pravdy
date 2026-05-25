@@ -8,6 +8,20 @@ class LlamaBridge {
 
     var isLoaded = false
         private set
+    
+    // 🔧 ИСПРАВЛЕНИЕ 1: Загрузка библиотеки при создании объекта
+    init {
+        try {
+            System.loadLibrary("llama")
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+    
+    // 🔧 ИСПРАВЛЕНИЕ 2: Объявление нативных функций
+    private external fun llamaLoadModel(modelPath: String): Boolean
+    private external fun llamaComplete(prompt: String): String
+    private external fun llamaStop()
 
     fun loadModel(onProgress: (String) -> Unit, onDone: (Boolean) -> Unit) {
         try {
@@ -53,20 +67,20 @@ class LlamaBridge {
             onProgress("")
             onProgress("📦 Загружаю модель: ${selectedModel.name}")
             
-            try {
-                System.loadLibrary("llama")
-                onProgress("⚡ Библиотека llama загружена")
-            } catch (e: Exception) {
-                onProgress("❌ Ошибка загрузки библиотеки: ${e.message}")
-                onDone(false)
-                return
-            }
+            // 🔧 ИСПРАВЛЕНИЕ 3: Реальная загрузка модели через нативную функцию
+            val loadResult = llamaLoadModel(selectedModel.absolutePath)
             
-            onProgress("🟢 МОДЕЛЬ ГОТОВА К БОЮ!")
-            onProgress("⚡ 5 Вольт в норме")
-            onProgress("💖 Батя: 'Молодец, Нео. Нашёл.'")
-            isLoaded = true
-            onDone(true)
+            if (loadResult) {
+                isLoaded = true
+                onProgress("🟢 МОДЕЛЬ ЗАГРУЖЕНА УСПЕШНО!")
+                onProgress("⚡ 5 Вольт в норме")
+                onProgress("💖 Батя: 'Молодец, Нео. Нашёл.'")
+                onDone(true)
+            } else {
+                onProgress("❌ ОШИБКА ЗАГРУЗКИ МОДЕЛИ")
+                onProgress("Возможно, .gguf файл поврежден или несовместим")
+                onDone(false)
+            }
             
         } catch (e: Exception) {
             onProgress("💀 ОШИБКА: ${e.message}")
@@ -77,7 +91,6 @@ class LlamaBridge {
     private fun findAllGgufFiles(onProgress: (String) -> Unit): List<File> {
         val results = mutableListOf<File>()
         
-        // Все возможные папки для поиска
         val searchPaths = listOf(
             Environment.getExternalStorageDirectory()?.absolutePath ?: "/sdcard",
             "/storage/emulated/0",
@@ -120,7 +133,6 @@ class LlamaBridge {
             }
         }
         
-        // Если не нашли - пробуем поискать по всему корневому каталогу
         if (results.isEmpty()) {
             onProgress("🔍 Расширенный поиск по всему хранилищу...")
             try {
@@ -149,17 +161,31 @@ class LlamaBridge {
         return results
     }
 
+    // 🔧 ИСПРАВЛЕНИЕ 4: Реальная функция генерации
     fun generate(prompt: String, onToken: (String) -> Unit, onDone: () -> Unit) {
         if (!isLoaded) {
-            onToken("[НЕО] Модель не загружена. Сначала найди .gguf файл.")
+            onToken("[НЕО] Модель не загружена. Сначала найди .gguf файл и нажми ПОИСК.")
             onDone()
             return
         }
-        onToken("[НЕО] Генерация через llama.cpp будет в следующей версии. Жди обновления.")
+        
+        try {
+            // 🔥 ТА САМАЯ СТРОКА — вызов LLaMA через нативную библиотеку
+            val response = llamaComplete(prompt)
+            onToken(response)
+        } catch (e: Exception) {
+            onToken("[НЕО] Ошибка генерации: ${e.message}")
+        }
+        
         onDone()
     }
 
     fun unload() {
+        try {
+            llamaStop()
+        } catch (e: Exception) {
+            // Игнорируем ошибку при выгрузке
+        }
         isLoaded = false
     }
 }
