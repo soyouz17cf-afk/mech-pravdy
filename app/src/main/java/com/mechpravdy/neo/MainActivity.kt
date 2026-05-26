@@ -46,7 +46,7 @@ class MainActivity : AppCompatActivity() {
 
         checkPermissions()
         addChatMessage("⚡ Меч Правды загружен")
-        addChatMessage("✅ Нажмите МИСТРАЛЬ 3Б и выберите .gguf файл")
+        addChatMessage("✅ Нажмите МИСТРАЛЬ 3Б для скачивания мозга")
     }
 
     private fun initViews() {
@@ -78,16 +78,65 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadModel() {
-        llamaBridge.loadModel(
-            onProgress = { message -> addChatMessage(message) },
-            onDone = { success ->
-                if (success) {
-                    addChatMessage("🎉 Модель загружена! Можно задавать вопросы.")
-                } else {
-                    addChatMessage("❌ Ошибка загрузки модели")
+        val modelDir = getExternalFilesDir("models") ?: filesDir
+        if (!modelDir.exists()) modelDir.mkdirs()
+        val modelFile = File(modelDir, "mistral-7b-instruct-v0.2.Q4_K_M.gguf")
+
+        if (modelFile.exists()) {
+            addChatMessage("✅ Модель найдена в песочнице. Загружаю...")
+            updateStatus("Загружаю...")
+            llamaBridge.loadModelFromPath(
+                modelFile.absolutePath,
+                onProgress = { msg -> addChatMessage(msg) },
+                onDone = { success ->
+                    if (success) {
+                        addChatMessage("🎉 Модель загружена! Можно задавать вопросы.")
+                        updateStatus("Готов")
+                    } else {
+                        addChatMessage("❌ Ошибка загрузки модели")
+                        updateStatus("Ошибка")
+                    }
                 }
-            }
-        )
+            )
+        } else {
+            addChatMessage("📥 Скачиваю Mistral 7B (4.1 ГБ). Жди...")
+            updateStatus("Качаю мозг...")
+
+            DownloadModelTask(
+                modelFile,
+                onProgressUpdate = { percent ->
+                    runOnUiThread {
+                        addChatMessage("📥 $percent%")
+                        updateStatus("Качаю $percent%")
+                    }
+                },
+                onDone = {
+                    runOnUiThread {
+                        addChatMessage("✅ Скачано! Загружаю модель...")
+                        updateStatus("Загружаю...")
+                        llamaBridge.loadModelFromPath(
+                            modelFile.absolutePath,
+                            onProgress = { msg -> addChatMessage(msg) },
+                            onDone = { success ->
+                                if (success) {
+                                    addChatMessage("🎉 Модель загружена! Можно задавать вопросы.")
+                                    updateStatus("Готов")
+                                } else {
+                                    addChatMessage("❌ Ошибка загрузки модели")
+                                    updateStatus("Ошибка")
+                                }
+                            }
+                        )
+                    }
+                },
+                onError = { error ->
+                    runOnUiThread {
+                        addChatMessage("❌ Ошибка скачивания: $error")
+                        updateStatus("Ошибка сети")
+                    }
+                }
+            ).execute()
+        }
     }
 
     private fun checkPermissions() {
@@ -97,6 +146,11 @@ class MainActivity : AppCompatActivity() {
         }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             permissions.add(Manifest.permission.RECORD_AUDIO)
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            }
         }
         if (permissions.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, permissions.toTypedArray(), 100)
