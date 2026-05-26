@@ -1,6 +1,5 @@
 package com.mechpravdy.neo
 
-import android.os.Environment
 import java.io.File
 
 class LlamaBridge {
@@ -8,56 +7,96 @@ class LlamaBridge {
     var isLoaded = false
         private set
 
+    private var modelPath: String? = null
+
+    init {
+        try {
+            System.loadLibrary("llama")
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private external fun llamaLoadModel(modelPath: String): Boolean
+    external fun llamaComplete(prompt: String): String
+    private external fun llamaStop()
+
+    /**
+     * Старый метод — ищет .gguf в папках (заглушка)
+     */
     fun loadModel(onProgress: (String) -> Unit, onDone: (Boolean) -> Unit) {
         try {
             onProgress("Ищу модель...")
-            val modelPath = findModelFile()
-            if (modelPath == null) {
-                onProgress("Модель не найдена. Проверял папки:")
-                val paths = getSearchPaths()
-                for (p in paths) {
-                    onProgress("  ${p}")
-                    val dir = File(p)
-                    if (dir.exists()) {
-                        val allFiles = dir.listFiles()
-                        if (allFiles != null) {
-                            for (f in allFiles) {
-                                onProgress("    ${f.name}")
-                            }
-                        }
-                    } else {
-                        onProgress("    (папка не существует)")
-                    }
-                }
-                onProgress("Положите файл .gguf в MyDocuments/for fone")
+            val foundPath = findModelFile()
+            if (foundPath == null) {
+                onProgress("Модель не найдена. Положите .gguf в MyDocuments/for fone")
                 onDone(false)
                 return
             }
-            onProgress("Нашёл: ${File(modelPath).name}")
-            onProgress("Загружаю библиотеку llama...")
-            try {
-                System.loadLibrary("llama")
-                onProgress("Библиотека загружена.")
-            } catch (e: Exception) {
-                onProgress("Ошибка загрузки библиотеки: ${e.message}")
-                onDone(false)
-                return
-            }
-            onProgress("Модель готова к бою!")
-            isLoaded = true
-            onDone(true)
+            onProgress("Нашёл: ${File(foundPath).name}")
+            loadModelFromPath(foundPath, onProgress, onDone)
         } catch (e: Exception) {
             onProgress("Ошибка: ${e.message}")
             onDone(false)
         }
     }
 
+    /**
+     * Новый метод — прямая загрузка из песочницы
+     */
+    fun loadModelFromPath(path: String, onProgress: (String) -> Unit, onDone: (Boolean) -> Unit) {
+        modelPath = path
+        onProgress("🔍 Файл: ${File(path).name}")
+
+        if (!File(path).exists()) {
+            onProgress("❌ Файл не найден: $path")
+            onDone(false)
+            return
+        }
+
+        val sizeMB = File(path).length() / (1024 * 1024)
+        onProgress("📦 Размер: $sizeMB МБ")
+        onProgress("⏳ Загружаю в память...")
+
+        try {
+            val result = llamaLoadModel(path)
+            if (result) {
+                isLoaded = true
+                onProgress("🟢 Модель загружена! Готов к бою!")
+                onDone(true)
+            } else {
+                onProgress("❌ Ошибка загрузки модели")
+                onDone(false)
+            }
+        } catch (e: Exception) {
+            onProgress("❌ Ошибка: ${e.message}")
+            onDone(false)
+        }
+    }
+
     fun generate(prompt: String, onToken: (String) -> Unit, onDone: () -> Unit) {
-        onToken("[NEO] Модель загружена, но генерация пока не реализована. Ждите обновления.")
+        if (!isLoaded) {
+            onToken("[NEO] Модель не загружена. Скачайте мозг через МИСТРАЛЬ 3B.")
+            onDone()
+            return
+        }
+
+        try {
+            val response = llamaComplete(prompt)
+            onToken(response)
+        } catch (e: Exception) {
+            onToken("[NEO] Ошибка генерации: ${e.message}")
+        }
+
         onDone()
     }
 
     fun unload() {
+        try {
+            llamaStop()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
         isLoaded = false
     }
 
