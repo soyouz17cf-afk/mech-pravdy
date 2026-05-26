@@ -106,6 +106,9 @@ class MainActivity : AppCompatActivity() {
             attachButton.setOnClickListener { hideKeyboard(); appendChat("[ℹ] Вставка текста из буфера"); pasteFromClipboard() }
             checkButton.setOnClickListener { hideKeyboard(); appendChat("[ℹ] Проверка токена"); checkToken() }
             capsuleButton.setOnClickListener { hideKeyboard(); showCapsuleDialog() }
+
+            // Инициализируем LlamaBridge в фоне при старте
+            thread { llamaBridge = LlamaBridge() }
         } catch (e: Exception) { Toast.makeText(this, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show() }
     }
 
@@ -260,9 +263,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadModelFromFile(file: File) {
-        if (llamaBridge == null) {
-            llamaBridge = LlamaBridge()
-        }
         appendChat("[МОЗГ] Загружаю модель в память...")
         setStatus("Загружаю...", "yellow")
         llamaBridge?.loadModelFromPath(
