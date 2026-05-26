@@ -41,16 +41,13 @@ class MainActivity : AppCompatActivity() {
     private var selectedFolderUri: Uri? = null
     private var modelPath: String? = null
 
-    // Регистрируем callback для выбора папки
     private val selectFolderLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK) {
             result.data?.data?.let { uri ->
                 selectedFolderUri = uri
-                // Сохраняем URI в SharedPreferences
                 getSharedPreferences("app_prefs", MODE_PRIVATE).edit()
                     .putString("model_folder_uri", uri.toString())
                     .apply()
-                // Запрашиваем постоянный доступ
                 contentResolver.takePersistableUriPermission(
                     uri,
                     Intent.FLAG_GRANT_READ_URI_PERMISSION
@@ -68,7 +65,6 @@ class MainActivity : AppCompatActivity() {
         initViews()
         setListeners()
         
-        // Восстанавливаем сохранённую папку
         val savedUri = getSharedPreferences("app_prefs", MODE_PRIVATE).getString("model_folder_uri", null)
         if (savedUri != null) {
             selectedFolderUri = Uri.parse(savedUri)
@@ -149,7 +145,6 @@ class MainActivity : AppCompatActivity() {
             return
         }
         
-        // Получаем список файлов через DocumentFile
         val documents = androidx.documentfile.provider.DocumentFile.fromTreeUri(this, selectedFolderUri!!)
         if (documents == null || !documents.exists()) {
             addChatMessage("❌ Не удалось прочитать папку")
@@ -200,7 +195,7 @@ class MainActivity : AppCompatActivity() {
         
         Thread {
             Thread.sleep(500)
-            val answer = "🤖 Модель готова: ${modelPath?.takeLast(30)}\n\n(LLaMA будет подключена)"
+            val answer = "🤖 Модель готова: ${modelPath?.takeLast(30)}\n\n(LLaMA будет подключена после настройки вызова)"
             runOnUiThread {
                 addChatMessage(answer)
                 updateStatus("Готов")
