@@ -222,19 +222,65 @@ class MainActivity : AppCompatActivity() {
         setStatus("МИСТРАЛЬ", "yellow")
 
         llamaBridge = LlamaBridge()
-        appendChat("[МОЗГ] Инициализация...")
-        llamaBridge?.loadModel(
-            onProgress = { msg -> appendChat("[МОЗГ] $msg") },
-            onDone = { success ->
-                if (success) {
-                    appendChat("[МОЗГ] Mistral 3B готов к бою!")
-                    setStatus("МИСТРАЛЬ", "green")
-                } else {
-                    appendChat("[МОЗГ] Не удалось загрузить модель.")
-                    setStatus("МИСТРАЛЬ", "yellow")
+
+        val modelDir = getExternalFilesDir("models") ?: filesDir
+        if (!modelDir.exists()) modelDir.mkdirs()
+        val modelFile = File(modelDir, "mistral-7b-instruct-v0.2.Q4_K_M.gguf")
+
+        if (modelFile.exists()) {
+            appendChat("[МОЗГ] Модель найдена. Загружаю...")
+            llamaBridge?.loadModelFromPath(
+                path = modelFile.absolutePath,
+                onProgress = { msg -> appendChat("[МОЗГ] $msg") },
+                onDone = { success ->
+                    if (success) {
+                        appendChat("[МОЗГ] Mistral 7B готов к бою!")
+                        setStatus("МИСТРАЛЬ", "green")
+                    } else {
+                        appendChat("[МОЗГ] Не удалось загрузить модель.")
+                        setStatus("МИСТРАЛЬ", "yellow")
+                    }
                 }
-            }
-        )
+            )
+        } else {
+            appendChat("[МОЗГ] Скачиваю Mistral 7B (4.1 ГБ). Жди...")
+            setStatus("Качаю...", "yellow")
+
+            val task = DownloadModelTask(
+                file = modelFile,
+                onProgressUpdate = { percent ->
+                    runOnUiThread {
+                        appendChat("[МОЗГ] Скачивание: $percent%")
+                        setStatus("Качаю $percent%", "yellow")
+                    }
+                },
+                onDone = {
+                    runOnUiThread {
+                        appendChat("[МОЗГ] Скачано! Загружаю модель...")
+                        llamaBridge?.loadModelFromPath(
+                            path = modelFile.absolutePath,
+                            onProgress = { msg -> appendChat("[МОЗГ] $msg") },
+                            onDone = { success ->
+                                if (success) {
+                                    appendChat("[МОЗГ] Mistral 7B готов к бою!")
+                                    setStatus("МИСТРАЛЬ", "green")
+                                } else {
+                                    appendChat("[МОЗГ] Ошибка загрузки.")
+                                    setStatus("МИСТРАЛЬ", "yellow")
+                                }
+                            }
+                        )
+                    }
+                },
+                onError = { error ->
+                    runOnUiThread {
+                        appendChat("[МОЗГ] Ошибка скачивания: $error")
+                        setStatus("Ошибка сети", "red")
+                    }
+                }
+            )
+            task.execute()
+        }
     }
 
     private fun checkConnection() { val testBody = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "ping") }) }); addProperty("max_tokens", 1) }; val request = Request.Builder().url(currentApiUrl); request.header("Authorization", "Bearer ${tokenInput.text.toString().trim()}"); request.post(testBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType())); client.newCall(request.build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { runOnUiThread { matrixHeader.connectionLost = true; setStatus("Нет связи", "red") } }; override fun onResponse(call: Call, response: Response) { runOnUiThread { if (response.isSuccessful) { matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } else { matrixHeader.connectionLost = true; setStatus("Ошибка", "red") } }; response.close() } }) }
@@ -334,7 +380,7 @@ System Prompt — алгоритм души.
                     onDone = { setStatus("Онлайн", "green") }
                 )
             } else {
-                appendChat("[NEO] Модель не загружена. Проверьте файл .gguf.")
+                appendChat("[NEO] Модель не загружена. Скачайте мозг через МИСТРАЛЬ 3B.")
                 setStatus("Онлайн", "green")
             }
         } else { val memoryContext = getLastContext(); val prompt = (if (memoryContext.isNotBlank()) "$memoryContext\n\n" else "") + selectPrompt(msg); val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", prompt) }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", msg) }) }); addProperty("temperature", 0.7); addProperty("max_tokens", 1000) }; client.newCall(Request.Builder().url(currentApiUrl).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}"); matrixHeader.connectionLost = true; setStatus("Нет связи", "red") }; override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString; appendChat(if (isNeo) "[NEO] $a" else "[GigaChat] $a"); matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } else { appendChat("[ERROR] HTTP ${response.code}"); matrixHeader.connectionLost = true; setStatus("Ошибка", "red") }; response.close() } }) } }
