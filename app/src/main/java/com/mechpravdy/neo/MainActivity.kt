@@ -62,7 +62,6 @@ class MainActivity : AppCompatActivity() {
             if (success) {
                 appendChat("[МОЗГ] Mistral 7B готов к бою!")
                 setStatus("МИСТРАЛЬ", "green")
-                llamaBridge?.isLoaded = true
             } else {
                 appendChat("[МОЗГ] Ошибка загрузки модели.")
                 setStatus("МИСТРАЛЬ", "yellow")
