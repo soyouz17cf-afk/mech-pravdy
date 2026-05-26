@@ -18,7 +18,9 @@ import java.io.File
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var btnMistral3b: MaterialButton
+    private lateinit var btnSelectFolder: MaterialButton
+    private lateinit var btnGrantPermission: MaterialButton
+    private lateinit var btnSearchModel: MaterialButton
     private lateinit var authKeyInput: EditText
     private lateinit var generateButton: MaterialButton
     private lateinit var tokenInput: EditText
@@ -32,6 +34,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var chatOutput: TextView
     private lateinit var statusText: TextView
     private lateinit var statusDot: ImageView
+    private lateinit var tvFileStatus: TextView
 
     private lateinit var llamaBridge: LlamaBridge
 
@@ -46,11 +49,13 @@ class MainActivity : AppCompatActivity() {
 
         checkPermissions()
         addChatMessage("⚡ Меч Правды загружен")
-        addChatMessage("✅ Нажми МИСТРАЛЬ 3Б для скачивания мозга")
+        addChatMessage("✅ Нажми «ВЫБРАТЬ ПАПКУ С МОДЕЛЬЮ» для скачивания мозга")
     }
 
     private fun initViews() {
-        btnMistral3b = findViewById(R.id.btnMistral3b)
+        btnSelectFolder = findViewById(R.id.btnSelectFolder)
+        btnGrantPermission = findViewById(R.id.btnGrantPermission)
+        btnSearchModel = findViewById(R.id.btnSearchModel)
         authKeyInput = findViewById(R.id.authKeyInput)
         generateButton = findViewById(R.id.generateButton)
         tokenInput = findViewById(R.id.tokenInput)
@@ -64,10 +69,13 @@ class MainActivity : AppCompatActivity() {
         chatOutput = findViewById(R.id.chatOutput)
         statusText = findViewById(R.id.statusText)
         statusDot = findViewById(R.id.statusDot)
+        tvFileStatus = findViewById(R.id.tvFileStatus)
     }
 
     private fun setListeners() {
-        btnMistral3b.setOnClickListener { loadModel() }
+        btnSelectFolder.setOnClickListener { loadModel() }
+        btnGrantPermission.setOnClickListener { grantPermission() }
+        btnSearchModel.setOnClickListener { searchModel() }
         generateButton.setOnClickListener { generateToken() }
         sendButton.setOnClickListener { sendMessage() }
         cameraButton.setOnClickListener { openCamera() }
@@ -85,6 +93,7 @@ class MainActivity : AppCompatActivity() {
         if (modelFile.exists()) {
             addChatMessage("✅ Модель найдена. Загружаю...")
             updateStatus("Загружаю...")
+            tvFileStatus.text = "🟢 Файл: ${modelFile.name}"
             llamaBridge.loadModelFromPath(
                 path = modelFile.absolutePath,
                 onProgress = { msg: String -> addChatMessage(msg) },
@@ -92,15 +101,18 @@ class MainActivity : AppCompatActivity() {
                     if (success) {
                         addChatMessage("🎉 Модель загружена!")
                         updateStatus("Готов")
+                        tvFileStatus.text = "🟢 Модель готова к работе"
                     } else {
                         addChatMessage("❌ Ошибка загрузки модели")
                         updateStatus("Ошибка")
+                        tvFileStatus.text = "❌ Ошибка загрузки"
                     }
                 }
             )
         } else {
-            addChatMessage("📥 Скачиваю Mistral 7B. Жди...")
+            addChatMessage("📥 Скачиваю Mistral 7B (4.1 ГБ). Жди...")
             updateStatus("Качаю...")
+            tvFileStatus.text = "📥 Скачивание..."
 
             val task = DownloadModelTask(
                 file = modelFile,
@@ -108,12 +120,14 @@ class MainActivity : AppCompatActivity() {
                     runOnUiThread {
                         addChatMessage("📥 $percent%")
                         updateStatus("Качаю $percent%")
+                        tvFileStatus.text = "📥 Скачано: $percent%"
                     }
                 },
                 onDone = {
                     runOnUiThread {
                         addChatMessage("✅ Скачано. Загружаю...")
                         updateStatus("Загружаю...")
+                        tvFileStatus.text = "🟢 Скачано. Загружаю..."
                         llamaBridge.loadModelFromPath(
                             path = modelFile.absolutePath,
                             onProgress = { msg: String -> addChatMessage(msg) },
@@ -121,9 +135,11 @@ class MainActivity : AppCompatActivity() {
                                 if (success) {
                                     addChatMessage("🎉 Модель загружена!")
                                     updateStatus("Готов")
+                                    tvFileStatus.text = "🟢 Модель готова к работе"
                                 } else {
                                     addChatMessage("❌ Ошибка загрузки")
                                     updateStatus("Ошибка")
+                                    tvFileStatus.text = "❌ Ошибка загрузки"
                                 }
                             }
                         )
@@ -133,10 +149,51 @@ class MainActivity : AppCompatActivity() {
                     runOnUiThread {
                         addChatMessage("❌ Ошибка: $error")
                         updateStatus("Ошибка сети")
+                        tvFileStatus.text = "❌ $error"
                     }
                 }
             )
             task.execute()
+        }
+    }
+
+    private fun grantPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                intent.data = android.net.Uri.parse("package:$packageName")
+                startActivity(intent)
+                tvFileStatus.text = "📁 Открыты настройки доступа"
+            } catch (e: Exception) {
+                tvFileStatus.text = "❌ Ошибка открытия настроек"
+            }
+        } else {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                    101
+                )
+            } else {
+                tvFileStatus.text = "✅ Доступ уже разрешён"
+            }
+        }
+    }
+
+    private fun searchModel() {
+        val modelDir: File = getExternalFilesDir("models") ?: filesDir
+        if (!modelDir.exists()) modelDir.mkdirs()
+        val modelFile = File(modelDir, "mistral-7b-instruct-v0.2.Q4_K_M.gguf")
+
+        if (modelFile.exists()) {
+            val sizeMB = modelFile.length() / (1024 * 1024)
+            tvFileStatus.text = "✅ Найден: ${modelFile.name} ($sizeMB МБ)"
+            addChatMessage("✅ Найден .gguf: $sizeMB МБ")
+        } else {
+            tvFileStatus.text = "❌ Файл не найден. Нажми «ВЫБРАТЬ ПАПКУ» для скачивания"
+            addChatMessage("❌ .gguf не найден в песочнице")
         }
     }
 
@@ -157,6 +214,24 @@ class MainActivity : AppCompatActivity() {
             ActivityCompat.requestPermissions(this, permissions.toTypedArray(), 100)
         } else {
             updateStatus("Готов")
+            tvFileStatus.text = "✅ Доступ разрешён"
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 100 || requestCode == 101) {
+            val allGranted = grantResults.all { it == PackageManager.PERMISSION_GRANTED }
+            if (allGranted) {
+                updateStatus("Готов")
+                tvFileStatus.text = "✅ Доступ разрешён"
+            } else {
+                tvFileStatus.text = "❌ Доступ не разрешён"
+            }
         }
     }
 
@@ -177,7 +252,7 @@ class MainActivity : AppCompatActivity() {
         if (question.isEmpty()) return
 
         if (!llamaBridge.isLoaded) {
-            addChatMessage("❌ Сначала загрузи модель (кнопка МИСТРАЛЬ 3Б)")
+            addChatMessage("❌ Сначала загрузи модель (кнопка «ВЫБРАТЬ ПАПКУ С МОДЕЛЬЮ»)")
             return
         }
 
@@ -203,8 +278,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkStatus() {
-        if (llamaBridge.isLoaded) addChatMessage("✅ Модель загружена")
-        else addChatMessage("❌ Модель не загружена. Нажми МИСТРАЛЬ 3Б")
+        if (llamaBridge.isLoaded) {
+            addChatMessage("✅ Модель загружена")
+            tvFileStatus.text = "🟢 Модель готова"
+        } else {
+            addChatMessage("❌ Модель не загружена. Нажми «ВЫБРАТЬ ПАПКУ С МОДЕЛЬЮ»")
+            tvFileStatus.text = "❌ Модель не загружена"
+        }
     }
 
     private fun saveCapsule() {
