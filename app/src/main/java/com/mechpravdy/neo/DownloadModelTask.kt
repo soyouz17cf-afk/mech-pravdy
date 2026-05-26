@@ -16,53 +16,52 @@ class DownloadModelTask(
     private var errorMessage: String? = null
 
     companion object {
-        const val MODEL_URL = "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
+        const val URL_GGUF =
+            "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
     }
 
-    override fun doInBackground(vararg params: Void?): Boolean {
+    override fun doInBackground(vararg p0: Void?): Boolean {
         return try {
-            val url = URL(MODEL_URL)
-            val connection = url.openConnection() as HttpURLConnection
-            connection.connectTimeout = 15000
-            connection.readTimeout = 60000
-            connection.instanceFollowRedirects = true
-            connection.connect()
+            val url = URL(URL_GGUF)
+            val conn = url.openConnection() as HttpURLConnection
+            conn.connectTimeout = 15000
+            conn.readTimeout = 60000
+            conn.instanceFollowRedirects = true
+            conn.connect()
 
-            if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                errorMessage = "HTTP ${connection.responseCode}"
+            if (conn.responseCode != HttpURLConnection.HTTP_OK) {
+                errorMessage = "HTTP ${conn.responseCode}"
                 return false
             }
 
-            val fileSize = connection.contentLength
-            val inputStream = connection.inputStream
-            val outputStream = FileOutputStream(file)
-
-            val buffer = ByteArray(8192)
+            val total = conn.contentLength
+            val input = conn.inputStream
+            val output = FileOutputStream(file)
+            val buf = ByteArray(8192)
             var downloaded: Long = 0
-            var bytesRead: Int
-            var lastProgress = -1
+            var read: Int
+            var lastPercent = -1
 
-            while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                outputStream.write(buffer, 0, bytesRead)
-                downloaded += bytesRead
-
-                if (fileSize > 0) {
-                    val progress = (downloaded * 100 / fileSize).toInt()
-                    if (progress > lastProgress) {
-                        lastProgress = progress
-                        publishProgress(progress)
+            while (input.read(buf).also { read = it } != -1) {
+                output.write(buf, 0, read)
+                downloaded += read
+                if (total > 0) {
+                    val p = (downloaded * 100 / total).toInt()
+                    if (p > lastPercent) {
+                        lastPercent = p
+                        publishProgress(p)
                     }
                 }
             }
 
-            outputStream.flush()
-            outputStream.close()
-            inputStream.close()
-            connection.disconnect()
+            output.flush()
+            output.close()
+            input.close()
+            conn.disconnect()
 
             file.exists() && file.length() > 0
         } catch (e: Exception) {
-            errorMessage = e.message ?: "Неизвестная ошибка сети"
+            errorMessage = e.message ?: "Ошибка сети"
             if (file.exists()) file.delete()
             false
         }
@@ -73,10 +72,6 @@ class DownloadModelTask(
     }
 
     override fun onPostExecute(result: Boolean) {
-        if (result) {
-            onDone()
-        } else {
-            onError(errorMessage ?: "Неизвестная ошибка")
-        }
+        if (result) onDone() else onError(errorMessage ?: "Неизвестная ошибка")
     }
 }
