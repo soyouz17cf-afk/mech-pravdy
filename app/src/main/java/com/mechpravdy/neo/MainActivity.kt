@@ -2,12 +2,15 @@ package com.mechpravdy.neo
 
 import android.app.AlertDialog
 import android.app.DownloadManager
+import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.*
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.speech.RecognizerIntent
@@ -52,6 +55,20 @@ class MainActivity : AppCompatActivity() {
     private var isLocalMode = false
     private var llamaBridge: LlamaBridge? = null
     private var downloadId: Long = -1L
+
+    private val modelLoadedReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val success = intent.getBooleanExtra(ModelLoadService.EXTRA_SUCCESS, false)
+            if (success) {
+                appendChat("[МОЗГ] Mistral 7B готов к бою!")
+                setStatus("МИСТРАЛЬ", "green")
+                llamaBridge?.isLoaded = true
+            } else {
+                appendChat("[МОЗГ] Ошибка загрузки модели.")
+                setStatus("МИСТРАЛЬ", "yellow")
+            }
+        }
+    }
 
     private lateinit var authKeyInput: EditText
     private lateinit var generateButton: Button
@@ -108,7 +125,13 @@ class MainActivity : AppCompatActivity() {
             capsuleButton.setOnClickListener { hideKeyboard(); showCapsuleDialog() }
 
             thread { llamaBridge = LlamaBridge() }
+            registerReceiver(modelLoadedReceiver, IntentFilter(ModelLoadService.BROADCAST_MODEL_LOADED))
         } catch (e: Exception) { Toast.makeText(this, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show() }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        try { unregisterReceiver(modelLoadedReceiver) } catch (_: Exception) {}
     }
 
     override fun onPause() { super.onPause(); saveMemory(chatOutput.text.toString()) }
@@ -232,8 +255,14 @@ class MainActivity : AppCompatActivity() {
         val modelFile = File(modelDir, "mistral-7b-instruct-v0.2.Q4_K_M.gguf")
 
         if (modelFile.exists() && modelFile.length() > 100L * 1024 * 1024) {
-            appendChat("[МОЗГ] Мозг уже скачан. Загружаю...")
-            loadModelFromFile(modelFile)
+            appendChat("[МОЗГ] Запускаю загрузку модели в фоне...")
+            setStatus("Загружаю...", "yellow")
+            val intent = Intent(this, ModelLoadService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
             return
         }
 
@@ -258,30 +287,6 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             appendChat("[МОЗГ] Ошибка DownloadManager: ${e.message}")
             setStatus("Ошибка", "red")
-        }
-    }
-
-    private fun loadModelFromFile(file: File) {
-        appendChat("[МОЗГ] Загружаю модель в память...")
-        setStatus("Загружаю...", "yellow")
-        thread {
-            llamaBridge?.loadModelFromPath(
-                path = file.absolutePath,
-                onProgress = { msg ->
-                    runOnUiThread { appendChat("[МОЗГ] $msg") }
-                },
-                onDone = { success ->
-                    runOnUiThread {
-                        if (success) {
-                            appendChat("[МОЗГ] Mistral 7B готов к бою!")
-                            setStatus("МИСТРАЛЬ", "green")
-                        } else {
-                            appendChat("[МОЗГ] Ошибка загрузки модели.")
-                            setStatus("МИСТРАЛЬ", "yellow")
-                        }
-                    }
-                }
-            )
         }
     }
 
