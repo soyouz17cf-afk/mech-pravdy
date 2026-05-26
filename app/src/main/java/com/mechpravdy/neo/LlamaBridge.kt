@@ -19,32 +19,26 @@ class LlamaBridge(private val activity: AppCompatActivity) {
     private val filePickerLauncher = activity.registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             result.data?.data?.let { uri ->
-                // Сохраняем доступ
                 activity.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                addProgress("📁 Файл выбран: ${uri.lastPathSegment}")
-                
                 val path = getRealPathFromUri(uri)
                 if (path != null) {
                     modelPath = path
-                    addProgress("📂 Путь: $path")
-                    
                     val loadResult = llamaLoadModel(path)
                     if (loadResult) {
                         isLoaded = true
-                        addProgress("🟢 МОДЕЛЬ ЗАГРУЖЕНА УСПЕШНО!")
-                        addProgress("⚡ 5 Вольт в норме")
+                        onProgressCallback?.invoke("🟢 МОДЕЛЬ ЗАГРУЖЕНА УСПЕШНО!")
                         onDoneCallback?.invoke(true)
                     } else {
-                        addProgress("❌ ОШИБКА ЗАГРУЗКИ МОДЕЛИ")
+                        onProgressCallback?.invoke("❌ ОШИБКА ЗАГРУЗКИ МОДЕЛИ")
                         onDoneCallback?.invoke(false)
                     }
                 } else {
-                    addProgress("❌ Не удалось получить путь к файлу")
+                    onProgressCallback?.invoke("❌ Не удалось получить путь к файлу")
                     onDoneCallback?.invoke(false)
                 }
             }
         } else {
-            addProgress("❌ Файл не выбран")
+            onProgressCallback?.invoke("❌ Файл не выбран")
             onDoneCallback?.invoke(false)
         }
     }
@@ -52,16 +46,11 @@ class LlamaBridge(private val activity: AppCompatActivity) {
     private var onProgressCallback: ((String) -> Unit)? = null
     private var onDoneCallback: ((Boolean) -> Unit)? = null
     
-    private fun addProgress(msg: String) {
-        onProgressCallback?.invoke(msg)
-    }
-    
     init {
         try {
             System.loadLibrary("llama")
-            addProgress("✅ Библиотека LLaMA загружена")
         } catch (e: Exception) {
-            addProgress("❌ Ошибка загрузки библиотеки: ${e.message}")
+            e.printStackTrace()
         }
     }
     
@@ -73,8 +62,7 @@ class LlamaBridge(private val activity: AppCompatActivity) {
         onProgressCallback = onProgress
         onDoneCallback = onDone
         
-        addProgress("📁 Нажмите и выберите файл .gguf")
-        addProgress("Откроется окно проводника")
+        onProgress("📁 Нажмите и выберите файл .gguf")
         
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
@@ -83,34 +71,25 @@ class LlamaBridge(private val activity: AppCompatActivity) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 try {
                     putExtra(DocumentsContract.EXTRA_INITIAL_URI, Uri.parse("/storage/emulated/0/Download"))
-                } catch (e: Exception) {
-                    // Игнорируем
-                }
+                } catch (e: Exception) { }
             }
         }
         filePickerLauncher.launch(intent)
     }
     
     private fun getRealPathFromUri(uri: Uri): String? {
-        if (uri.scheme == "file") {
-            return uri.path
-        }
+        if (uri.scheme == "file") return uri.path
         
-        if (uri.scheme == "content") {
-            val cursor = activity.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
-            cursor?.use {
-                if (it.moveToFirst()) {
-                    val fileName = it.getString(0)
-                    val candidates = listOf(
-                        "/storage/emulated/0/Download/$fileName",
-                        "/storage/emulated/0/Downloads/$fileName",
-                        "/storage/emulated/0/Documents/$fileName"
-                    )
-                    for (candidate in candidates) {
-                        if (File(candidate).exists()) {
-                            return candidate
-                        }
-                    }
+        val cursor = activity.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+        cursor?.use {
+            if (it.moveToFirst()) {
+                val fileName = it.getString(0)
+                val candidates = listOf(
+                    "/storage/emulated/0/Download/$fileName",
+                    "/storage/emulated/0/Downloads/$fileName"
+                )
+                for (candidate in candidates) {
+                    if (File(candidate).exists()) return candidate
                 }
             }
         }
@@ -119,7 +98,7 @@ class LlamaBridge(private val activity: AppCompatActivity) {
 
     fun generate(prompt: String, onToken: (String) -> Unit, onDone: () -> Unit) {
         if (!isLoaded) {
-            onToken("[НЕО] Модель не загружена. Нажми МИСТРАЛЬ 3Б и выбери .gguf файл.")
+            onToken("[НЕО] Модель не загружена. Нажми НАЙТИ .GGUF.")
             onDone()
             return
         }
@@ -128,16 +107,13 @@ class LlamaBridge(private val activity: AppCompatActivity) {
             val response = llamaComplete(prompt)
             onToken(response)
         } catch (e: Exception) {
-            onToken("[НЕО] Ошибка генерации: ${e.message}")
+            onToken("[НЕО] Ошибка: ${e.message}")
         }
-        
         onDone()
     }
 
     fun unload() {
-        try {
-            llamaStop()
-        } catch (e: Exception) { }
+        try { llamaStop() } catch (e: Exception) { }
         isLoaded = false
     }
 }
