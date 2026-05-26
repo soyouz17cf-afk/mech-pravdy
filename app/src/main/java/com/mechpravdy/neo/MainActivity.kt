@@ -18,7 +18,7 @@ import java.io.File
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var btnMistral3b: MaterialButton
+    private lateinit var btnSearchModel: MaterialButton
     private lateinit var authKeyInput: EditText
     private lateinit var generateButton: MaterialButton
     private lateinit var tokenInput: EditText
@@ -46,11 +46,11 @@ class MainActivity : AppCompatActivity() {
         
         checkPermissions()
         addChatMessage("⚡ Меч Правды загружен")
-        addChatMessage("✅ Нажмите кнопку МИСТРАЛЬ 3Б и выберите .gguf файл")
+        addChatMessage("✅ Нажмите кнопку НАЙТИ .GGUF и выберите файл модели")
     }
 
     private fun initViews() {
-        btnMistral3b = findViewById(R.id.btnMistral3b)
+        btnSearchModel = findViewById(R.id.btnSearchModel)
         authKeyInput = findViewById(R.id.authKeyInput)
         generateButton = findViewById(R.id.generateButton)
         tokenInput = findViewById(R.id.tokenInput)
@@ -67,7 +67,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setListeners() {
-        btnMistral3b.setOnClickListener { loadModel() }
+        btnSearchModel.setOnClickListener { loadModel() }
         generateButton.setOnClickListener { generateToken() }
         sendButton.setOnClickListener { sendMessage() }
         cameraButton.setOnClickListener { openCamera() }
@@ -122,7 +122,7 @@ class MainActivity : AppCompatActivity() {
         if (question.isEmpty()) return
         
         if (!llamaBridge.isLoaded) {
-            addChatMessage("❌ Сначала загрузите модель по кнопке МИСТРАЛЬ 3Б")
+            addChatMessage("❌ Сначала загрузите модель по кнопке НАЙТИ .GGUF")
             return
         }
         
@@ -148,7 +148,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun checkStatus() {
         if (llamaBridge.isLoaded) addChatMessage("✅ Модель загружена")
-        else addChatMessage("❌ Модель не загружена. Нажмите МИСТРАЛЬ 3Б")
+        else addChatMessage("❌ Модель не загружена. Нажмите НАЙТИ .GGUF")
     }
 
     private fun saveCapsule() {
