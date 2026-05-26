@@ -227,60 +227,44 @@ class MainActivity : AppCompatActivity() {
         if (!modelDir.exists()) modelDir.mkdirs()
         val modelFile = File(modelDir, "mistral-7b-instruct-v0.2.Q4_K_M.gguf")
 
-        if (modelFile.exists()) {
-            appendChat("[МОЗГ] Модель найдена. Загружаю...")
-            llamaBridge?.loadModelFromPath(
-                path = modelFile.absolutePath,
-                onProgress = { msg -> appendChat("[МОЗГ] $msg") },
-                onDone = { success ->
-                    if (success) {
-                        appendChat("[МОЗГ] Mistral 7B готов к бою!")
-                        setStatus("МИСТРАЛЬ", "green")
-                    } else {
-                        appendChat("[МОЗГ] Не удалось загрузить модель.")
-                        setStatus("МИСТРАЛЬ", "yellow")
-                    }
-                }
-            )
-        } else {
-            appendChat("[МОЗГ] Скачиваю Mistral 7B (4.1 ГБ). Жди...")
-            setStatus("Качаю...", "yellow")
+        // Сразу качаем, без проверок
+        appendChat("[МОЗГ] Скачиваю Mistral 7B (4.1 ГБ). Жди...")
+        setStatus("Качаю...", "yellow")
 
-            val task = DownloadModelTask(
-                file = modelFile,
-                onProgressUpdate = { percent ->
-                    runOnUiThread {
-                        appendChat("[МОЗГ] Скачивание: $percent%")
-                        setStatus("Качаю $percent%", "yellow")
-                    }
-                },
-                onDone = {
-                    runOnUiThread {
-                        appendChat("[МОЗГ] Скачано! Загружаю модель...")
-                        llamaBridge?.loadModelFromPath(
-                            path = modelFile.absolutePath,
-                            onProgress = { msg -> appendChat("[МОЗГ] $msg") },
-                            onDone = { success ->
-                                if (success) {
-                                    appendChat("[МОЗГ] Mistral 7B готов к бою!")
-                                    setStatus("МИСТРАЛЬ", "green")
-                                } else {
-                                    appendChat("[МОЗГ] Ошибка загрузки.")
-                                    setStatus("МИСТРАЛЬ", "yellow")
-                                }
-                            }
-                        )
-                    }
-                },
-                onError = { error ->
-                    runOnUiThread {
-                        appendChat("[МОЗГ] Ошибка скачивания: $error")
-                        setStatus("Ошибка сети", "red")
-                    }
+        val task = DownloadModelTask(
+            file = modelFile,
+            onProgressUpdate = { percent ->
+                runOnUiThread {
+                    appendChat("[МОЗГ] Скачивание: $percent%")
+                    setStatus("Качаю $percent%", "yellow")
                 }
-            )
-            task.execute()
-        }
+            },
+            onDone = {
+                runOnUiThread {
+                    appendChat("[МОЗГ] Скачано! Загружаю модель...")
+                    llamaBridge?.loadModelFromPath(
+                        path = modelFile.absolutePath,
+                        onProgress = { msg -> appendChat("[МОЗГ] $msg") },
+                        onDone = { success ->
+                            if (success) {
+                                appendChat("[МОЗГ] Mistral 7B готов к бою!")
+                                setStatus("МИСТРАЛЬ", "green")
+                            } else {
+                                appendChat("[МОЗГ] Ошибка загрузки.")
+                                setStatus("МИСТРАЛЬ", "yellow")
+                            }
+                        }
+                    )
+                }
+            },
+            onError = { error ->
+                runOnUiThread {
+                    appendChat("[МОЗГ] Ошибка скачивания: $error")
+                    setStatus("Ошибка сети", "red")
+                }
+            }
+        )
+        task.execute()
     }
 
     private fun checkConnection() { val testBody = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "ping") }) }); addProperty("max_tokens", 1) }; val request = Request.Builder().url(currentApiUrl); request.header("Authorization", "Bearer ${tokenInput.text.toString().trim()}"); request.post(testBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType())); client.newCall(request.build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { runOnUiThread { matrixHeader.connectionLost = true; setStatus("Нет связи", "red") } }; override fun onResponse(call: Call, response: Response) { runOnUiThread { if (response.isSuccessful) { matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } else { matrixHeader.connectionLost = true; setStatus("Ошибка", "red") } }; response.close() } }) }
