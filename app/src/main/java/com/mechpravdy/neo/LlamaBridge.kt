@@ -1,6 +1,5 @@
 package com.mechpravdy.neo
 
-import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -60,6 +59,9 @@ class LlamaBridge(private val activity: AppCompatActivity) {
     external fun llamaComplete(prompt: String): String
     private external fun llamaStop()
 
+    /**
+     * Загрузка модели через проводник (старый метод)
+     */
     fun loadModel(onProgress: (String) -> Unit, onDone: (Boolean) -> Unit) {
         onProgressCallback = onProgress
         onDoneCallback = onDone
@@ -76,6 +78,39 @@ class LlamaBridge(private val activity: AppCompatActivity) {
             }
         }
         filePickerLauncher.launch(intent)
+    }
+
+    /**
+     * Прямая загрузка модели по пути к файлу (новый метод для автозагрузки)
+     */
+    fun loadModelFromPath(path: String, onProgress: (String) -> Unit, onDone: (Boolean) -> Unit) {
+        onProgressCallback = onProgress
+        onDoneCallback = onDone
+
+        modelPath = path
+        onProgress("🔍 Проверяю файл: ${File(path).name}")
+
+        if (!File(path).exists()) {
+            onProgress("❌ Файл не найден: $path")
+            onDone(false)
+            return
+        }
+
+        val fileSizeMB = File(path).length() / (1024 * 1024)
+        onProgress("📦 Размер модели: $fileSizeMB МБ")
+        onProgress("⏳ Загружаю в память...")
+
+        val loadResult = llamaLoadModel(path)
+        if (loadResult) {
+            isLoaded = true
+            onProgress("🟢 МОДЕЛЬ ЗАГРУЖЕНА УСПЕШНО!")
+            onProgress("🧠 Готов к работе. Задавай вопросы!")
+            onDone(true)
+        } else {
+            onProgress("❌ ОШИБКА ЗАГРУЗКИ МОДЕЛИ")
+            onProgress("Проверь целостность файла .gguf")
+            onDone(false)
+        }
     }
 
     private fun getRealPathFromUri(uri: Uri): String? {
@@ -104,7 +139,7 @@ class LlamaBridge(private val activity: AppCompatActivity) {
 
     fun generate(prompt: String, onToken: (String) -> Unit, onDone: () -> Unit) {
         if (!isLoaded) {
-            onToken("[НЕО] Модель не загружена. Нажми МИСТРАЛЬ 3Б и выбери .gguf файл.")
+            onToken("[НЕО] Модель не загружена. Нажми МИСТРАЛЬ 3Б для скачивания мозга.")
             onDone()
             return
         }
@@ -122,7 +157,9 @@ class LlamaBridge(private val activity: AppCompatActivity) {
     fun unload() {
         try {
             llamaStop()
-        } catch (e: Exception) { }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
         isLoaded = false
     }
 }
