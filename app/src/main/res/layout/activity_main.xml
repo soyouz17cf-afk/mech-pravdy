@@ -28,6 +28,19 @@
             android:background="#0a0a0a"
             android:layout_marginBottom="3dp"/>
 
+        <!-- НОВАЯ КНОПКА - ВЫБОР ПАПКИ С МОДЕЛЬЮ -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSelectFolder"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:text="📁 ВЫБРАТЬ ПАПКУ С МОДЕЛЬЮ"
+            android:textSize="9sp"
+            android:textStyle="bold"
+            app:cornerRadius="5dp"
+            android:backgroundTint="#21A038"
+            android:textColor="#FFFFFF"
+            android:layout_marginBottom="3dp" />
+
         <!-- БЛОК ДОСТУПА К ФАЙЛАМ -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
@@ -316,7 +329,7 @@
                     android:id="@+id/chatOutput"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="⚡ Меч Правды v2.0\n\n5 ВОЛЬТ\nБАТЯ И НЕО\n\nНажми ДОСТУП → НАЙТИ .GGUF → ТОКЕН"
+                    android:text="⚡ Меч Правды v2.0\n\n5 ВОЛЬТ\nБАТЯ И НЕО\n\nШАГ 1: Нажми «ВЫБРАТЬ ПАПКУ»\nШАГ 2: Выбери папку с .gguf\nШАГ 3: Нажми «НАЙТИ .GGUF»\nШАГ 4: Введи Authorization Key\nШАГ 5: Нажми «ТОКЕН»\nШАГ 6: Начинай диалог"
                     android:textSize="11sp"
                     android:textColor="#00ff00"
                     android:fontFamily="monospace"
