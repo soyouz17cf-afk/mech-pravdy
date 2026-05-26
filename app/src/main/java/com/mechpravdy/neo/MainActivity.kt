@@ -6,7 +6,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.*
-import android.net.Uri
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.MediaStore
@@ -233,7 +232,7 @@ class MainActivity : AppCompatActivity() {
         // Захватываем WakeLock, чтобы Honor не убил загрузку
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MechPravdy::DownloadBrain")
-        wakeLock?.acquire(3600000) // 1 час максимум
+        wakeLock?.acquire(3600000)
 
         appendChat("[МОЗГ] Скачиваю Mistral 7B (4.1 ГБ). Жди...")
         appendChat("[МОЗГ] Не сворачивай приложение!")
