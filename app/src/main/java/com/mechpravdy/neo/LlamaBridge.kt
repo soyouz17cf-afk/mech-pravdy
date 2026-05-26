@@ -15,11 +15,16 @@ class LlamaBridge(private val activity: AppCompatActivity) {
 
     private var modelPath: String? = null
 
-    private val filePickerLauncher = activity.registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
+    private val filePickerLauncher = activity.registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == AppCompatActivity.RESULT_OK) {
             result.data?.data?.let { uri ->
-                activity.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                onProgressCallback?.invoke("📁 Выбран файл: ${uri.lastPathSegment}")
+                activity.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                onProgressCallback?.invoke("📁 Выбран: ${uri.lastPathSegment}")
 
                 val path = getRealPathFromUri(uri)
                 if (path != null) {
@@ -27,14 +32,14 @@ class LlamaBridge(private val activity: AppCompatActivity) {
                     val loadResult = llamaLoadModel(path)
                     if (loadResult) {
                         isLoaded = true
-                        onProgressCallback?.invoke("🟢 МОДЕЛЬ ЗАГРУЖЕНА УСПЕШНО!")
+                        onProgressCallback?.invoke("🟢 МОДЕЛЬ ЗАГРУЖЕНА!")
                         onDoneCallback?.invoke(true)
                     } else {
-                        onProgressCallback?.invoke("❌ ОШИБКА ЗАГРУЗКИ МОДЕЛИ")
+                        onProgressCallback?.invoke("❌ ОШИБКА ЗАГРУЗКИ")
                         onDoneCallback?.invoke(false)
                     }
                 } else {
-                    onProgressCallback?.invoke("❌ Не удалось получить путь к файлу")
+                    onProgressCallback?.invoke("❌ Не удалось получить путь")
                     onDoneCallback?.invoke(false)
                 }
             }
@@ -59,78 +64,73 @@ class LlamaBridge(private val activity: AppCompatActivity) {
     external fun llamaComplete(prompt: String): String
     private external fun llamaStop()
 
-    /**
-     * Загрузка модели через проводник (старый метод)
-     */
     fun loadModel(onProgress: (String) -> Unit, onDone: (Boolean) -> Unit) {
         onProgressCallback = onProgress
         onDoneCallback = onDone
 
-        onProgress("📁 Нажмите и выберите файл .gguf")
-        onProgress("Откроется окно проводника")
+        onProgress("📁 Выбери файл .gguf")
 
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "*/*"
-            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/octet-stream", "model/gguf"))
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/octet-stream"))
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                putExtra(DocumentsContract.EXTRA_INITIAL_URI, Uri.parse("/storage/emulated/0/Download"))
+                putExtra(
+                    DocumentsContract.EXTRA_INITIAL_URI,
+                    Uri.parse("/storage/emulated/0/Download")
+                )
             }
         }
         filePickerLauncher.launch(intent)
     }
 
-    /**
-     * Прямая загрузка модели по пути к файлу (новый метод для автозагрузки)
-     */
     fun loadModelFromPath(path: String, onProgress: (String) -> Unit, onDone: (Boolean) -> Unit) {
         onProgressCallback = onProgress
         onDoneCallback = onDone
 
         modelPath = path
-        onProgress("🔍 Проверяю файл: ${File(path).name}")
+        onProgress("🔍 Файл: ${File(path).name}")
 
         if (!File(path).exists()) {
-            onProgress("❌ Файл не найден: $path")
+            onProgress("❌ Файл не найден")
             onDone(false)
             return
         }
 
-        val fileSizeMB = File(path).length() / (1024 * 1024)
-        onProgress("📦 Размер модели: $fileSizeMB МБ")
-        onProgress("⏳ Загружаю в память...")
+        val sizeMB = File(path).length() / (1024 * 1024)
+        onProgress("📦 Размер: $sizeMB МБ")
+        onProgress("⏳ Загружаю...")
 
-        val loadResult = llamaLoadModel(path)
-        if (loadResult) {
+        val result = llamaLoadModel(path)
+        if (result) {
             isLoaded = true
-            onProgress("🟢 МОДЕЛЬ ЗАГРУЖЕНА УСПЕШНО!")
-            onProgress("🧠 Готов к работе. Задавай вопросы!")
+            onProgress("🟢 ГОТОВ!")
             onDone(true)
         } else {
-            onProgress("❌ ОШИБКА ЗАГРУЗКИ МОДЕЛИ")
-            onProgress("Проверь целостность файла .gguf")
+            onProgress("❌ ОШИБКА")
             onDone(false)
         }
     }
 
     private fun getRealPathFromUri(uri: Uri): String? {
-        if (uri.scheme == "file") {
-            return uri.path
-        }
+        if (uri.scheme == "file") return uri.path
 
-        val cursor = activity.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+        val cursor = activity.contentResolver.query(
+            uri,
+            arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+            null, null, null
+        )
         cursor?.use {
             if (it.moveToFirst()) {
-                val fileName = it.getString(0)
-                val candidates = listOf(
-                    "/storage/emulated/0/Download/$fileName",
-                    "/storage/emulated/0/Downloads/$fileName",
-                    "/storage/emulated/0/Documents/$fileName"
+                val name = it.getString(0)
+                val dirs = listOf(
+                    "/storage/emulated/0/Download",
+                    "/storage/emulated/0/Downloads",
+                    "/storage/emulated/0/Documents"
                 )
-                for (candidate in candidates) {
-                    if (File(candidate).exists()) {
-                        return candidate
-                    }
+                for (dir in dirs) {
+                    val f = File(dir, name)
+                    if (f.exists()) return f.absolutePath
                 }
             }
         }
@@ -139,7 +139,7 @@ class LlamaBridge(private val activity: AppCompatActivity) {
 
     fun generate(prompt: String, onToken: (String) -> Unit, onDone: () -> Unit) {
         if (!isLoaded) {
-            onToken("[НЕО] Модель не загружена. Нажми МИСТРАЛЬ 3Б для скачивания мозга.")
+            onToken("[НЕО] Модель не загружена. Нажми МИСТРАЛЬ 3Б.")
             onDone()
             return
         }
@@ -148,7 +148,7 @@ class LlamaBridge(private val activity: AppCompatActivity) {
             val response = llamaComplete(prompt)
             onToken(response)
         } catch (e: Exception) {
-            onToken("[НЕО] Ошибка генерации: ${e.message}")
+            onToken("[НЕО] Ошибка: ${e.message}")
         }
 
         onDone()
