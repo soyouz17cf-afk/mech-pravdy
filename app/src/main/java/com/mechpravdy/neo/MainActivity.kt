@@ -1,16 +1,21 @@
 package com.mechpravdy.neo
 
 import android.Manifest
+import android.content.ContentResolver
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.provider.DocumentsContract
+import android.provider.Settings
 import android.speech.RecognizerIntent
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -19,7 +24,7 @@ import java.io.File
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var btnGrantPermission: MaterialButton
+    private lateinit var btnSelectFolder: MaterialButton
     private lateinit var btnSearchModel: MaterialButton
     private lateinit var authKeyInput: EditText
     private lateinit var generateButton: MaterialButton
@@ -35,6 +40,29 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var statusDot: ImageView
 
+    private var selectedFolderUri: Uri? = null
+    private var modelPath: String? = null
+
+    // Регистрируем callback для выбора папки
+    private val selectFolderLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK) {
+            result.data?.data?.let { uri ->
+                selectedFolderUri = uri
+                // Сохраняем URI в SharedPreferences
+                getSharedPreferences("app_prefs", MODE_PRIVATE).edit()
+                    .putString("model_folder_uri", uri.toString())
+                    .apply()
+                // Запрашиваем постоянный доступ
+                contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                addChatMessage("✅ Папка выбрана: ${uri.path?.takeLast(30)}")
+                searchGgufFiles()
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -42,51 +70,25 @@ class MainActivity : AppCompatActivity() {
         initViews()
         setListeners()
         
-        // === ПРИНУДИТЕЛЬНОЕ СОЗДАНИЕ ПАПКИ И ПРОВЕРКА ===
-        forceCreateFolderAndCheck()
+        // Восстанавливаем сохранённую папку
+        val savedUri = getSharedPreferences("app_prefs", MODE_PRIVATE).getString("model_folder_uri", null)
+        if (savedUri != null) {
+            selectedFolderUri = Uri.parse(savedUri)
+            addChatMessage("📁 Сохранённая папка: ${selectedFolderUri?.path?.takeLast(30)}")
+            searchGgufFiles()
+        } else {
+            addChatMessage("⚡ Нажмите «ВЫБРАТЬ ПАПКУ» и укажите папку с моделью .gguf")
+        }
         
         checkPermissions()
         addChatMessage("⚡ Меч Правды загружен")
     }
 
-    private fun forceCreateFolderAndCheck() {
-        try {
-            val appFolder = getExternalFilesDir(null)
-            if (appFolder == null) {
-                addChatMessage("❌ Не удалось получить папку приложения")
-                return
-            }
-            
-            addChatMessage("✅ Рабочая папка: ${appFolder.absolutePath}")
-            
-            // Создаём тестовый файл, чтобы Android точно создал папку
-            val testFile = File(appFolder, ".nomedia")
-            testFile.createNewFile()
-            addChatMessage("✅ Папка активирована")
-            
-            // Проверяем содержимое
-            val files = appFolder.listFiles()
-            if (files == null || files.isEmpty()) {
-                addChatMessage("📁 Папка пуста")
-                addChatMessage("📌 Скопируйте .gguf по этому пути:")
-                addChatMessage(appFolder.absolutePath)
-            } else {
-                addChatMessage("📁 В папке ${files.size} файлов:")
-                for (file in files) {
-                    if (file.name.endsWith(".gguf", ignoreCase = true)) {
-                        addChatMessage("   🎉 МОДЕЛЬ: ${file.name} (${file.length() / 1024 / 1024} MB)")
-                    } else {
-                        addChatMessage("   📄 ${file.name}")
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            addChatMessage("❌ Ошибка: ${e.message}")
-        }
-    }
-
     private fun initViews() {
-        btnGrantPermission = findViewById(R.id.btnGrantPermission)
+        btnSelectFolder = MaterialButton(this).apply {
+            text = "📁 ВЫБРАТЬ ПАПКУ С МОДЕЛЬЮ"
+            setBackgroundColor(android.graphics.Color.parseColor("#21A038"))
+        }
         btnSearchModel = findViewById(R.id.btnSearchModel)
         authKeyInput = findViewById(R.id.authKeyInput)
         generateButton = findViewById(R.id.generateButton)
@@ -101,10 +103,13 @@ class MainActivity : AppCompatActivity() {
         chatOutput = findViewById(R.id.chatOutput)
         statusText = findViewById(R.id.statusText)
         statusDot = findViewById(R.id.statusDot)
+        
+        // Добавляем кнопку в интерфейс (временно, потом вставишь в XML)
+        (findViewById<android.widget.LinearLayout>(R.id.llMain))?.addView(btnSelectFolder, 0)
     }
 
     private fun setListeners() {
-        btnGrantPermission.setOnClickListener { requestStoragePermission() }
+        btnSelectFolder.setOnClickListener { selectModelFolder() }
         btnSearchModel.setOnClickListener { searchGgufFiles() }
         generateButton.setOnClickListener { generateToken() }
         sendButton.setOnClickListener { sendMessage() }
@@ -115,73 +120,42 @@ class MainActivity : AppCompatActivity() {
         voiceButton.setOnClickListener { startVoiceInput() }
     }
 
-    private fun checkPermissions() {
-        val permissions = mutableListOf<String>()
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            permissions.add(Manifest.permission.CAMERA)
+    private fun selectModelFolder() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            putExtra(DocumentsContract.EXTRA_INITIAL_URI, Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath)
         }
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            permissions.add(Manifest.permission.RECORD_AUDIO)
-        }
-        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
-            }
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                permissions.add(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
-        if (permissions.isNotEmpty()) {
-            ActivityCompat.requestPermissions(this, permissions.toTypedArray(), 100)
-        } else {
-            updateStatus("Готов")
-        }
-    }
-
-    private fun requestStoragePermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (!Environment.isExternalStorageManager()) {
-                val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-                intent.data = android.net.Uri.parse("package:$packageName")
-                startActivity(intent)
-            } else {
-                Toast.makeText(this, "Доступ уже есть", Toast.LENGTH_SHORT).show()
-            }
-        } else {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE), 101)
-        }
+        selectFolderLauncher.launch(intent)
     }
 
     private fun searchGgufFiles() {
-        addChatMessage("🔍 ПОИСК .GGUF...")
-        val folder = getExternalFilesDir(null)
-        if (folder == null) {
-            addChatMessage("❌ Папка приложения не найдена")
+        addChatMessage("🔍 Поиск .gguf...")
+        if (selectedFolderUri == null) {
+            addChatMessage("❌ Сначала выберите папку с моделью")
             return
         }
-        addChatMessage("📂 ПАПКА: ${folder.absolutePath}")
-        val files = folder.listFiles()
-        if (files == null || files.isEmpty()) {
-            addChatMessage("❌ ПАПКА ПУСТА")
-            addChatMessage("📁 Скопируйте .gguf сюда: ${folder.absolutePath}")
+        
+        // Получаем список файлов через DocumentFile
+        val documents = androidx.documentfile.provider.DocumentFile.fromTreeUri(this, selectedFolderUri!!)
+        if (documents == null || !documents.exists()) {
+            addChatMessage("❌ Не удалось прочитать папку")
             return
         }
-        addChatMessage("📄 ВСЕГО ФАЙЛОВ: ${files.size}")
+        
         var found = false
-        for (file in files) {
-            if (file.name.endsWith(".gguf", ignoreCase = true)) {
-                addChatMessage("🎉🎉🎉 МОДЕЛЬ НАЙДЕНА: ${file.name}")
-                addChatMessage("📏 РАЗМЕР: ${file.length() / 1024 / 1024} MB")
+        for (file in documents.listFiles()) {
+            if (!file.isDirectory && file.name?.endsWith(".gguf", ignoreCase = true) == true) {
+                addChatMessage("🎉 МОДЕЛЬ НАЙДЕНА: ${file.name}")
+                addChatMessage("📏 Размер: ${file.length() / 1024 / 1024} MB")
+                modelPath = file.uri.toString()
                 found = true
-            } else {
-                addChatMessage("📄 ${file.name}")
+                break
             }
         }
+        
         if (!found) {
-            addChatMessage("❌ .GGUF НЕ НАЙДЕНЫ")
-            addChatMessage("📁 Скопируйте .gguf сюда: ${folder.absolutePath}")
+            addChatMessage("❌ .gguf не найдены в выбранной папке")
+            addChatMessage("📁 Убедитесь, что файл модели лежит в выбранной папке")
         }
     }
 
@@ -201,18 +175,42 @@ class MainActivity : AppCompatActivity() {
         val question = messageInput.text.toString().trim()
         if (question.isEmpty()) return
         
+        if (modelPath == null) {
+            addChatMessage("❌ Сначала выберите папку с моделью и найдите .gguf")
+            return
+        }
+        
         addChatMessage("👤 $question")
         messageInput.text.clear()
         updateStatus("Думаю...")
         
+        // Здесь будет вызов LLaMA через выбранный файл
         Thread {
             Thread.sleep(500)
-            val answer = "🤖 (Тест) Ты сказал: \"$question\"\n\n⚡ 5 Вольт"
+            val answer = "🤖 Модель готова: $modelPath\n\nВопрос: $question\n\n(LLaMA будет подключена после настройки вызова)"
             runOnUiThread {
                 addChatMessage(answer)
                 updateStatus("Готов")
             }
         }.start()
+    }
+
+    private fun checkPermissions() {
+        val permissions = mutableListOf<String>()
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            permissions.add(Manifest.permission.CAMERA)
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            permissions.add(Manifest.permission.RECORD_AUDIO)
+        }
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+            }
+        }
+        if (permissions.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, permissions.toTypedArray(), 100)
+        }
     }
 
     private fun openCamera() {
@@ -226,7 +224,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkStatus() {
-        addChatMessage("✅ Приложение работает")
+        if (modelPath != null) {
+            addChatMessage("✅ Модель готова: $modelPath")
+        } else {
+            addChatMessage("❌ Модель не выбрана. Нажмите «ВЫБРАТЬ ПАПКУ»")
+        }
     }
 
     private fun saveCapsule() {
@@ -251,6 +253,7 @@ class MainActivity : AppCompatActivity() {
         startActivityForResult(intent, 200)
     }
 
+    @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == 200 && resultCode == RESULT_OK) {
