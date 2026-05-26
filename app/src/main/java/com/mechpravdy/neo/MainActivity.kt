@@ -3,17 +3,13 @@ package com.mechpravdy.neo
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Environment
-import android.provider.DocumentsContract
 import android.speech.RecognizerIntent
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -22,8 +18,7 @@ import java.io.File
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var btnSelectFolder: MaterialButton
-    private lateinit var btnSearchModel: MaterialButton
+    private lateinit var btnMistral3b: MaterialButton
     private lateinit var authKeyInput: EditText
     private lateinit var generateButton: MaterialButton
     private lateinit var tokenInput: EditText
@@ -38,25 +33,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var statusDot: ImageView
 
-    private var selectedFolderUri: Uri? = null
-    private var modelPath: String? = null
-
-    private val selectFolderLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == RESULT_OK) {
-            result.data?.data?.let { uri ->
-                selectedFolderUri = uri
-                getSharedPreferences("app_prefs", MODE_PRIVATE).edit()
-                    .putString("model_folder_uri", uri.toString())
-                    .apply()
-                contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-                addChatMessage("✅ Папка выбрана: ${uri.path?.takeLast(30)}")
-                searchGgufFiles()
-            }
-        }
-    }
+    private lateinit var llamaBridge: LlamaBridge
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,22 +42,15 @@ class MainActivity : AppCompatActivity() {
         initViews()
         setListeners()
         
-        val savedUri = getSharedPreferences("app_prefs", MODE_PRIVATE).getString("model_folder_uri", null)
-        if (savedUri != null) {
-            selectedFolderUri = Uri.parse(savedUri)
-            addChatMessage("📁 Сохранённая папка: ${selectedFolderUri?.path?.takeLast(30)}")
-            searchGgufFiles()
-        } else {
-            addChatMessage("⚡ Нажмите «ВЫБРАТЬ ПАПКУ» и укажите папку с моделью .gguf")
-        }
+        llamaBridge = LlamaBridge(this)
         
         checkPermissions()
         addChatMessage("⚡ Меч Правды загружен")
+        addChatMessage("✅ Нажмите кнопку МИСТРАЛЬ 3Б и выберите .gguf файл")
     }
 
     private fun initViews() {
-        btnSelectFolder = findViewById(R.id.btnSelectFolder)
-        btnSearchModel = findViewById(R.id.btnSearchModel)
+        btnMistral3b = findViewById(R.id.btnMistral3b)
         authKeyInput = findViewById(R.id.authKeyInput)
         generateButton = findViewById(R.id.generateButton)
         tokenInput = findViewById(R.id.tokenInput)
@@ -97,8 +67,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setListeners() {
-        btnSelectFolder.setOnClickListener { selectModelFolder() }
-        btnSearchModel.setOnClickListener { searchGgufFiles() }
+        btnMistral3b.setOnClickListener { loadModel() }
         generateButton.setOnClickListener { generateToken() }
         sendButton.setOnClickListener { sendMessage() }
         cameraButton.setOnClickListener { openCamera() }
@@ -108,14 +77,17 @@ class MainActivity : AppCompatActivity() {
         voiceButton.setOnClickListener { startVoiceInput() }
     }
 
-    private fun selectModelFolder() {
-        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                putExtra(DocumentsContract.EXTRA_INITIAL_URI, Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath)
+    private fun loadModel() {
+        llamaBridge.loadModel(
+            onProgress = { message -> addChatMessage(message) },
+            onDone = { success -> 
+                if (success) {
+                    addChatMessage("🎉 Мозг подключен! Можно задавать вопросы.")
+                } else {
+                    addChatMessage("❌ Модель не загружена. Попробуйте ещё раз.")
+                }
             }
-        }
-        selectFolderLauncher.launch(intent)
+        )
     }
 
     private fun checkPermissions() {
@@ -126,45 +98,10 @@ class MainActivity : AppCompatActivity() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             permissions.add(Manifest.permission.RECORD_AUDIO)
         }
-        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
-            }
-        }
         if (permissions.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, permissions.toTypedArray(), 100)
         } else {
             updateStatus("Готов")
-        }
-    }
-
-    private fun searchGgufFiles() {
-        addChatMessage("🔍 Поиск .gguf...")
-        if (selectedFolderUri == null) {
-            addChatMessage("❌ Сначала выберите папку с моделью")
-            return
-        }
-        
-        val documents = androidx.documentfile.provider.DocumentFile.fromTreeUri(this, selectedFolderUri!!)
-        if (documents == null || !documents.exists()) {
-            addChatMessage("❌ Не удалось прочитать папку")
-            return
-        }
-        
-        var found = false
-        for (file in documents.listFiles()) {
-            if (!file.isDirectory && file.name?.endsWith(".gguf", ignoreCase = true) == true) {
-                addChatMessage("🎉 МОДЕЛЬ НАЙДЕНА: ${file.name}")
-                addChatMessage("📏 Размер: ${file.length() / 1024 / 1024} MB")
-                modelPath = file.uri.toString()
-                found = true
-                break
-            }
-        }
-        
-        if (!found) {
-            addChatMessage("❌ .gguf не найдены в выбранной папке")
-            addChatMessage("📁 Убедитесь, что файл модели лежит в выбранной папке")
         }
     }
 
@@ -184,8 +121,8 @@ class MainActivity : AppCompatActivity() {
         val question = messageInput.text.toString().trim()
         if (question.isEmpty()) return
         
-        if (modelPath == null) {
-            addChatMessage("❌ Сначала выберите папку с моделью и найдите .gguf")
+        if (!llamaBridge.isLoaded) {
+            addChatMessage("❌ Сначала загрузите модель по кнопке МИСТРАЛЬ 3Б")
             return
         }
         
@@ -193,14 +130,10 @@ class MainActivity : AppCompatActivity() {
         messageInput.text.clear()
         updateStatus("Думаю...")
         
-        Thread {
-            Thread.sleep(500)
-            val answer = "🤖 Модель готова: ${modelPath?.takeLast(30)}\n\n(LLaMA будет подключена после настройки вызова)"
-            runOnUiThread {
-                addChatMessage(answer)
-                updateStatus("Готов")
-            }
-        }.start()
+        llamaBridge.generate(question,
+            onToken = { answer -> addChatMessage("🤖 $answer") },
+            onDone = { updateStatus("Готов") }
+        )
     }
 
     private fun openCamera() {
@@ -214,11 +147,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkStatus() {
-        if (modelPath != null) {
-            addChatMessage("✅ Модель готова")
-        } else {
-            addChatMessage("❌ Модель не выбрана. Нажмите «ВЫБРАТЬ ПАПКУ»")
-        }
+        if (llamaBridge.isLoaded) addChatMessage("✅ Модель загружена")
+        else addChatMessage("❌ Модель не загружена. Нажмите МИСТРАЛЬ 3Б")
     }
 
     private fun saveCapsule() {
