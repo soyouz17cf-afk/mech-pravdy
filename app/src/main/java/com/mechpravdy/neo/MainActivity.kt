@@ -41,23 +41,37 @@ class MainActivity : AppCompatActivity() {
         
         initViews()
         setListeners()
-        checkPermissions()
         
-        // БЛОК СОЗДАНИЯ ПАПКИ ПРИЛОЖЕНИЯ
-        val appFolder = getExternalFilesDir(null)
-        if (appFolder != null) {
-            addChatMessage("✅ Папка приложения: ${appFolder.absolutePath}")
-            if (appFolder.exists()) {
-                addChatMessage("📁 Папка существует, можно копировать модель")
+        // === ПРИНУДИТЕЛЬНОЕ СОЗДАНИЕ ПАПКИ И ПРОВЕРКА ===
+        try {
+            val appFolder = getExternalFilesDir(null)
+            if (appFolder != null) {
+                addChatMessage("✅ Папка приложения: ${appFolder.absolutePath}")
+                
+                // Создаём тестовый файл
+                val testFile = File(appFolder, "test.txt")
+                testFile.writeText("Папка работает")
+                addChatMessage("✅ Тестовый файл создан")
+                
+                // Ищем .gguf
+                val ggufFiles = appFolder.listFiles { file -> file.name.endsWith(".gguf", ignoreCase = true) }
+                if (ggufFiles != null && ggufFiles.isNotEmpty()) {
+                    for (file in ggufFiles) {
+                        addChatMessage("🎉 МОДЕЛЬ: ${file.name} (${file.length() / 1024 / 1024} MB)")
+                    }
+                } else {
+                    addChatMessage("❌ .gguf не найдены")
+                    addChatMessage("📁 Скопируйте сюда: ${appFolder.absolutePath}")
+                }
             } else {
-                addChatMessage("📁 Папка будет создана автоматически при первом обращении")
+                addChatMessage("❌ Папка приложения не найдена")
             }
-        } else {
-            addChatMessage("❌ Ошибка: не удалось получить доступ к папке приложения")
+        } catch (e: Exception) {
+            addChatMessage("❌ Ошибка: ${e.message}")
         }
         
+        checkPermissions()
         addChatMessage("⚡ Меч Правды загружен")
-        addChatMessage("✅ Все кнопки работают")
     }
 
     private fun initViews() {
@@ -95,9 +109,17 @@ class MainActivity : AppCompatActivity() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             permissions.add(Manifest.permission.CAMERA)
         }
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            permissions.add(Manifest.permission.RECORD_AUDIO)
+        }
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
                 permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
         if (permissions.isNotEmpty()) {
@@ -123,21 +145,28 @@ class MainActivity : AppCompatActivity() {
 
     private fun searchGgufFiles() {
         addChatMessage("🔍 Поиск .gguf...")
-        val dirs = listOf(
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS),
-            getExternalFilesDir(null)
-        )
+        val folder = getExternalFilesDir(null)
+        if (folder == null) {
+            addChatMessage("❌ Папка приложения не найдена")
+            return
+        }
+        addChatMessage("📂 Ищем в: ${folder.absolutePath}")
+        val files = folder.listFiles()
+        if (files == null || files.isEmpty()) {
+            addChatMessage("❌ Папка пуста")
+            return
+        }
         var found = false
-        dirs.forEach { dir ->
-            dir?.listFiles()?.forEach { file ->
-                if (file.extension.equals("gguf", ignoreCase = true)) {
-                    addChatMessage("📁 ${file.name} (${file.length() / 1024 / 1024} MB)")
-                    found = true
-                }
+        for (file in files) {
+            if (file.name.endsWith(".gguf", ignoreCase = true)) {
+                addChatMessage("✅ МОДЕЛЬ: ${file.name} (${file.length() / 1024 / 1024} MB)")
+                found = true
             }
         }
-        if (!found) addChatMessage("❌ .gguf файлы не найдены")
+        if (!found) {
+            addChatMessage("❌ .gguf не найдены")
+            addChatMessage("📁 Скопируйте сюда: ${folder.absolutePath}")
+        }
     }
 
     private fun generateToken() {
