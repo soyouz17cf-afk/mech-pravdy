@@ -107,7 +107,6 @@ class MainActivity : AppCompatActivity() {
             checkButton.setOnClickListener { hideKeyboard(); appendChat("[ℹ] Проверка токена"); checkToken() }
             capsuleButton.setOnClickListener { hideKeyboard(); showCapsuleDialog() }
 
-            // Инициализируем LlamaBridge в фоне при старте
             thread { llamaBridge = LlamaBridge() }
         } catch (e: Exception) { Toast.makeText(this, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show() }
     }
@@ -265,19 +264,25 @@ class MainActivity : AppCompatActivity() {
     private fun loadModelFromFile(file: File) {
         appendChat("[МОЗГ] Загружаю модель в память...")
         setStatus("Загружаю...", "yellow")
-        llamaBridge?.loadModelFromPath(
-            path = file.absolutePath,
-            onProgress = { msg -> appendChat("[МОЗГ] $msg") },
-            onDone = { success ->
-                if (success) {
-                    appendChat("[МОЗГ] Mistral 7B готов к бою!")
-                    setStatus("МИСТРАЛЬ", "green")
-                } else {
-                    appendChat("[МОЗГ] Ошибка загрузки модели.")
-                    setStatus("МИСТРАЛЬ", "yellow")
+        thread {
+            llamaBridge?.loadModelFromPath(
+                path = file.absolutePath,
+                onProgress = { msg ->
+                    runOnUiThread { appendChat("[МОЗГ] $msg") }
+                },
+                onDone = { success ->
+                    runOnUiThread {
+                        if (success) {
+                            appendChat("[МОЗГ] Mistral 7B готов к бою!")
+                            setStatus("МИСТРАЛЬ", "green")
+                        } else {
+                            appendChat("[МОЗГ] Ошибка загрузки модели.")
+                            setStatus("МИСТРАЛЬ", "yellow")
+                        }
+                    }
                 }
-            }
-        )
+            )
+        }
     }
 
     private fun checkConnection() { val testBody = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "ping") }) }); addProperty("max_tokens", 1) }; val request = Request.Builder().url(currentApiUrl); request.header("Authorization", "Bearer ${tokenInput.text.toString().trim()}"); request.post(testBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType())); client.newCall(request.build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { runOnUiThread { matrixHeader.connectionLost = true; setStatus("Нет связи", "red") } }; override fun onResponse(call: Call, response: Response) { runOnUiThread { if (response.isSuccessful) { matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } else { matrixHeader.connectionLost = true; setStatus("Ошибка", "red") } }; response.close() } }) }
