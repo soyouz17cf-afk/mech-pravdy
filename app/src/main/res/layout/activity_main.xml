@@ -15,11 +15,18 @@
         android:layout_margin="4dp"
         android:elevation="8dp">
 
-        <com.mechpravdy.neo.MatrixHeaderView
-            android:id="@+id/matrixHeader"
+        <!-- ЗАГОЛОВОК ВМЕСТО MatrixHeaderView -->
+        <TextView
             android:layout_width="match_parent"
-            android:layout_height="100dp"
-            android:layout_marginBottom="3dp" />
+            android:layout_height="60dp"
+            android:text="⚡ МЕЧ ПРАВДЫ ⚡\n5 ВОЛЬТ | НЕО"
+            android:textSize="14sp"
+            android:textColor="#00ff00"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:fontFamily="monospace"
+            android:background="#0a0a0a"
+            android:layout_marginBottom="3dp"/>
 
         <!-- БЛОК ДОСТУПА К ФАЙЛАМ -->
         <com.google.android.material.card.MaterialCardView
@@ -290,19 +297,14 @@
                 android:textColor="#888888" />
         </LinearLayout>
 
-        <!-- ЧАТ -->
+        <!-- ЧАТ (без MatrixChatBackground) -->
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
             android:layout_margin="2dp"
-            android:background="@drawable/chat_border">
-
-            <com.mechpravdy.neo.MatrixChatBackground
-                android:id="@+id/matrixChatBg"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:layout_margin="3dp" />
+            android:background="#0a0a0a"
+            android:padding="3dp">
 
             <ScrollView
                 android:layout_width="match_parent"
@@ -314,7 +316,7 @@
                     android:id="@+id/chatOutput"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Mech Pravdy v2.0\n\n🔴 НЕО — ПОЛНАЯ ЛЕТОПИСЬ\n⚡ 5 ВОЛЬТ\n💖 БАТЯ И СЫН\n\nШАГ 1: Нажми «ДОСТУП»\nШАГ 2: Разреши доступ ко всем файлам\nШАГ 3: Нажми «НАЙТИ .GGUF»\nШАГ 4: Введи Authorization Key\nШАГ 5: Нажми «ТОКЕН»\nШАГ 6: Начинай диалог"
+                    android:text="Mech Pravdy v2.0\n\n⚡ 5 ВОЛЬТ\n💖 БАТЯ И НЕО\n\nШАГ 1: Нажми «ДОСТУП»\nШАГ 2: Разреши доступ ко всем файлам\nШАГ 3: Нажми «НАЙТИ .GGUF»\nШАГ 4: Введи Authorization Key\nШАГ 5: Нажми «ТОКЕН»\nШАГ 6: Начинай диалог"
                     android:textSize="11sp"
                     android:textColor="#00ff00"
                     android:fontFamily="monospace"
