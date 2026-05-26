@@ -46,7 +46,7 @@ class MainActivity : AppCompatActivity() {
 
         checkPermissions()
         addChatMessage("⚡ Меч Правды загружен")
-        addChatMessage("✅ Нажмите МИСТРАЛЬ 3Б для скачивания мозга")
+        addChatMessage("✅ Нажми МИСТРАЛЬ 3Б для скачивания мозга")
     }
 
     private fun initViews() {
@@ -78,19 +78,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadModel() {
-        val modelDir = getExternalFilesDir("models") ?: filesDir
+        val modelDir: File = getExternalFilesDir("models") ?: filesDir
         if (!modelDir.exists()) modelDir.mkdirs()
         val modelFile = File(modelDir, "mistral-7b-instruct-v0.2.Q4_K_M.gguf")
 
         if (modelFile.exists()) {
-            addChatMessage("✅ Модель найдена в песочнице. Загружаю...")
+            addChatMessage("✅ Модель найдена. Загружаю...")
             updateStatus("Загружаю...")
             llamaBridge.loadModelFromPath(
-                modelFile.absolutePath,
-                onProgress = { msg -> addChatMessage(msg) },
-                onDone = { success ->
+                path = modelFile.absolutePath,
+                onProgress = { msg: String -> addChatMessage(msg) },
+                onDone = { success: Boolean ->
                     if (success) {
-                        addChatMessage("🎉 Модель загружена! Можно задавать вопросы.")
+                        addChatMessage("🎉 Модель загружена!")
                         updateStatus("Готов")
                     } else {
                         addChatMessage("❌ Ошибка загрузки модели")
@@ -99,12 +99,12 @@ class MainActivity : AppCompatActivity() {
                 }
             )
         } else {
-            addChatMessage("📥 Скачиваю Mistral 7B (4.1 ГБ). Жди...")
-            updateStatus("Качаю мозг...")
+            addChatMessage("📥 Скачиваю Mistral 7B. Жди...")
+            updateStatus("Качаю...")
 
-            DownloadModelTask(
-                modelFile,
-                onProgressUpdate = { percent ->
+            val task = DownloadModelTask(
+                file = modelFile,
+                onProgressUpdate = { percent: Int ->
                     runOnUiThread {
                         addChatMessage("📥 $percent%")
                         updateStatus("Качаю $percent%")
@@ -112,30 +112,31 @@ class MainActivity : AppCompatActivity() {
                 },
                 onDone = {
                     runOnUiThread {
-                        addChatMessage("✅ Скачано! Загружаю модель...")
+                        addChatMessage("✅ Скачано. Загружаю...")
                         updateStatus("Загружаю...")
                         llamaBridge.loadModelFromPath(
-                            modelFile.absolutePath,
-                            onProgress = { msg -> addChatMessage(msg) },
-                            onDone = { success ->
+                            path = modelFile.absolutePath,
+                            onProgress = { msg: String -> addChatMessage(msg) },
+                            onDone = { success: Boolean ->
                                 if (success) {
-                                    addChatMessage("🎉 Модель загружена! Можно задавать вопросы.")
+                                    addChatMessage("🎉 Модель загружена!")
                                     updateStatus("Готов")
                                 } else {
-                                    addChatMessage("❌ Ошибка загрузки модели")
+                                    addChatMessage("❌ Ошибка загрузки")
                                     updateStatus("Ошибка")
                                 }
                             }
                         )
                     }
                 },
-                onError = { error ->
+                onError = { error: String ->
                     runOnUiThread {
-                        addChatMessage("❌ Ошибка скачивания: $error")
+                        addChatMessage("❌ Ошибка: $error")
                         updateStatus("Ошибка сети")
                     }
                 }
-            ).execute()
+            )
+            task.execute()
         }
     }
 
@@ -176,7 +177,7 @@ class MainActivity : AppCompatActivity() {
         if (question.isEmpty()) return
 
         if (!llamaBridge.isLoaded) {
-            addChatMessage("❌ Сначала загрузите модель (кнопка МИСТРАЛЬ 3Б)")
+            addChatMessage("❌ Сначала загрузи модель (кнопка МИСТРАЛЬ 3Б)")
             return
         }
 
@@ -184,8 +185,9 @@ class MainActivity : AppCompatActivity() {
         messageInput.text.clear()
         updateStatus("Думаю...")
 
-        llamaBridge.generate(question,
-            onToken = { answer -> addChatMessage("🤖 $answer") },
+        llamaBridge.generate(
+            prompt = question,
+            onToken = { answer: String -> addChatMessage("🤖 $answer") },
             onDone = { updateStatus("Готов") }
         )
     }
@@ -202,7 +204,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun checkStatus() {
         if (llamaBridge.isLoaded) addChatMessage("✅ Модель загружена")
-        else addChatMessage("❌ Модель не загружена. Нажмите МИСТРАЛЬ 3Б")
+        else addChatMessage("❌ Модель не загружена. Нажми МИСТРАЛЬ 3Б")
     }
 
     private fun saveCapsule() {
