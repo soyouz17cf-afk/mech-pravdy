@@ -43,6 +43,19 @@ class MainActivity : AppCompatActivity() {
         setListeners()
         checkPermissions()
         
+        // БЛОК СОЗДАНИЯ ПАПКИ ПРИЛОЖЕНИЯ
+        val appFolder = getExternalFilesDir(null)
+        if (appFolder != null) {
+            addChatMessage("✅ Папка приложения: ${appFolder.absolutePath}")
+            if (appFolder.exists()) {
+                addChatMessage("📁 Папка существует, можно копировать модель")
+            } else {
+                addChatMessage("📁 Папка будет создана автоматически при первом обращении")
+            }
+        } else {
+            addChatMessage("❌ Ошибка: не удалось получить доступ к папке приложения")
+        }
+        
         addChatMessage("⚡ Меч Правды загружен")
         addChatMessage("✅ Все кнопки работают")
     }
