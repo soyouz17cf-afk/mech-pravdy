@@ -1,7 +1,6 @@
 package com.mechpravdy.neo
 
 import android.Manifest
-import android.content.ContentResolver
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -9,7 +8,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.DocumentsContract
-import android.provider.Settings
 import android.speech.RecognizerIntent
 import android.widget.EditText
 import android.widget.ImageView
@@ -85,10 +83,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initViews() {
-        btnSelectFolder = MaterialButton(this).apply {
-            text = "📁 ВЫБРАТЬ ПАПКУ С МОДЕЛЬЮ"
-            setBackgroundColor(android.graphics.Color.parseColor("#21A038"))
-        }
+        btnSelectFolder = findViewById(R.id.btnSelectFolder)
         btnSearchModel = findViewById(R.id.btnSearchModel)
         authKeyInput = findViewById(R.id.authKeyInput)
         generateButton = findViewById(R.id.generateButton)
@@ -103,9 +98,6 @@ class MainActivity : AppCompatActivity() {
         chatOutput = findViewById(R.id.chatOutput)
         statusText = findViewById(R.id.statusText)
         statusDot = findViewById(R.id.statusDot)
-        
-        // Добавляем кнопку в интерфейс (временно, потом вставишь в XML)
-        (findViewById<android.widget.LinearLayout>(R.id.llMain))?.addView(btnSelectFolder, 0)
     }
 
     private fun setListeners() {
@@ -123,9 +115,31 @@ class MainActivity : AppCompatActivity() {
     private fun selectModelFolder() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            putExtra(DocumentsContract.EXTRA_INITIAL_URI, Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                putExtra(DocumentsContract.EXTRA_INITIAL_URI, Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath)
+            }
         }
         selectFolderLauncher.launch(intent)
+    }
+
+    private fun checkPermissions() {
+        val permissions = mutableListOf<String>()
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            permissions.add(Manifest.permission.CAMERA)
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            permissions.add(Manifest.permission.RECORD_AUDIO)
+        }
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+            }
+        }
+        if (permissions.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, permissions.toTypedArray(), 100)
+        } else {
+            updateStatus("Готов")
+        }
     }
 
     private fun searchGgufFiles() {
@@ -184,33 +198,14 @@ class MainActivity : AppCompatActivity() {
         messageInput.text.clear()
         updateStatus("Думаю...")
         
-        // Здесь будет вызов LLaMA через выбранный файл
         Thread {
             Thread.sleep(500)
-            val answer = "🤖 Модель готова: $modelPath\n\nВопрос: $question\n\n(LLaMA будет подключена после настройки вызова)"
+            val answer = "🤖 Модель готова: ${modelPath?.takeLast(30)}\n\n(LLaMA будет подключена)"
             runOnUiThread {
                 addChatMessage(answer)
                 updateStatus("Готов")
             }
         }.start()
-    }
-
-    private fun checkPermissions() {
-        val permissions = mutableListOf<String>()
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            permissions.add(Manifest.permission.CAMERA)
-        }
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            permissions.add(Manifest.permission.RECORD_AUDIO)
-        }
-        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
-            }
-        }
-        if (permissions.isNotEmpty()) {
-            ActivityCompat.requestPermissions(this, permissions.toTypedArray(), 100)
-        }
     }
 
     private fun openCamera() {
@@ -225,7 +220,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun checkStatus() {
         if (modelPath != null) {
-            addChatMessage("✅ Модель готова: $modelPath")
+            addChatMessage("✅ Модель готова")
         } else {
             addChatMessage("❌ Модель не выбрана. Нажмите «ВЫБРАТЬ ПАПКУ»")
         }
