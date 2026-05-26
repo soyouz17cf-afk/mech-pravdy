@@ -43,35 +43,46 @@ class MainActivity : AppCompatActivity() {
         setListeners()
         
         // === ПРИНУДИТЕЛЬНОЕ СОЗДАНИЕ ПАПКИ И ПРОВЕРКА ===
+        forceCreateFolderAndCheck()
+        
+        checkPermissions()
+        addChatMessage("⚡ Меч Правды загружен")
+    }
+
+    private fun forceCreateFolderAndCheck() {
         try {
             val appFolder = getExternalFilesDir(null)
-            if (appFolder != null) {
-                addChatMessage("✅ Папка приложения: ${appFolder.absolutePath}")
-                
-                // Создаём тестовый файл
-                val testFile = File(appFolder, "test.txt")
-                testFile.writeText("Папка работает")
-                addChatMessage("✅ Тестовый файл создан")
-                
-                // Ищем .gguf
-                val ggufFiles = appFolder.listFiles { file -> file.name.endsWith(".gguf", ignoreCase = true) }
-                if (ggufFiles != null && ggufFiles.isNotEmpty()) {
-                    for (file in ggufFiles) {
-                        addChatMessage("🎉 МОДЕЛЬ: ${file.name} (${file.length() / 1024 / 1024} MB)")
-                    }
-                } else {
-                    addChatMessage("❌ .gguf не найдены")
-                    addChatMessage("📁 Скопируйте сюда: ${appFolder.absolutePath}")
-                }
+            if (appFolder == null) {
+                addChatMessage("❌ Не удалось получить папку приложения")
+                return
+            }
+            
+            addChatMessage("✅ Рабочая папка: ${appFolder.absolutePath}")
+            
+            // Создаём тестовый файл, чтобы Android точно создал папку
+            val testFile = File(appFolder, ".nomedia")
+            testFile.createNewFile()
+            addChatMessage("✅ Папка активирована")
+            
+            // Проверяем содержимое
+            val files = appFolder.listFiles()
+            if (files == null || files.isEmpty()) {
+                addChatMessage("📁 Папка пуста")
+                addChatMessage("📌 Скопируйте .gguf по этому пути:")
+                addChatMessage(appFolder.absolutePath)
             } else {
-                addChatMessage("❌ Папка приложения не найдена")
+                addChatMessage("📁 В папке ${files.size} файлов:")
+                for (file in files) {
+                    if (file.name.endsWith(".gguf", ignoreCase = true)) {
+                        addChatMessage("   🎉 МОДЕЛЬ: ${file.name} (${file.length() / 1024 / 1024} MB)")
+                    } else {
+                        addChatMessage("   📄 ${file.name}")
+                    }
+                }
             }
         } catch (e: Exception) {
             addChatMessage("❌ Ошибка: ${e.message}")
         }
-        
-        checkPermissions()
-        addChatMessage("⚡ Меч Правды загружен")
     }
 
     private fun initViews() {
@@ -144,28 +155,33 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun searchGgufFiles() {
-        addChatMessage("🔍 Поиск .gguf...")
+        addChatMessage("🔍 ПОИСК .GGUF...")
         val folder = getExternalFilesDir(null)
         if (folder == null) {
             addChatMessage("❌ Папка приложения не найдена")
             return
         }
-        addChatMessage("📂 Ищем в: ${folder.absolutePath}")
+        addChatMessage("📂 ПАПКА: ${folder.absolutePath}")
         val files = folder.listFiles()
         if (files == null || files.isEmpty()) {
-            addChatMessage("❌ Папка пуста")
+            addChatMessage("❌ ПАПКА ПУСТА")
+            addChatMessage("📁 Скопируйте .gguf сюда: ${folder.absolutePath}")
             return
         }
+        addChatMessage("📄 ВСЕГО ФАЙЛОВ: ${files.size}")
         var found = false
         for (file in files) {
             if (file.name.endsWith(".gguf", ignoreCase = true)) {
-                addChatMessage("✅ МОДЕЛЬ: ${file.name} (${file.length() / 1024 / 1024} MB)")
+                addChatMessage("🎉🎉🎉 МОДЕЛЬ НАЙДЕНА: ${file.name}")
+                addChatMessage("📏 РАЗМЕР: ${file.length() / 1024 / 1024} MB")
                 found = true
+            } else {
+                addChatMessage("📄 ${file.name}")
             }
         }
         if (!found) {
-            addChatMessage("❌ .gguf не найдены")
-            addChatMessage("📁 Скопируйте сюда: ${folder.absolutePath}")
+            addChatMessage("❌ .GGUF НЕ НАЙДЕНЫ")
+            addChatMessage("📁 Скопируйте .gguf сюда: ${folder.absolutePath}")
         }
     }
 
