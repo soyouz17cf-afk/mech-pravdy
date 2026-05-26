@@ -9,17 +9,12 @@ android {
 
     defaultConfig {
         applicationId "com.mechpravdy.neo"
-        minSdk 28
+        minSdk 24
         targetSdk 34
         versionCode 1
         versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-        
-        // Для нативных библиотек (libllama.so)
-        ndk {
-            abiFilters 'arm64-v8a'
-        }
     }
 
     buildTypes {
@@ -37,13 +32,6 @@ android {
     kotlinOptions {
         jvmTarget = '17'
     }
-    
-    // Чтобы Android нашел libllama.so в jniLibs
-    sourceSets {
-        main {
-            jniLibs.srcDirs = ['src/main/jniLibs']
-        }
-    }
 }
 
 dependencies {
@@ -51,9 +39,6 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.11.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
-    
-    // Для работы с корутинами (если нужно для асинхронности)
-    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
     
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
