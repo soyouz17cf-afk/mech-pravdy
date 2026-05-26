@@ -124,7 +124,11 @@ class MainActivity : AppCompatActivity() {
             capsuleButton.setOnClickListener { hideKeyboard(); showCapsuleDialog() }
 
             thread { llamaBridge = LlamaBridge() }
-            registerReceiver(modelLoadedReceiver, IntentFilter(ModelLoadService.BROADCAST_MODEL_LOADED))
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(modelLoadedReceiver, IntentFilter(ModelLoadService.BROADCAST_MODEL_LOADED), Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                registerReceiver(modelLoadedReceiver, IntentFilter(ModelLoadService.BROADCAST_MODEL_LOADED))
+            }
         } catch (e: Exception) { Toast.makeText(this, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show() }
     }
 
