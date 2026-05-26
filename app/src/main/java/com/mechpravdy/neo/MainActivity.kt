@@ -9,7 +9,6 @@ import android.content.Intent
 import android.graphics.*
 import android.net.Uri
 import android.os.Bundle
-import android.os.Environment
 import android.provider.MediaStore
 import android.speech.RecognizerIntent
 import android.text.format.DateFormat
@@ -226,13 +225,10 @@ class MainActivity : AppCompatActivity() {
         appendChat("[РЕЖИМ] МИСТРАЛЬ 3B (локальный)")
         setStatus("МИСТРАЛЬ", "yellow")
 
-        llamaBridge = LlamaBridge()
-
         val modelDir = getExternalFilesDir("models") ?: filesDir
         if (!modelDir.exists()) modelDir.mkdirs()
         val modelFile = File(modelDir, "mistral-7b-instruct-v0.2.Q4_K_M.gguf")
 
-        // Проверяем, скачан ли уже мозг
         if (modelFile.exists() && modelFile.length() > 100L * 1024 * 1024) {
             appendChat("[МОЗГ] Мозг уже скачан. Загружаю...")
             loadModelFromFile(modelFile)
@@ -244,21 +240,29 @@ class MainActivity : AppCompatActivity() {
         appendChat("[МОЗГ] Когда скачается — нажми МИСТРАЛЬ 3B ещё раз.")
         setStatus("Качаю...", "yellow")
 
-        val request = DownloadManager.Request(
-            Uri.parse("https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q4_K_M.gguf")
-        )
-            .setTitle("Меч Правды: скачивание мозга")
-            .setDescription("Mistral 7B (4.1 ГБ)")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationUri(Uri.fromFile(modelFile))
-            .setAllowedOverMetered(true)
-            .setAllowedOverRoaming(true)
+        try {
+            val request = DownloadManager.Request(
+                Uri.parse("https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q4_K_M.gguf")
+            )
+                .setTitle("Меч Правды: скачивание мозга")
+                .setDescription("Mistral 7B (4.1 ГБ)")
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setDestinationUri(Uri.fromFile(modelFile))
+                .setAllowedOverMetered(true)
+                .setAllowedOverRoaming(true)
 
-        val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        downloadId = manager.enqueue(request)
+            val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            downloadId = manager.enqueue(request)
+        } catch (e: Exception) {
+            appendChat("[МОЗГ] Ошибка DownloadManager: ${e.message}")
+            setStatus("Ошибка", "red")
+        }
     }
 
     private fun loadModelFromFile(file: File) {
+        if (llamaBridge == null) {
+            llamaBridge = LlamaBridge()
+        }
         appendChat("[МОЗГ] Загружаю модель в память...")
         setStatus("Загружаю...", "yellow")
         llamaBridge?.loadModelFromPath(
