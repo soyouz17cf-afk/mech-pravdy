@@ -260,11 +260,16 @@ class MainActivity : AppCompatActivity() {
         if (modelFile.exists() && modelFile.length() > 100L * 1024 * 1024) {
             appendChat("[МОЗГ] Запускаю загрузку модели в фоне...")
             setStatus("Загружаю...", "yellow")
-            val intent = Intent(this, ModelLoadService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(intent)
-            } else {
-                startService(intent)
+            thread {
+                try {
+                    Thread.sleep(500)
+                } catch (_: Exception) {}
+                val intent = Intent(this@MainActivity, ModelLoadService::class.java)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(intent)
+                } else {
+                    startService(intent)
+                }
             }
             return
         }
