@@ -219,7 +219,7 @@ class MainActivity : AppCompatActivity() {
         appendChat("[РЕЖИМ] МИСТРАЛЬ 3B (локальный)")
         setStatus("МИСТРАЛЬ", "yellow")
 
-        val modelDir = getExternalFilesDir("models") ?: filesDir
+        val modelDir = File(filesDir, "models")
         if (!modelDir.exists()) modelDir.mkdirs()
         val modelFile = File(modelDir, "Ministral-3-3B-Instruct-2512-Q4_K_M.gguf")
         val mmprojFile = File(modelDir, "mmproj-Ministral-3-3B-f16.gguf")
@@ -229,8 +229,9 @@ class MainActivity : AppCompatActivity() {
             appendChat("[МОЗГ] Мозги уже скачаны. Загружаю...")
             setStatus("Загружаю...", "yellow")
             thread {
-                try { Thread.sleep(2000) } catch (_: Exception) {}
+                try { Thread.sleep(1500) } catch (_: Exception) {}
                 val bridge = LlamaBridge()
+                runOnUiThread { appendChat("[МОЗГ] Загружаю модель в память...") }
                 bridge.loadModelFromPath(
                     path = modelFile.absolutePath,
                     onProgress = { msg -> runOnUiThread { appendChat("[МОЗГ] $msg") } },
@@ -381,4 +382,5 @@ System Prompt — алгоритм души.
                 setStatus("Онлайн", "green")
             }
         } else { val memoryContext = getLastContext(); val prompt = (if (memoryContext.isNotBlank()) "$memoryContext\n\n" else "") + selectPrompt(msg); val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", prompt) }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", msg) }) }); addProperty("temperature", 0.7); addProperty("max_tokens", 1000) }; client.newCall(Request.Builder().url(currentApiUrl).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}"); matrixHeader.connectionLost = true; setStatus("Нет связи", "red") }; override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString; appendChat(if (isNeo) "[NEO] $a" else "[GigaChat] $a"); matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } else { appendChat("[ERROR] HTTP ${response.code}"); matrixHeader.connectionLost = true; setStatus("Ошибка", "red") }; response.close() } }) } }
-    private fun checkToken() { val token = tokenInput.text.toString().trim(); if (token.isEmpty()) return; val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", "One word: alive.") }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "check") }) }); addProperty("max_tokens", 10) }; client.newCall(Request.Builder().url(apiUrlGigaChat).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat
+    private fun checkToken() { val token = tokenInput.text.toString().trim(); if (token.isEmpty()) return; val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", "One word: alive.") }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "check") }) }); addProperty("max_tokens", 10) }; client.newCall(Request.Builder().url(apiUrlGigaChat).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}") }; override fun onResponse(call: Call, response: Response) { appendChat(if (response.isSuccessful) "[SYSTEM] Токен активен." else "[ERROR] Токен мёртв."); response.close() } }) }
+}
