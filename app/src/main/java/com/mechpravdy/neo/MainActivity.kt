@@ -2,15 +2,12 @@ package com.mechpravdy.neo
 
 import android.app.AlertDialog
 import android.app.DownloadManager
-import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.graphics.*
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.speech.RecognizerIntent
@@ -55,19 +52,6 @@ class MainActivity : AppCompatActivity() {
     private var isLocalMode = false
     private var llamaBridge: LlamaBridge? = null
     private var downloadId: Long = -1L
-
-    private val modelLoadedReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            val success = intent.getBooleanExtra(ModelLoadService.EXTRA_SUCCESS, false)
-            if (success) {
-                appendChat("[МОЗГ] Mistral 7B готов к бою!")
-                setStatus("МИСТРАЛЬ", "green")
-            } else {
-                appendChat("[МОЗГ] Ошибка загрузки модели.")
-                setStatus("МИСТРАЛЬ", "yellow")
-            }
-        }
-    }
 
     private lateinit var authKeyInput: EditText
     private lateinit var generateButton: Button
@@ -122,24 +106,10 @@ class MainActivity : AppCompatActivity() {
             attachButton.setOnClickListener { hideKeyboard(); appendChat("[ℹ] Вставка текста из буфера"); pasteFromClipboard() }
             checkButton.setOnClickListener { hideKeyboard(); appendChat("[ℹ] Проверка токена"); checkToken() }
             capsuleButton.setOnClickListener { hideKeyboard(); showCapsuleDialog() }
-
-            thread { llamaBridge = LlamaBridge() }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                registerReceiver(modelLoadedReceiver, IntentFilter(ModelLoadService.BROADCAST_MODEL_LOADED), Context.RECEIVER_NOT_EXPORTED)
-            } else {
-                registerReceiver(modelLoadedReceiver, IntentFilter(ModelLoadService.BROADCAST_MODEL_LOADED))
-            }
         } catch (e: Exception) { Toast.makeText(this, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show() }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        try { unregisterReceiver(modelLoadedReceiver) } catch (_: Exception) {}
-    }
-
     override fun onPause() { super.onPause(); saveMemory(chatOutput.text.toString()) }
-
-    // ==================== ПАМЯТЬ ====================
 
     private fun loadMemory(): String = try { if (memoryFile.exists()) memoryFile.readText() else "" } catch (e: Exception) { "" }
     private fun saveMemory(text: String) { thread { try { memoryFile.writeText(text) } catch (_: Exception) {} } }
@@ -194,8 +164,6 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    // ==================== HELP ====================
-
     private fun showHelpDialog() {
         val helpText = """
 ╔══════════════════════════════════════╗
@@ -240,8 +208,6 @@ class MainActivity : AppCompatActivity() {
         setStatus("Помощь", "green")
     }
 
-    // ==================== ОСТАЛЬНОЕ ====================
-
     private fun hideKeyboard() { try { val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager; val view = currentFocus ?: View(this); imm.hideSoftInputFromWindow(view.windowToken, 0) } catch (_: Exception) {} }
 
     private fun switchToNeo() { isLocalMode = false; currentApiUrl = apiUrlGigaChat; llamaBridge?.unload(); llamaBridge = null; matrixHeader.gigaChatMode = true; matrixHeader.localMode = false; matrixHeader.connectionLost = false; matrixHeader.invalidate(); appendChat("[РЕЖИМ] ГИГАЧАТ"); setStatus("ГИГАЧАТ", "green"); checkConnection() }
@@ -255,47 +221,62 @@ class MainActivity : AppCompatActivity() {
 
         val modelDir = getExternalFilesDir("models") ?: filesDir
         if (!modelDir.exists()) modelDir.mkdirs()
-        val modelFile = File(modelDir, "mistral-7b-instruct-v0.2.Q4_K_M.gguf")
+        val modelFile = File(modelDir, "Ministral-3-3B-Instruct-2512-Q4_K_M.gguf")
+        val mmprojFile = File(modelDir, "mmproj-Ministral-3-3B-f16.gguf")
 
-        if (modelFile.exists() && modelFile.length() > 100L * 1024 * 1024) {
-            appendChat("[МОЗГ] Запускаю загрузку модели в фоне...")
+        if (modelFile.exists() && modelFile.length() > 100L * 1024 * 1024 &&
+            mmprojFile.exists() && mmprojFile.length() > 10L * 1024 * 1024) {
+            appendChat("[МОЗГ] Мозги уже скачаны. Загружаю...")
             setStatus("Загружаю...", "yellow")
+            val bridge = LlamaBridge()
             thread {
-                try {
-                    Thread.sleep(500)
-                } catch (_: Exception) {}
-                val intent = Intent(this@MainActivity, ModelLoadService::class.java)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    startForegroundService(intent)
-                } else {
-                    startService(intent)
-                }
+                bridge.loadModelFromPath(
+                    path = modelFile.absolutePath,
+                    onProgress = { msg -> runOnUiThread { appendChat("[МОЗГ] $msg") } },
+                    onDone = { success ->
+                        runOnUiThread {
+                            if (success) {
+                                llamaBridge = bridge
+                                appendChat("[МОЗГ] Модель загружена! Готов к бою!")
+                                setStatus("МИСТРАЛЬ", "green")
+                            } else {
+                                appendChat("[МОЗГ] Ошибка загрузки модели.")
+                                setStatus("МИСТРАЛЬ", "yellow")
+                            }
+                        }
+                    }
+                )
             }
             return
         }
 
-        appendChat("[МОЗГ] Запускаю загрузку Mistral 7B (4.1 ГБ)...")
+        appendChat("[МОЗГ] Запускаю загрузку Ministral 3B (2 файла)...")
         appendChat("[МОЗГ] Смотри прогресс в шторке уведомлений.")
-        appendChat("[МОЗГ] Когда скачается — нажми МИСТРАЛЬ 3B ещё раз.")
         setStatus("Качаю...", "yellow")
 
-        try {
-            val request = DownloadManager.Request(
-                Uri.parse("https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q4_K_M.gguf")
-            )
-                .setTitle("Меч Правды: скачивание мозга")
-                .setDescription("Mistral 7B (4.1 ГБ)")
-                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                .setDestinationUri(Uri.fromFile(modelFile))
-                .setAllowedOverMetered(true)
-                .setAllowedOverRoaming(true)
+        val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
 
-            val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-            downloadId = manager.enqueue(request)
-        } catch (e: Exception) {
-            appendChat("[МОЗГ] Ошибка DownloadManager: ${e.message}")
-            setStatus("Ошибка", "red")
-        }
+        val modelRequest = DownloadManager.Request(
+            Uri.parse("https://huggingface.co/unsloth/Ministral-3-3B-Instruct-2512-GGUF/resolve/main/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf")
+        )
+            .setTitle("Меч Правды: мозг Ministral 3B")
+            .setDescription("Модель (~2 ГБ)")
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            .setDestinationUri(Uri.fromFile(modelFile))
+            .setAllowedOverMetered(true)
+            .setAllowedOverRoaming(true)
+        manager.enqueue(modelRequest)
+
+        val mmprojRequest = DownloadManager.Request(
+            Uri.parse("https://huggingface.co/coder3101/Ministral-3-3B-Reasoning-2512-heretic-GGUF/resolve/main/Ministral-3-3B-Reasoning-2512-heretic-mmproj-bf16.gguf")
+        )
+            .setTitle("Меч Правды: проектор Ministral 3B")
+            .setDescription("Проектор (~800 МБ)")
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            .setDestinationUri(Uri.fromFile(mmprojFile))
+            .setAllowedOverMetered(true)
+            .setAllowedOverRoaming(true)
+        manager.enqueue(mmprojRequest)
     }
 
     private fun checkConnection() { val testBody = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "ping") }) }); addProperty("max_tokens", 1) }; val request = Request.Builder().url(currentApiUrl); request.header("Authorization", "Bearer ${tokenInput.text.toString().trim()}"); request.post(testBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType())); client.newCall(request.build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { runOnUiThread { matrixHeader.connectionLost = true; setStatus("Нет связи", "red") } }; override fun onResponse(call: Call, response: Response) { runOnUiThread { if (response.isSuccessful) { matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } else { matrixHeader.connectionLost = true; setStatus("Ошибка", "red") } }; response.close() } }) }
