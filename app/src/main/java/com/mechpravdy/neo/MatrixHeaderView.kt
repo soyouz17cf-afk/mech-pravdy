@@ -152,9 +152,15 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRoundRect(localButtonRect, 10f, 10f, btnPaint)
         canvas.drawText("МИСТРАЛЬ 3B", localButtonRect.centerX(), localButtonRect.centerY() + 5f, btnTextPaint)
 
-        // Фото Мурзёхи
+        // Фото Мурзёхи с закруглёнными углами
         murzikBitmap?.let {
+            val clipPath = android.graphics.Path().apply {
+                addRoundRect(murzikRect, 24f, 24f, android.graphics.Path.Direction.CW)
+            }
+            canvas.save()
+            canvas.clipPath(clipPath)
             canvas.drawBitmap(it, null, murzikRect, null)
+            canvas.restore()
         }
 
         // Светофор
