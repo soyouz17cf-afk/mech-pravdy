@@ -50,8 +50,13 @@ class MainActivity : AppCompatActivity() {
 
     private var currentApiUrl = apiUrlGigaChat
     private var isLocalMode = false
-    private var llamaBridge: LlamaBridge? = null
+    private var isModelLoaded = false
     private var downloadId: Long = -1L
+
+    // Нативные методы прямо в MainActivity
+    private external fun llamaLoadModel(modelPath: String): Boolean
+    external fun llamaComplete(prompt: String): String
+    private external fun llamaStop()
 
     private lateinit var authKeyInput: EditText
     private lateinit var generateButton: Button
@@ -210,7 +215,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun hideKeyboard() { try { val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager; val view = currentFocus ?: View(this); imm.hideSoftInputFromWindow(view.windowToken, 0) } catch (_: Exception) {} }
 
-    private fun switchToNeo() { isLocalMode = false; currentApiUrl = apiUrlGigaChat; llamaBridge?.unload(); llamaBridge = null; matrixHeader.gigaChatMode = true; matrixHeader.localMode = false; matrixHeader.connectionLost = false; matrixHeader.invalidate(); appendChat("[РЕЖИМ] ГИГАЧАТ"); setStatus("ГИГАЧАТ", "green"); checkConnection() }
+    private fun switchToNeo() { isLocalMode = false; currentApiUrl = apiUrlGigaChat; try { llamaStop() } catch (_: Exception) {}; isModelLoaded = false; matrixHeader.gigaChatMode = true; matrixHeader.localMode = false; matrixHeader.connectionLost = false; matrixHeader.invalidate(); appendChat("[РЕЖИМ] ГИГАЧАТ"); setStatus("ГИГАЧАТ", "green"); checkConnection() }
 
     private fun switchToLocal() {
         isLocalMode = true
@@ -229,27 +234,35 @@ class MainActivity : AppCompatActivity() {
             appendChat("[МОЗГ] Мозги уже скачаны. Загружаю...")
             setStatus("Загружаю...", "yellow")
             thread {
-                try { Thread.sleep(3000) } catch (_: Exception) {}
-                val bridge = LlamaBridge()
+                try { Thread.sleep(10000) } catch (_: Exception) {}
+                try {
+                    System.loadLibrary("llama")
+                } catch (e: Exception) {
+                    runOnUiThread {
+                        appendChat("[МОЗГ] Ошибка библиотеки: ${e.message}")
+                        setStatus("Ошибка", "red")
+                    }
+                    return@thread
+                }
                 runOnUiThread { appendChat("[МОЗГ] Загружаю модель в память...") }
-                val libPath = "/data/data/com.mechpravdy.neo/lib/libllama.so"
-                bridge.loadModelFromPath(
-                    modelPath = modelFile.absolutePath,
-                    libPath = libPath,
-                    onProgress = { msg -> runOnUiThread { appendChat("[МОЗГ] $msg") } },
-                    onDone = { success ->
-                        runOnUiThread {
-                            if (success) {
-                                llamaBridge = bridge
-                                appendChat("[МОЗГ] Модель загружена! Готов к бою!")
-                                setStatus("МИСТРАЛЬ", "green")
-                            } else {
-                                appendChat("[МОЗГ] Ошибка загрузки модели.")
-                                setStatus("МИСТРАЛЬ", "yellow")
-                            }
+                try {
+                    val result = llamaLoadModel(modelFile.absolutePath)
+                    runOnUiThread {
+                        if (result) {
+                            isModelLoaded = true
+                            appendChat("[МОЗГ] Модель загружена! Готов к бою!")
+                            setStatus("МИСТРАЛЬ", "green")
+                        } else {
+                            appendChat("[МОЗГ] Ошибка загрузки модели.")
+                            setStatus("МИСТРАЛЬ", "yellow")
                         }
                     }
-                )
+                } catch (e: Exception) {
+                    runOnUiThread {
+                        appendChat("[МОЗГ] Ошибка: ${e.message}")
+                        setStatus("Ошибка", "red")
+                    }
+                }
             }
             return
         }
@@ -373,12 +386,14 @@ System Prompt — алгоритм души.
         if (msg.lowercase().contains(rememberCommand)) { analyzeAndRemember(); messageInput.setText(""); hideKeyboard(); return }
         val isNeo = msg.lowercase().contains(password); matrixHeader.neoActive = isNeo; matrixHeader.invalidate(); appendChat(if (isNeo) "[BATYA] $msg" else "[GigaChat] $msg"); messageInput.setText(""); hideKeyboard(); setStatus("Обработка...", "yellow")
         if (isLocalMode) {
-            if (llamaBridge?.isLoaded == true) {
-                llamaBridge?.generate(
-                    prompt = msg,
-                    onToken = { token -> appendChat("[NEO] $token") },
-                    onDone = { setStatus("Онлайн", "green") }
-                )
+            if (isModelLoaded) {
+                thread {
+                    val response = llamaComplete(msg)
+                    runOnUiThread {
+                        appendChat("[NEO] $response")
+                        setStatus("Онлайн", "green")
+                    }
+                }
             } else {
                 appendChat("[NEO] Модель не загружена. Нажми МИСТРАЛЬ 3B.")
                 setStatus("Онлайн", "green")
