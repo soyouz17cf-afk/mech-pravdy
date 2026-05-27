@@ -3,6 +3,7 @@ package com.mechpravdy.neo
 import android.Manifest
 import android.app.AlertDialog
 import android.app.DownloadManager
+import android.app.ProgressDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -205,7 +206,7 @@ class MainActivity : AppCompatActivity() {
     private fun showHelpDialog() {
         val helpText = """
 ╔══════════════════════════════════════╗
-║        МЕЧ ПРАВДЫ — ИНСТРУКЦИЯ     ║
+║        МЕЧ ПРАВДЫ — ИНСТРУКЦИЯ       ║
 ╚══════════════════════════════════════╝
 
 🔹 КНОПКИ В ШАПКЕ:
@@ -266,12 +267,22 @@ class MainActivity : AppCompatActivity() {
             mmprojFile.exists() && mmprojFile.length() > 10L * 1024 * 1024) {
             appendChat("[МОЗГ] Мозги уже скачаны. Загружаю...")
             setStatus("Загружаю...", "yellow")
+
+            // Показываем ProgressDialog с крутящимся индикатором
+            val progressDialog = ProgressDialog(this).apply {
+                setTitle("Меч Правды")
+                setMessage("Загрузка модели...\nПожалуйста, подождите.")
+                setCancelable(false)
+                setProgressStyle(ProgressDialog.STYLE_SPINNER)
+                show()
+            }
+
             thread {
-                try { Thread.sleep(3000) } catch (_: Exception) {}
-                runOnUiThread { appendChat("[МОЗГ] Загружаю модель в память...") }
+                try { Thread.sleep(1500) } catch (_: Exception) {}
                 try {
                     val result = llamaLoadModel(modelFile.absolutePath)
                     runOnUiThread {
+                        progressDialog.dismiss()
                         if (result) {
                             isModelLoaded = true
                             appendChat("[МОЗГ] Модель загружена! Готов к бою!")
@@ -283,6 +294,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 } catch (e: Exception) {
                     runOnUiThread {
+                        progressDialog.dismiss()
                         appendChat("[МОЗГ] Ошибка: ${e.message}")
                         setStatus("Ошибка", "red")
                     }
