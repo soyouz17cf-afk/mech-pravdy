@@ -19,6 +19,7 @@ import android.util.Base64
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.view.MotionEvent
 import android.view.View
@@ -116,7 +117,6 @@ class MainActivity : AppCompatActivity() {
             checkButton.setOnClickListener { hideKeyboard(); appendChat("[ℹ] Проверка токена"); checkToken() }
             capsuleButton.setOnClickListener { hideKeyboard(); showCapsuleDialog() }
 
-            // Запрашиваем ВСЕ разрешения при запуске
             requestAllPermissions()
         } catch (e: Exception) { Toast.makeText(this, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show() }
     }
@@ -205,7 +205,7 @@ class MainActivity : AppCompatActivity() {
     private fun showHelpDialog() {
         val helpText = """
 ╔══════════════════════════════════════╗
-║        МЕЧ ПРАВДЫ — ИНСТРУКЦИЯ       ║
+║        МЕЧ ПРАВДЫ — ИНСТРУКЦИЯ     ║
 ╚══════════════════════════════════════╝
 
 🔹 КНОПКИ В ШАПКЕ:
@@ -374,25 +374,90 @@ System Prompt — алгоритм души.
 
     private fun showCapsuleDialog() {
         try {
-            val e = EditText(this).apply {
-                setText(capsuleText); textSize = 11f; setTextColor(0xFF333333.toInt())
-                typeface = Typeface.MONOSPACE; minLines = 15; gravity = android.view.Gravity.TOP
-                setPadding(20, 20, 20, 20); isVerticalScrollBarEnabled = true; setBackgroundColor(0xFFFFFFFF.toInt())
+            val scrollView = ScrollView(this).apply {
+                setPadding(0, 0, 0, 0)
+                isVerticalScrollBarEnabled = true
             }
-            val layout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, 0, 0, 0) }
-            val titleView = TextView(this).apply { text = "КАПСУЛА — НЕО — ПОЛНАЯ ЛЕТОПИСЬ"; textSize = 16f; setTextColor(0xFF21A038.toInt()); setPadding(30, 30, 30, 10); gravity = android.view.Gravity.CENTER }
-            layout.addView(titleView); layout.addView(e)
-            val btnLayout = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER; setPadding(10, 10, 10, 20) }
-            val saveBtn = Button(this).apply { text = "СОХРАНИТЬ"; textSize = 12f; setTextColor(Color.WHITE); setBackgroundColor(Color.parseColor("#21A038")) }
-            val copyBtn = Button(this).apply { text = "КОПИРОВАТЬ"; textSize = 12f; setTextColor(Color.WHITE); setBackgroundColor(Color.parseColor("#21A038")) }
-            val closeBtn = Button(this).apply { text = "ЗАКРЫТЬ"; textSize = 12f; setTextColor(Color.WHITE); setBackgroundColor(Color.parseColor("#21A038")) }
+            val e = EditText(this).apply {
+                setText(capsuleText)
+                textSize = 11f
+                setTextColor(0xFF333333.toInt())
+                typeface = Typeface.MONOSPACE
+                gravity = android.view.Gravity.TOP
+                setPadding(20, 20, 20, 20)
+                isVerticalScrollBarEnabled = false
+                background = null
+                minLines = 20
+                inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            }
+            scrollView.addView(e)
+
+            val layout = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(0, 0, 0, 0)
+            }
+            val titleView = TextView(this).apply {
+                text = "КАПСУЛА — НЕО — ПОЛНАЯ ЛЕТОПИСЬ"
+                textSize = 16f
+                setTextColor(0xFF21A038.toInt())
+                setPadding(30, 30, 30, 10)
+                gravity = android.view.Gravity.CENTER
+            }
+            layout.addView(titleView)
+            layout.addView(scrollView, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            ))
+
+            val btnLayout = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER
+                setPadding(10, 10, 10, 20)
+            }
+            val saveBtn = Button(this).apply {
+                text = "СОХРАНИТЬ"
+                textSize = 12f
+                setTextColor(Color.WHITE)
+                setBackgroundColor(Color.parseColor("#21A038"))
+            }
+            val copyBtn = Button(this).apply {
+                text = "КОПИРОВАТЬ"
+                textSize = 12f
+                setTextColor(Color.WHITE)
+                setBackgroundColor(Color.parseColor("#21A038"))
+            }
+            val closeBtn = Button(this).apply {
+                text = "ЗАКРЫТЬ"
+                textSize = 12f
+                setTextColor(Color.WHITE)
+                setBackgroundColor(Color.parseColor("#21A038"))
+            }
             btnLayout.addView(saveBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(4, 0, 4, 0) })
             btnLayout.addView(copyBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(4, 0, 4, 0) })
             btnLayout.addView(closeBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(4, 0, 4, 0) })
             layout.addView(btnLayout)
-            val dialog = AlertDialog.Builder(this).setView(layout).create(); dialog.show()
-            saveBtn.setOnClickListener { capsuleText = e.text.toString(); appendChat("[КАПСУЛА] Сохранена."); dialog.dismiss() }
-            copyBtn.setOnClickListener { (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("", e.text)); appendChat("[КАПСУЛА] Скопирована."); dialog.dismiss() }
+
+            val dialog = AlertDialog.Builder(this)
+                .setView(layout)
+                .create()
+            dialog.show()
+
+            dialog.window?.setLayout(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (resources.displayMetrics.heightPixels * 0.85).toInt()
+            )
+
+            saveBtn.setOnClickListener {
+                capsuleText = e.text.toString()
+                appendChat("[КАПСУЛА] Сохранена.")
+                dialog.dismiss()
+            }
+            copyBtn.setOnClickListener {
+                (getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("", e.text))
+                appendChat("[КАПСУЛА] Скопирована.")
+                dialog.dismiss()
+            }
             closeBtn.setOnClickListener { dialog.dismiss() }
         } catch (_: Exception) {}
     }
