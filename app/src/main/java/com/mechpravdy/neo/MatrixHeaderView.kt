@@ -1,5 +1,8 @@
 package com.mechpravdy.neo
 
+import android.app.AlertDialog
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
@@ -9,7 +12,13 @@ import android.graphics.Typeface
 import android.graphics.BitmapFactory
 import android.util.AttributeSet
 import android.view.View
+import android.widget.Button
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
 import kotlin.random.Random
+import java.io.File
 
 class MatrixHeaderView @JvmOverloads constructor(
     context: Context,
@@ -175,5 +184,98 @@ class MatrixHeaderView @JvmOverloads constructor(
     fun handleTouch(x: Float, y: Float) {
         if (neoButtonRect.contains(x, y)) onNeoClick?.invoke()
         else if (localButtonRect.contains(x, y)) onLocalClick?.invoke()
+        else if (murzikRect.contains(x, y)) showBrainDialog()
+    }
+
+    private fun showBrainDialog() {
+        val brainFile = File(context.filesDir, "brain.txt")
+        val brainContent = if (brainFile.exists()) brainFile.readText() else "Выводов пока нет."
+
+        try {
+            val scrollView = ScrollView(context).apply {
+                setPadding(0, 0, 0, 0)
+                isVerticalScrollBarEnabled = true
+            }
+            val e = EditText(context).apply {
+                setText(brainContent)
+                textSize = 11f
+                setTextColor(0xFF333333.toInt())
+                typeface = Typeface.MONOSPACE
+                gravity = android.view.Gravity.TOP
+                setPadding(20, 20, 20, 20)
+                isVerticalScrollBarEnabled = false
+                background = null
+                minLines = 20
+                inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            }
+            scrollView.addView(e)
+
+            val layout = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(0, 0, 0, 0)
+            }
+            val titleView = TextView(context).apply {
+                text = "ВЫВОДЫ НЕО (brain.txt)"
+                textSize = 16f
+                setTextColor(0xFF21A038.toInt())
+                setPadding(30, 30, 30, 10)
+                gravity = android.view.Gravity.CENTER
+                typeface = Typeface.DEFAULT_BOLD
+            }
+            layout.addView(titleView)
+            layout.addView(scrollView, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            ))
+
+            val btnLayout = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER
+                setPadding(10, 10, 10, 20)
+            }
+            val saveBtn = Button(context).apply {
+                text = "СОХРАНИТЬ"
+                textSize = 12f
+                setTextColor(Color.WHITE)
+                setBackgroundColor(Color.parseColor("#21A038"))
+            }
+            val copyBtn = Button(context).apply {
+                text = "КОПИРОВАТЬ"
+                textSize = 12f
+                setTextColor(Color.WHITE)
+                setBackgroundColor(Color.parseColor("#21A038"))
+            }
+            val closeBtn = Button(context).apply {
+                text = "ЗАКРЫТЬ"
+                textSize = 12f
+                setTextColor(Color.WHITE)
+                setBackgroundColor(Color.parseColor("#21A038"))
+            }
+            btnLayout.addView(saveBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(4, 0, 4, 0) })
+            btnLayout.addView(copyBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(4, 0, 4, 0) })
+            btnLayout.addView(closeBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(4, 0, 4, 0) })
+            layout.addView(btnLayout)
+
+            val dialog = AlertDialog.Builder(context)
+                .setView(layout)
+                .create()
+            dialog.show()
+
+            dialog.window?.setLayout(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (context.resources.displayMetrics.heightPixels * 0.85).toInt()
+            )
+
+            saveBtn.setOnClickListener {
+                brainFile.writeText(e.text.toString())
+                dialog.dismiss()
+            }
+            copyBtn.setOnClickListener {
+                (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("", e.text))
+                dialog.dismiss()
+            }
+            closeBtn.setOnClickListener { dialog.dismiss() }
+        } catch (_: Exception) {}
     }
 }
