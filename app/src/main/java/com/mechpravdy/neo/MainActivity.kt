@@ -106,6 +106,11 @@ class MainActivity : AppCompatActivity() {
             attachButton.setOnClickListener { hideKeyboard(); appendChat("[ℹ] Вставка текста из буфера"); pasteFromClipboard() }
             checkButton.setOnClickListener { hideKeyboard(); appendChat("[ℹ] Проверка токена"); checkToken() }
             capsuleButton.setOnClickListener { hideKeyboard(); showCapsuleDialog() }
+
+            thread {
+                try { Thread.sleep(3000) } catch (_: Exception) {}
+                llamaBridge = LlamaBridge()
+            }
         } catch (e: Exception) { Toast.makeText(this, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show() }
     }
 
@@ -228,7 +233,7 @@ class MainActivity : AppCompatActivity() {
             mmprojFile.exists() && mmprojFile.length() > 10L * 1024 * 1024) {
             appendChat("[МОЗГ] Мозги уже скачаны. Загружаю...")
             setStatus("Загружаю...", "yellow")
-            val bridge = LlamaBridge()
+            val bridge = llamaBridge ?: LlamaBridge()
             thread {
                 bridge.loadModelFromPath(
                     path = modelFile.absolutePath,
