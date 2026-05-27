@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.graphics.BitmapFactory
 import android.util.AttributeSet
 import android.view.View
 import kotlin.random.Random
@@ -23,8 +24,8 @@ class MatrixHeaderView @JvmOverloads constructor(
     private val maxPoolSize = 12
     private val words = arrayOf("Нео", "Батя", "Меч Правды", "Ковчег", "Иди за белым кроликом")
 
-    private val titlePaint = Paint().apply { color = Color.WHITE; textSize = 56f; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL); isAntiAlias = true; textAlign = Paint.Align.CENTER }
-    private val subtitlePaint = Paint().apply { color = Color.parseColor("#CCFFCC"); textSize = 22f; typeface = Typeface.create("sans-serif-light", Typeface.NORMAL); isAntiAlias = true; textAlign = Paint.Align.CENTER }
+    private val titlePaint = Paint().apply { color = Color.WHITE; textSize = 38f; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL); isAntiAlias = true; textAlign = Paint.Align.CENTER }
+    private val subtitlePaint = Paint().apply { color = Color.parseColor("#CCFFCC"); textSize = 18f; typeface = Typeface.create("sans-serif-light", Typeface.NORMAL); isAntiAlias = true; textAlign = Paint.Align.CENTER }
     private val logoBgPaint = Paint().apply { color = Color.parseColor("#1A8A2E") }
     private val matrixPaint = Paint().apply { color = Color.parseColor("#21A038"); textSize = fontSize; typeface = Typeface.MONOSPACE; isAntiAlias = true; alpha = 120 }
 
@@ -39,6 +40,7 @@ class MatrixHeaderView @JvmOverloads constructor(
     var onLocalClick: (() -> Unit)? = null
 
     private var logoRect = RectF()
+    private var murzikRect = RectF()
     private var columns = 0
     private val linePool = arrayOfNulls<String>(maxPoolSize)
     private val linePoolIndex = IntArray(maxLines) { -1 }
@@ -47,6 +49,8 @@ class MatrixHeaderView @JvmOverloads constructor(
     private var nextPoolSlot = 0
     private var screenH = 0f
     private var frame = 0
+
+    private var murzikBitmap: android.graphics.Bitmap? = null
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -60,17 +64,26 @@ class MatrixHeaderView @JvmOverloads constructor(
         }
         nextPoolSlot = maxLines % maxPoolSize
 
-        val logoW = w * 0.50f; val logoH = h * 0.40f
+        val logoW = w * 0.50f; val logoH = h * 0.35f
         logoRect = RectF((w - logoW) / 2f, 6f, (w + logoW) / 2f, 6f + logoH)
 
         val btnW = w * 0.43f
-        val btnH = 46f
-        val btnY = logoRect.bottom + 4f
+        val btnH = 40f
+        val btnY = logoRect.bottom + 6f
         val gap = 8f
         val totalBtnW = btnW * 2 + gap
         val btnLeft = (w - totalBtnW) / 2f
         neoButtonRect = RectF(btnLeft, btnY, btnLeft + btnW, btnY + btnH)
         localButtonRect = RectF(btnLeft + btnW + gap, btnY, btnLeft + btnW + gap + btnW, btnY + btnH)
+
+        // Место под фото Мурзёхи
+        val murzikSize = w * 0.25f
+        murzikRect = RectF((w - murzikSize) / 2f, btnY + btnH + 8f, (w + murzikSize) / 2f, btnY + btnH + 8f + murzikSize)
+
+        // Загружаем фото Мурзёхи
+        try {
+            murzikBitmap = BitmapFactory.decodeResource(resources, R.drawable.murzik)
+        } catch (_: Exception) {}
     }
 
     private fun generateLine() = if (Random.nextFloat() < 0.15f) { words[Random.nextInt(words.size)] } else { CharArray(columns) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("") }
@@ -114,26 +127,31 @@ class MatrixHeaderView @JvmOverloads constructor(
             }
         }
 
-        // Логотип — СБЕР и ГигаЧат по центру зелёного прямоугольника
+        // Логотип — СБЕР и ГигаЧат ровно по центру зелёного прямоугольника
         canvas.drawRoundRect(logoRect, 16f, 16f, logoBgPaint)
         val centerY = logoRect.centerY()
-        canvas.drawText("СБЕР", w / 2, centerY - 12f, titlePaint)
-        canvas.drawText("ГигаЧат", w / 2, centerY + 22f, subtitlePaint)
+        canvas.drawText("СБЕР", w / 2, centerY - 6f, titlePaint)
+        canvas.drawText("ГигаЧат", w / 2, centerY + 18f, subtitlePaint)
 
         // Кнопки
-        val btnPaint = Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 17f; typeface = Typeface.DEFAULT_BOLD }
-        val btnTextPaint = Paint().apply { color = Color.WHITE; isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 17f; typeface = Typeface.DEFAULT_BOLD }
+        val btnPaint = Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 15f; typeface = Typeface.DEFAULT_BOLD }
+        val btnTextPaint = Paint().apply { color = Color.WHITE; isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 15f; typeface = Typeface.DEFAULT_BOLD }
         btnPaint.color = if (gigaChatMode) Color.parseColor("#21A038") else Color.parseColor("#555555")
         canvas.drawRoundRect(neoButtonRect, 10f, 10f, btnPaint)
-        canvas.drawText("ГИГАЧАТ", neoButtonRect.centerX(), neoButtonRect.centerY() + 6f, btnTextPaint)
+        canvas.drawText("ГИГАЧАТ", neoButtonRect.centerX(), neoButtonRect.centerY() + 5f, btnTextPaint)
         btnPaint.color = if (localMode) Color.parseColor("#FF8800") else Color.parseColor("#555555")
         canvas.drawRoundRect(localButtonRect, 10f, 10f, btnPaint)
-        canvas.drawText("МИСТРАЛЬ 3B", localButtonRect.centerX(), localButtonRect.centerY() + 6f, btnTextPaint)
+        canvas.drawText("МИСТРАЛЬ 3B", localButtonRect.centerX(), localButtonRect.centerY() + 5f, btnTextPaint)
+
+        // Фото Мурзёхи
+        murzikBitmap?.let {
+            canvas.drawBitmap(it, null, murzikRect, null)
+        }
 
         // Светофор
-        val dotRadius = 16f
-        val dotSpacing = 34f
-        val trafficX = logoRect.right + 18f
+        val dotRadius = 14f
+        val dotSpacing = 30f
+        val trafficX = logoRect.right + 16f
         val trafficY = logoRect.centerY() - dotSpacing
 
         val dotPaint = Paint().apply { isAntiAlias = true }
@@ -144,10 +162,10 @@ class MatrixHeaderView @JvmOverloads constructor(
         dotPaint.color = if (localMode) Color.parseColor("#FFCC00") else Color.parseColor("#555555")
         canvas.drawCircle(trafficX, trafficY + dotSpacing * 2, dotRadius, dotPaint)
 
-        val labelPaint = Paint().apply { color = Color.parseColor("#888888"); textSize = 13f; typeface = Typeface.DEFAULT; isAntiAlias = true }
-        canvas.drawText("НЕО", trafficX + 22f, trafficY + 5f, labelPaint)
-        canvas.drawText("ГИГАЧАТ", trafficX + 22f, trafficY + dotSpacing + 5f, labelPaint)
-        canvas.drawText("МИСТРАЛЬ", trafficX + 22f, trafficY + dotSpacing * 2 + 5f, labelPaint)
+        val labelPaint = Paint().apply { color = Color.parseColor("#888888"); textSize = 12f; typeface = Typeface.DEFAULT; isAntiAlias = true }
+        canvas.drawText("НЕО", trafficX + 20f, trafficY + 4f, labelPaint)
+        canvas.drawText("ГИГАЧАТ", trafficX + 20f, trafficY + dotSpacing + 4f, labelPaint)
+        canvas.drawText("МИСТРАЛЬ", trafficX + 20f, trafficY + dotSpacing * 2 + 4f, labelPaint)
 
         postInvalidateDelayed(50)
     }
