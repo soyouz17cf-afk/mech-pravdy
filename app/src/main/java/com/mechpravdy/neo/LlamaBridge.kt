@@ -1,8 +1,6 @@
 package com.mechpravdy.neo
 
-import android.content.Context
 import java.io.File
-import dalvik.system.PathClassLoader
 
 class LlamaBridge {
 
@@ -13,22 +11,14 @@ class LlamaBridge {
     external fun llamaComplete(prompt: String): String
     private external fun llamaStop()
 
-    fun loadModelFromPath(context: Context, modelPath: String, onProgress: (String) -> Unit, onDone: (Boolean) -> Unit) {
+    fun loadModelFromPath(modelPath: String, libPath: String, onProgress: (String) -> Unit, onDone: (Boolean) -> Unit) {
         onProgress("Файл: ${File(modelPath).name}")
         val sizeMB = File(modelPath).length() / (1024 * 1024)
         onProgress("Размер: $sizeMB МБ")
 
         try {
-            // Загружаем библиотеку через системный ClassLoader
-            val libPath = context.applicationInfo.nativeLibDir + "/libllama.so"
             onProgress("Загружаю библиотеку...")
-            try {
-                System.load(libPath)
-            } catch (e: Exception) {
-                // Если не вышло через System.load, пробуем через ClassLoader
-                val classLoader = PathClassLoader(libPath, ClassLoader.getSystemClassLoader())
-                Thread.currentThread().contextClassLoader = classLoader
-            }
+            System.load(libPath)
 
             onProgress("Библиотека загружена. Загружаю модель...")
             try {
