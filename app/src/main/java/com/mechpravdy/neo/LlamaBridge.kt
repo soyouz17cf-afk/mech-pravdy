@@ -2,37 +2,40 @@ package com.mechpravdy.neo
 
 import android.content.Context
 import java.io.File
+import dalvik.system.PathClassLoader
 
 class LlamaBridge {
 
     var isLoaded = false
         private set
 
-    private var libraryLoaded = false
-
     private external fun llamaLoadModel(modelPath: String): Boolean
     external fun llamaComplete(prompt: String): String
     private external fun llamaStop()
 
-    fun ensureLibraryLoaded(context: Context) {
-        if (!libraryLoaded) {
-            val libPath = File(context.filesDir, "libllama.so")
-            if (libPath.exists()) {
-                System.load(libPath.absolutePath)
-                libraryLoaded = true
-            } else {
-                throw RuntimeException("Библиотека libllama.so не найдена в песочнице")
-            }
-        }
-    }
-
-    fun loadModelFromPath(path: String, onProgress: (String) -> Unit, onDone: (Boolean) -> Unit) {
-        onProgress("Файл: ${File(path).name}")
-        val sizeMB = File(path).length() / (1024 * 1024)
+    fun loadModelFromPath(context: Context, modelPath: String, onProgress: (String) -> Unit, onDone: (Boolean) -> Unit) {
+        onProgress("Файл: ${File(modelPath).name}")
+        val sizeMB = File(modelPath).length() / (1024 * 1024)
         onProgress("Размер: $sizeMB МБ")
-        onProgress("Загружаю модель...")
+
         try {
-            val result = llamaLoadModel(path)
+            // Загружаем библиотеку через системный ClassLoader
+            val libPath = context.applicationInfo.nativeLibDir + "/libllama.so"
+            onProgress("Загружаю библиотеку...")
+            try {
+                System.load(libPath)
+            } catch (e: Exception) {
+                // Если не вышло через System.load, пробуем через ClassLoader
+                val classLoader = PathClassLoader(libPath, ClassLoader.getSystemClassLoader())
+                Thread.currentThread().contextClassLoader = classLoader
+            }
+
+            onProgress("Библиотека загружена. Загружаю модель...")
+            try {
+                Thread.sleep(500)
+            } catch (_: Exception) {}
+
+            val result = llamaLoadModel(modelPath)
             if (result) {
                 isLoaded = true
                 onProgress("Модель загружена! Готов к бою!")
