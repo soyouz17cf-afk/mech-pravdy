@@ -231,18 +231,10 @@ class MainActivity : AppCompatActivity() {
             thread {
                 try { Thread.sleep(3000) } catch (_: Exception) {}
                 val bridge = LlamaBridge()
-                try {
-                    bridge.ensureLibraryLoaded(this@MainActivity)
-                } catch (e: Exception) {
-                    runOnUiThread {
-                        appendChat("[МОЗГ] Ошибка загрузки библиотеки: ${e.message}")
-                        setStatus("Ошибка", "red")
-                    }
-                    return@thread
-                }
                 runOnUiThread { appendChat("[МОЗГ] Загружаю модель в память...") }
                 bridge.loadModelFromPath(
-                    path = modelFile.absolutePath,
+                    context = this@MainActivity,
+                    modelPath = modelFile.absolutePath,
                     onProgress = { msg -> runOnUiThread { appendChat("[МОЗГ] $msg") } },
                     onDone = { success ->
                         runOnUiThread {
