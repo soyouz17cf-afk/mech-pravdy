@@ -268,7 +268,6 @@ class MainActivity : AppCompatActivity() {
             appendChat("[МОЗГ] Мозги уже скачаны. Загружаю...")
             setStatus("Загружаю...", "yellow")
 
-            // Показываем ProgressDialog с крутящимся индикатором
             val progressDialog = ProgressDialog(this).apply {
                 setTitle("Меч Правды")
                 setMessage("Загрузка модели...\nПожалуйста, подождите.")
@@ -478,7 +477,53 @@ System Prompt — алгоритм души.
     private fun captureAndAnalyze() = try { cameraLauncher.launch(Intent(MediaStore.ACTION_IMAGE_CAPTURE)) } catch (e: Exception) { appendChat("[ERROR] ${e.message}") }
     private fun pasteFromClipboard() { try { val cb = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager; val clip = cb.primaryClip; if (clip != null && clip.itemCount > 0) { val text = clip.getItemAt(0).text?.toString() ?: ""; if (text.isNotBlank()) { messageInput.append(text); appendChat("[ВСТАВКА] Текст из буфера.") } else { appendChat("[ВСТАВКА] Пусто.") } } else { appendChat("[ВСТАВКА] Пусто.") } } catch (e: Exception) { appendChat("[ВСТАВКА] Ошибка.") } }
 
-    private fun analyzePhoto(bitmap: Bitmap) { if (isLocalMode) { appendChat("[АНАЛИЗ] Локальный ИИ ещё не загружен."); return }; val token = tokenInput.text.toString().trim(); if (token.isEmpty()) { appendChat("[АНАЛИЗ] Сгенерируйте токен."); return }; setStatus("Анализ...", "yellow"); val baos = ByteArrayOutputStream(); bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos); val base64 = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP); val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", "Опиши, что на этом фото. Кратко, по-русски.") }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "data:image/jpeg;base64,$base64") }) }); addProperty("temperature", 0.7); addProperty("max_tokens", 300) }; client.newCall(Request.Builder().url(apiUrlGigaChat).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[АНАЛИЗ] Ошибка."); setStatus("Готов", "green") }; override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString; appendChat("[АНАЛИЗ] $a") } else { appendChat("[АНАЛИЗ] Ошибка HTTP ${response.code}") }; setStatus("Готов", "green"); response.close() } }) }
+    private fun analyzePhoto(bitmap: Bitmap) {
+        if (isLocalMode) {
+            if (!isModelLoaded) {
+                appendChat("[АНАЛИЗ] Локальный ИИ ещё не загружен.")
+                return
+            }
+            setStatus("Анализ...", "yellow")
+            val baos = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos)
+            val base64 = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
+            thread {
+                val response = llamaComplete("Опиши, что на этом фото. Кратко, по-русски.\n\n[IMAGE: data:image/jpeg;base64,$base64]")
+                runOnUiThread {
+                    appendChat("[АНАЛИЗ] $response")
+                    setStatus("Готов", "green")
+                }
+            }
+            return
+        }
+        val token = tokenInput.text.toString().trim()
+        if (token.isEmpty()) { appendChat("[АНАЛИЗ] Сгенерируйте токен."); return }
+        setStatus("Анализ...", "yellow")
+        val baos = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos)
+        val base64 = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
+        val body = JsonObject().apply {
+            addProperty("model", "GigaChat:latest")
+            add("messages", JsonArray().apply {
+                add(JsonObject().apply { addProperty("role", "system"); addProperty("content", "Опиши, что на этом фото. Кратко, по-русски.") })
+                add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "data:image/jpeg;base64,$base64") })
+            })
+            addProperty("temperature", 0.7)
+            addProperty("max_tokens", 300)
+        }
+        client.newCall(Request.Builder().url(apiUrlGigaChat).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) { appendChat("[АНАЛИЗ] Ошибка."); setStatus("Готов", "green") }
+            override fun onResponse(call: Call, response: Response) {
+                val b = response.body?.string() ?: ""
+                if (response.isSuccessful) {
+                    val a = gson.fromJson(b, JsonObject::class.java).getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString
+                    appendChat("[АНАЛИЗ] $a")
+                } else { appendChat("[АНАЛИЗ] Ошибка HTTP ${response.code}") }
+                setStatus("Готов", "green")
+                response.close()
+            }
+        })
+    }
 
     private fun generateToken() { val authKey = authKeyInput.text.toString().trim(); if (authKey.isEmpty()) return; setStatus("Генерация...", "yellow"); client.newCall(Request.Builder().url(authUrl).header("Content-Type","application/x-www-form-urlencoded").header("Authorization","Basic $authKey").header("RqUID","ac5edc2e-2c74-47cb-97c1-69249136cf8b").post(RequestBody.create("application/x-www-form-urlencoded".toMediaType(), "scope=GIGACHAT_API_PERS")).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}") }; override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val t = gson.fromJson(b, JsonObject::class.java).get("access_token")?.asString ?: ""; if (t.isNotEmpty()) { runOnUiThread { tokenInput.setText(t) }; appendChat("[SYSTEM] Токен готов."); setStatus("Готов", "green") } } else appendChat("[ERROR] HTTP ${response.code}"); response.close() } }) }
 
