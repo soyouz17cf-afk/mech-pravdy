@@ -60,9 +60,10 @@ class MainActivity : AppCompatActivity() {
     private var isModelLoaded = false
     private var downloadId: Long = -1L
 
-    private external fun llamaLoadModel(modelPath: String): Boolean
-    external fun llamaComplete(prompt: String): String
-    private external fun llamaStop()
+    // Нативные методы из libai-chat.so (берём из ABB LLM)
+    private external fun aiChatLoadModel(modelPath: String): Boolean
+    external fun aiChatComplete(prompt: String): String
+    private external fun aiChatStop()
 
     private lateinit var authKeyInput: EditText
     private lateinit var generateButton: Button
@@ -249,7 +250,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun hideKeyboard() { try { val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager; val view = currentFocus ?: View(this); imm.hideSoftInputFromWindow(view.windowToken, 0) } catch (_: Exception) {} }
 
-    private fun switchToNeo() { isLocalMode = false; currentApiUrl = apiUrlGigaChat; try { llamaStop() } catch (_: Exception) {}; isModelLoaded = false; matrixHeader.gigaChatMode = true; matrixHeader.localMode = false; matrixHeader.connectionLost = false; matrixHeader.invalidate(); appendChat("[РЕЖИМ] ГИГАЧАТ"); setStatus("ГИГАЧАТ", "green"); checkConnection() }
+    private fun switchToNeo() { isLocalMode = false; currentApiUrl = apiUrlGigaChat; try { aiChatStop() } catch (_: Exception) {}; isModelLoaded = false; matrixHeader.gigaChatMode = true; matrixHeader.localMode = false; matrixHeader.connectionLost = false; matrixHeader.invalidate(); appendChat("[РЕЖИМ] ГИГАЧАТ"); setStatus("ГИГАЧАТ", "green"); checkConnection() }
 
     private fun switchToLocal() {
         isLocalMode = true
@@ -279,7 +280,7 @@ class MainActivity : AppCompatActivity() {
             thread {
                 try { Thread.sleep(1500) } catch (_: Exception) {}
                 try {
-                    val result = llamaLoadModel(modelFile.absolutePath)
+                    val result = aiChatLoadModel(modelFile.absolutePath)
                     runOnUiThread {
                         progressDialog.dismiss()
                         if (result) {
@@ -488,7 +489,7 @@ System Prompt — алгоритм души.
             bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos)
             val base64 = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
             thread {
-                val response = llamaComplete("Опиши, что на этом фото. Кратко, по-русски.\n\n[IMAGE: data:image/jpeg;base64,$base64]")
+                val response = aiChatComplete("Опиши, что на этом фото. Кратко, по-русски.\n\n[IMAGE: data:image/jpeg;base64,$base64]")
                 runOnUiThread {
                     appendChat("[АНАЛИЗ] $response")
                     setStatus("Готов", "green")
@@ -534,7 +535,7 @@ System Prompt — алгоритм души.
         if (isLocalMode) {
             if (isModelLoaded) {
                 thread {
-                    val response = llamaComplete(msg)
+                    val response = aiChatComplete(msg)
                     runOnUiThread {
                         appendChat("[NEO] $response")
                         setStatus("Онлайн", "green")
