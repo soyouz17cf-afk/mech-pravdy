@@ -1,5 +1,6 @@
 package com.mechpravdy.neo
 
+import android.content.Context
 import java.io.File
 
 class LlamaBridge {
@@ -13,10 +14,15 @@ class LlamaBridge {
     external fun llamaComplete(prompt: String): String
     private external fun llamaStop()
 
-    private fun ensureLibraryLoaded() {
+    fun ensureLibraryLoaded(context: Context) {
         if (!libraryLoaded) {
-            System.loadLibrary("llama")
-            libraryLoaded = true
+            val libPath = File(context.filesDir, "libllama.so")
+            if (libPath.exists()) {
+                System.load(libPath.absolutePath)
+                libraryLoaded = true
+            } else {
+                throw RuntimeException("Библиотека libllama.so не найдена в песочнице")
+            }
         }
     }
 
@@ -24,13 +30,8 @@ class LlamaBridge {
         onProgress("Файл: ${File(path).name}")
         val sizeMB = File(path).length() / (1024 * 1024)
         onProgress("Размер: $sizeMB МБ")
-        onProgress("Загружаю библиотеку...")
+        onProgress("Загружаю модель...")
         try {
-            ensureLibraryLoaded()
-            onProgress("Библиотека загружена. Загружаю модель...")
-            try {
-                Thread.sleep(500)
-            } catch (_: Exception) {}
             val result = llamaLoadModel(path)
             if (result) {
                 isLoaded = true
