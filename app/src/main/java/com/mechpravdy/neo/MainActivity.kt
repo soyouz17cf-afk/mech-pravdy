@@ -232,9 +232,10 @@ class MainActivity : AppCompatActivity() {
                 try { Thread.sleep(3000) } catch (_: Exception) {}
                 val bridge = LlamaBridge()
                 runOnUiThread { appendChat("[МОЗГ] Загружаю модель в память...") }
+                val libPath = applicationInfo.nativeLibDir + "/libllama.so"
                 bridge.loadModelFromPath(
-                    context = this@MainActivity,
                     modelPath = modelFile.absolutePath,
+                    libPath = libPath,
                     onProgress = { msg -> runOnUiThread { appendChat("[МОЗГ] $msg") } },
                     onDone = { success ->
                         runOnUiThread {
