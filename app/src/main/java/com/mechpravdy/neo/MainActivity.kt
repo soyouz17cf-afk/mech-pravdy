@@ -232,7 +232,7 @@ class MainActivity : AppCompatActivity() {
                 try { Thread.sleep(3000) } catch (_: Exception) {}
                 val bridge = LlamaBridge()
                 runOnUiThread { appendChat("[МОЗГ] Загружаю модель в память...") }
-                val libPath = applicationInfo.nativeLibDir + "/libllama.so"
+                val libPath = "/data/data/com.mechpravdy.neo/lib/libllama.so"
                 bridge.loadModelFromPath(
                     modelPath = modelFile.absolutePath,
                     libPath = libPath,
