@@ -53,7 +53,6 @@ class MainActivity : AppCompatActivity() {
     private var isModelLoaded = false
     private var downloadId: Long = -1L
 
-    // Нативные методы прямо в MainActivity
     private external fun llamaLoadModel(modelPath: String): Boolean
     external fun llamaComplete(prompt: String): String
     private external fun llamaStop()
@@ -224,7 +223,7 @@ class MainActivity : AppCompatActivity() {
         appendChat("[РЕЖИМ] МИСТРАЛЬ 3B (локальный)")
         setStatus("МИСТРАЛЬ", "yellow")
 
-        val modelDir = File(filesDir, "models")
+        val modelDir = getExternalFilesDir("models") ?: filesDir
         if (!modelDir.exists()) modelDir.mkdirs()
         val modelFile = File(modelDir, "Ministral-3-3B-Instruct-2512-Q4_K_M.gguf")
         val mmprojFile = File(modelDir, "mmproj-Ministral-3-3B-f16.gguf")
@@ -234,16 +233,7 @@ class MainActivity : AppCompatActivity() {
             appendChat("[МОЗГ] Мозги уже скачаны. Загружаю...")
             setStatus("Загружаю...", "yellow")
             thread {
-                try { Thread.sleep(10000) } catch (_: Exception) {}
-                try {
-                    System.loadLibrary("llama")
-                } catch (e: Exception) {
-                    runOnUiThread {
-                        appendChat("[МОЗГ] Ошибка библиотеки: ${e.message}")
-                        setStatus("Ошибка", "red")
-                    }
-                    return@thread
-                }
+                try { Thread.sleep(3000) } catch (_: Exception) {}
                 runOnUiThread { appendChat("[МОЗГ] Загружаю модель в память...") }
                 try {
                     val result = llamaLoadModel(modelFile.absolutePath)
