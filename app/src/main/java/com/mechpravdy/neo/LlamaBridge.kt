@@ -7,76 +7,58 @@ class LlamaBridge {
     var isLoaded = false
         private set
 
-    private var modelPath: String? = null
-
-    init {
-        try {
-            System.loadLibrary("llama")
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
+    private var libraryLoaded = false
 
     private external fun llamaLoadModel(modelPath: String): Boolean
     external fun llamaComplete(prompt: String): String
     private external fun llamaStop()
 
-    /**
-     * Прямая загрузка модели из песочницы (без поиска по папкам)
-     */
-    fun loadModelFromPath(path: String, onProgress: (String) -> Unit, onDone: (Boolean) -> Unit) {
-        modelPath = path
-        onProgress("🔍 Файл: ${File(path).name}")
-
-        if (!File(path).exists()) {
-            onProgress("❌ Файл не найден: $path")
-            onDone(false)
-            return
+    private fun ensureLibraryLoaded() {
+        if (!libraryLoaded) {
+            System.loadLibrary("llama")
+            libraryLoaded = true
         }
+    }
 
+    fun loadModelFromPath(path: String, onProgress: (String) -> Unit, onDone: (Boolean) -> Unit) {
+        onProgress("Файл: ${File(path).name}")
         val sizeMB = File(path).length() / (1024 * 1024)
-        onProgress("📦 Размер: $sizeMB МБ")
-        onProgress("⏳ Загружаю в память...")
-
+        onProgress("Размер: $sizeMB МБ")
+        onProgress("Загружаю...")
         try {
+            ensureLibraryLoaded()
             val result = llamaLoadModel(path)
             if (result) {
                 isLoaded = true
-                onProgress("🟢 Модель загружена! Готов к бою!")
+                onProgress("Модель загружена! Готов к бою!")
                 onDone(true)
             } else {
-                onProgress("❌ Ошибка загрузки модели")
+                onProgress("Ошибка загрузки модели")
                 onDone(false)
             }
         } catch (e: Exception) {
-            onProgress("❌ Ошибка: ${e.message}")
+            onProgress("Ошибка: ${e.message}")
             onDone(false)
         }
     }
 
     fun generate(prompt: String, onToken: (String) -> Unit, onDone: () -> Unit) {
         if (!isLoaded) {
-            onToken("[NEO] Модель не загружена. Скачайте мозг через МИСТРАЛЬ 3B.")
+            onToken("[NEO] Модель не загружена.")
             onDone()
             return
         }
-
         try {
             val response = llamaComplete(prompt)
             onToken(response)
         } catch (e: Exception) {
-            onToken("[NEO] Ошибка генерации: ${e.message}")
+            onToken("[NEO] Ошибка: ${e.message}")
         }
-
         onDone()
     }
 
     fun unload() {
-        try {
-            llamaStop()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        try { llamaStop() } catch (e: Exception) { e.printStackTrace() }
         isLoaded = false
     }
 }
