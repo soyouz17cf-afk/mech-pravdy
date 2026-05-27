@@ -24,9 +24,13 @@ class LlamaBridge {
         onProgress("Файл: ${File(path).name}")
         val sizeMB = File(path).length() / (1024 * 1024)
         onProgress("Размер: $sizeMB МБ")
-        onProgress("Загружаю...")
+        onProgress("Загружаю библиотеку...")
         try {
             ensureLibraryLoaded()
+            onProgress("Библиотека загружена. Загружаю модель...")
+            try {
+                Thread.sleep(500)
+            } catch (_: Exception) {}
             val result = llamaLoadModel(path)
             if (result) {
                 isLoaded = true
