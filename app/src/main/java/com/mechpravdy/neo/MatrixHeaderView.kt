@@ -61,6 +61,7 @@ class MatrixHeaderView @JvmOverloads constructor(
     private var frame = 0
 
     private var murzikBitmap: android.graphics.Bitmap? = null
+    private val murzikPaint = Paint().apply { alpha = 180 } // Полупрозрачность
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -86,11 +87,10 @@ class MatrixHeaderView @JvmOverloads constructor(
         neoButtonRect = RectF(btnLeft, btnY, btnLeft + btnW, btnY + btnH)
         localButtonRect = RectF(btnLeft + btnW + gap, btnY, btnLeft + btnW + gap + btnW, btnY + btnH)
 
-        // Место под фото Мурзёхи
+        // Мурзёха поднят выше — прямо под кнопками
         val murzikSize = w * 0.25f
-        murzikRect = RectF((w - murzikSize) / 2f, btnY + btnH + 8f, (w + murzikSize) / 2f, btnY + btnH + 8f + murzikSize)
+        murzikRect = RectF((w - murzikSize) / 2f, btnY + btnH + 2f, (w + murzikSize) / 2f, btnY + btnH + 2f + murzikSize)
 
-        // Загружаем фото Мурзёхи
         try {
             murzikBitmap = BitmapFactory.decodeResource(resources, R.drawable.murzik)
         } catch (_: Exception) {}
@@ -137,7 +137,7 @@ class MatrixHeaderView @JvmOverloads constructor(
             }
         }
 
-        // Логотип — СБЕР и ГигаЧат ровно по центру зелёного прямоугольника
+        // Логотип
         canvas.drawRoundRect(logoRect, 16f, 16f, logoBgPaint)
         val centerY = logoRect.centerY()
         canvas.drawText("СБЕР", w / 2, centerY - 6f, titlePaint)
@@ -153,7 +153,7 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRoundRect(localButtonRect, 10f, 10f, btnPaint)
         canvas.drawText("МИСТРАЛЬ 3B", localButtonRect.centerX(), localButtonRect.centerY() + 5f, btnTextPaint)
 
-        // Фото Мурзёхи с закруглёнными верхним левым и нижним правым углами
+        // Мурзёха — закруглённые углы, полупрозрачный
         murzikBitmap?.let { bitmap ->
             val radius = 32f
             val clipPath = android.graphics.Path().apply {
@@ -179,7 +179,7 @@ class MatrixHeaderView @JvmOverloads constructor(
             val top = murzikRect.centerY() - newHeight / 2
             val fittedRect = RectF(left, top, left + newWidth, top + newHeight)
 
-            canvas.drawBitmap(bitmap, srcRect, fittedRect, null)
+            canvas.drawBitmap(bitmap, srcRect, fittedRect, murzikPaint)
             canvas.restore()
         }
 
