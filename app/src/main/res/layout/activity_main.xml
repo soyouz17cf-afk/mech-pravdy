@@ -257,19 +257,6 @@
                     android:textIsSelectable="true" />
             </ScrollView>
 
-            <!-- Мурзёха в правом верхнем углу чата -->
-            <ImageView
-                android:id="@+id/murzikImage"
-                android:layout_width="60dp"
-                android:layout_height="60dp"
-                android:layout_gravity="end|top"
-                android:layout_margin="6dp"
-                android:src="@drawable/murzik"
-                android:scaleType="centerCrop"
-                android:background="@drawable/murzik_rounded"
-                android:clickable="true"
-                android:focusable="true" />
-
         </FrameLayout>
 
         <TextView
