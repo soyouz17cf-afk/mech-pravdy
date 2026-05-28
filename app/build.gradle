@@ -56,8 +56,10 @@ dependencies {
     implementation 'com.google.code.gson:gson:2.10.1'
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
 
-    // MediaPipe LLM Inference (вместо TensorFlow Lite)
-    implementation 'com.google.mediapipe:tasks-genai:0.10.14'
+    // TensorFlow Lite + NNAPI
+    implementation 'org.tensorflow:tensorflow-lite:2.14.0'
+    implementation 'org.tensorflow:tensorflow-lite-gpu:2.14.0'
+    implementation 'org.tensorflow:tensorflow-lite-support:0.4.4'
 
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
