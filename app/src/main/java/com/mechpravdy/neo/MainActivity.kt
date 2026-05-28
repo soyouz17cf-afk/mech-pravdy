@@ -30,6 +30,7 @@ import androidx.core.content.ContextCompat
 import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
+import com.github.junrar.Junrar
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -277,7 +278,6 @@ class MainActivity : AppCompatActivity() {
             thread {
                 try { Thread.sleep(1000) } catch (_: Exception) {}
                 try {
-                    // Используем NNAPI через TensorFlow Lite
                     val interpreter = org.tensorflow.lite.Interpreter(modelFile)
                     isModelLoaded = true
                     runOnUiThread {
@@ -309,7 +309,6 @@ class MainActivity : AppCompatActivity() {
 
         thread {
             try {
-                // Скачиваем все части
                 val partFiles = mutableListOf<File>()
                 for ((index, url) in partUrls.withIndex()) {
                     val partFile = File(modelDir, "model.part${index + 1}.rar")
@@ -320,14 +319,13 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                // Собираем части в один файл
                 val combinedFile = File(modelDir, "model_combined.rar")
                 FileOutputStream(combinedFile).use { output ->
                     for (partFile in partFiles) {
                         partFile.inputStream().use { input ->
                             input.copyTo(output)
                         }
-                        partFile.delete() // удаляем часть после объединения
+                        partFile.delete()
                     }
                 }
 
@@ -336,8 +334,9 @@ class MainActivity : AppCompatActivity() {
                     appendChat("[МОЗГ] Части собраны. Распаковываю...")
                 }
 
-                // Распаковываем RAR
-                extractRar(combinedFile, modelDir)
+                // Используем junrar для распаковки
+                Junrar.extract(combinedFile, modelDir)
+                combinedFile.delete()
 
                 runOnUiThread {
                     appendChat("[МОЗГ] Готово! Нажми МИСТРАЛЬ 3B ещё раз для загрузки модели.")
@@ -362,36 +361,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
         response.close()
-    }
-
-    private fun extractRar(rarFile: File, destDir: File) {
-        // Для RAR нужно использовать библиотеку junrar или аналоги
-        // Пока что просто копируем как есть, если это бинарный файл
-        // В реальности нужно добавить библиотеку для распаковки RAR
-        try {
-            // Пробуем распаковать как ZIP (если это переименованный ZIP)
-            java.util.zip.ZipFile(rarFile).use { zip ->
-                val entries = zip.entries()
-                while (entries.hasMoreElements()) {
-                    val entry = entries.nextElement()
-                    val entryFile = File(destDir, entry.name)
-                    if (entry.isDirectory) {
-                        entryFile.mkdirs()
-                    } else {
-                        entryFile.parentFile?.mkdirs()
-                        zip.getInputStream(entry).use { input ->
-                            FileOutputStream(entryFile).use { output ->
-                                input.copyTo(output)
-                            }
-                        }
-                    }
-                }
-            }
-            rarFile.delete()
-        } catch (e: Exception) {
-            // Если не ZIP, то это RAR — нужна библиотека
-            appendChat("[МОЗГ] Для RAR нужна библиотека. Файл сохранён как есть.")
-        }
     }
 
     private fun checkConnection() { val testBody = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "ping") }) }); addProperty("max_tokens", 1) }; val request = Request.Builder().url(currentApiUrl); request.header("Authorization", "Bearer ${tokenInput.text.toString().trim()}"); request.post(testBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType())); client.newCall(request.build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { runOnUiThread { matrixHeader.connectionLost = true; setStatus("Нет связи", "red") } }; override fun onResponse(call: Call, response: Response) { runOnUiThread { if (response.isSuccessful) { matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } else { matrixHeader.connectionLost = true; setStatus("Ошибка", "red") } }; response.close() } }) }
