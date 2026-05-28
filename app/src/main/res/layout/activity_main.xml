@@ -63,20 +63,6 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Мурзёха — отдельная кнопка по центру -->
-        <ImageView
-            android:id="@+id/murzikImage"
-            android:layout_width="100dp"
-            android:layout_height="100dp"
-            android:layout_gravity="center"
-            android:layout_marginTop="4dp"
-            android:layout_marginBottom="4dp"
-            android:src="@drawable/murzik"
-            android:scaleType="centerCrop"
-            android:background="@drawable/murzik_rounded"
-            android:clickable="true"
-            android:focusable="true" />
-
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -270,6 +256,19 @@
                     android:inputType="textMultiLine"
                     android:textIsSelectable="true" />
             </ScrollView>
+
+            <!-- Мурзёха в правом верхнем углу чата -->
+            <ImageView
+                android:id="@+id/murzikImage"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:layout_gravity="end|top"
+                android:layout_margin="6dp"
+                android:src="@drawable/murzik"
+                android:scaleType="centerCrop"
+                android:background="@drawable/murzik_rounded"
+                android:clickable="true"
+                android:focusable="true" />
 
         </FrameLayout>
 
