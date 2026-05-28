@@ -86,7 +86,7 @@ class MatrixHeaderView @JvmOverloads constructor(
         neoButtonRect = RectF(btnLeft, btnY, btnLeft + btnW, btnY + btnH)
         localButtonRect = RectF(btnLeft + btnW + gap, btnY, btnLeft + btnW + gap + btnW, btnY + btnH)
 
-        // Мурзёха — прямо под кнопками, с минимальным отступом
+        // Мурзёха — прямо под кнопками, отступ 2px
         val murzikSize = w * 0.25f
         murzikRect = RectF((w - murzikSize) / 2f, btnY + btnH + 2f, (w + murzikSize) / 2f, btnY + btnH + 2f + murzikSize)
 
@@ -152,7 +152,7 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRoundRect(localButtonRect, 10f, 10f, btnPaint)
         canvas.drawText("МИСТРАЛЬ 3B", localButtonRect.centerX(), localButtonRect.centerY() + 5f, btnTextPaint)
 
-        // Мурзёха — все 4 угла сильно закруглены (как капсула)
+        // Мурзёха — все 4 угла закруглены (капсула)
         murzikBitmap?.let { bitmap ->
             val maxRadius = murzikRect.height() / 2
             val clipPath = android.graphics.Path().apply {
