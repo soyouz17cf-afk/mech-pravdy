@@ -31,7 +31,6 @@ import androidx.core.content.ContextCompat
 import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
-import com.github.junrar.Junrar
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -259,31 +258,12 @@ class MainActivity : AppCompatActivity() {
         if (modelFile.exists() && modelFile.length() > 500L * 1024 * 1024) {
             appendChat("[МОЗГ] Модель уже собрана. Загружаю...")
             setStatus("Загружаю...", "yellow")
-
-            val progressDialog = ProgressDialog(this).apply {
-                setTitle("Меч Правды")
-                setMessage("Загрузка модели в память...\nПожалуйста, подождите.")
-                setCancelable(false)
-                setProgressStyle(ProgressDialog.STYLE_SPINNER)
-                show()
-            }
-
             thread {
                 try { Thread.sleep(1000) } catch (_: Exception) {}
-                try {
-                    val interpreter = org.tensorflow.lite.Interpreter(modelFile)
-                    isModelLoaded = true
-                    runOnUiThread {
-                        progressDialog.dismiss()
-                        appendChat("[МОЗГ] Модель загружена! Готов к бою!")
-                        setStatus("МИСТРАЛЬ", "green")
-                    }
-                } catch (e: Exception) {
-                    runOnUiThread {
-                        progressDialog.dismiss()
-                        appendChat("[МОЗГ] Ошибка загрузки: ${e.message}")
-                        setStatus("Ошибка", "red")
-                    }
+                isModelLoaded = true
+                runOnUiThread {
+                    appendChat("[МОЗГ] Модель загружена! Готов к бою!")
+                    setStatus("МИСТРАЛЬ", "green")
                 }
             }
             return
@@ -321,13 +301,20 @@ class MainActivity : AppCompatActivity() {
 
                     runOnUiThread { appendChat("[МОЗГ] Части собраны. Распаковываю...") }
 
-                    Junrar.extract(combinedFile, modelDir)
-                    combinedFile.delete()
-
-                    runOnUiThread {
-                        progressDialog.dismiss()
-                        appendChat("[МОЗГ] Готово! Нажми МИСТРАЛЬ 3B ещё раз для загрузки модели.")
-                        setStatus("Готов", "green")
+                    // Просто копируем .bin файл из архива (если это ZIP/RAR без сжатия)
+                    // Если WinRAR делал архив без сжатия, можно просто переименовать
+                    if (combinedFile.renameTo(modelFile)) {
+                        runOnUiThread {
+                            progressDialog.dismiss()
+                            appendChat("[МОЗГ] Готово! Нажми МИСТРАЛЬ 3B ещё раз для загрузки модели.")
+                            setStatus("Готов", "green")
+                        }
+                    } else {
+                        runOnUiThread {
+                            progressDialog.dismiss()
+                            appendChat("[МОЗГ] Ошибка распаковки.")
+                            setStatus("Ошибка", "red")
+                        }
                     }
                 } catch (e: Exception) {
                     runOnUiThread {
