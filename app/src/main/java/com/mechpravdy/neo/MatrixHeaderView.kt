@@ -153,10 +153,20 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRoundRect(localButtonRect, 10f, 10f, btnPaint)
         canvas.drawText("МИСТРАЛЬ 3B", localButtonRect.centerX(), localButtonRect.centerY() + 5f, btnTextPaint)
 
-        // Фото Мурзёхи с закруглёнными углами и правильным масштабированием
+        // Фото Мурзёхи с закруглёнными верхним левым и нижним правым углами
         murzikBitmap?.let { bitmap ->
+            val radius = 32f
             val clipPath = android.graphics.Path().apply {
-                addRoundRect(murzikRect, 24f, 24f, android.graphics.Path.Direction.CW)
+                // Верхний левый угол закруглён
+                moveTo(murzikRect.left + radius, murzikRect.top)
+                lineTo(murzikRect.right, murzikRect.top)
+                // Нижний правый угол закруглён
+                lineTo(murzikRect.right, murzikRect.bottom - radius)
+                quadTo(murzikRect.right, murzikRect.bottom, murzikRect.right - radius, murzikRect.bottom)
+                lineTo(murzikRect.left, murzikRect.bottom)
+                lineTo(murzikRect.left, murzikRect.top + radius)
+                quadTo(murzikRect.left, murzikRect.top, murzikRect.left + radius, murzikRect.top)
+                close()
             }
             canvas.save()
             canvas.clipPath(clipPath)
