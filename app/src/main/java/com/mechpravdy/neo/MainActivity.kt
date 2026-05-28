@@ -295,12 +295,10 @@ class MainActivity : AppCompatActivity() {
 
         val modelDir = getExternalFilesDir("models") ?: filesDir
         if (!modelDir.exists()) modelDir.mkdirs()
-        val modelFile = File(modelDir, "Ministral-3-3B-Instruct-2512-Q4_K_M.gguf")
-        val mmprojFile = File(modelDir, "mmproj-Ministral-3-3B-f16.gguf")
+        val modelFile = File(modelDir, "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf")
 
-        if (modelFile.exists() && modelFile.length() > 100L * 1024 * 1024 &&
-            mmprojFile.exists() && mmprojFile.length() > 10L * 1024 * 1024) {
-            appendChat("[МОЗГ] Мозги уже скачаны. Загружаю...")
+        if (modelFile.exists() && modelFile.length() > 100L * 1024 * 1024) {
+            appendChat("[МОЗГ] Мозг уже скачан. Загружаю...")
             setStatus("Загружаю...", "yellow")
 
             // Останавливаем матрицу и чистим память
@@ -351,33 +349,22 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        appendChat("[МОЗГ] Запускаю загрузку Ministral 3B (2 файла)...")
+        appendChat("[МОЗГ] Запускаю загрузку TinyLlama (700 МБ)...")
         appendChat("[МОЗГ] Смотри прогресс в шторке уведомлений.")
         setStatus("Качаю...", "yellow")
 
         val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
 
         val modelRequest = DownloadManager.Request(
-            Uri.parse("https://huggingface.co/unsloth/Ministral-3-3B-Instruct-2512-GGUF/resolve/main/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf")
+            Uri.parse("https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf")
         )
-            .setTitle("Меч Правды: мозг Ministral 3B")
-            .setDescription("Модель (~2 ГБ)")
+            .setTitle("Меч Правды: мозг TinyLlama")
+            .setDescription("Модель (700 МБ)")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationUri(Uri.fromFile(modelFile))
             .setAllowedOverMetered(true)
             .setAllowedOverRoaming(true)
         manager.enqueue(modelRequest)
-
-        val mmprojRequest = DownloadManager.Request(
-            Uri.parse("https://huggingface.co/coder3101/Ministral-3-3B-Reasoning-2512-heretic-GGUF/resolve/main/Ministral-3-3B-Reasoning-2512-heretic-mmproj-bf16.gguf")
-        )
-            .setTitle("Меч Правды: проектор Ministral 3B")
-            .setDescription("Проектор (~800 МБ)")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationUri(Uri.fromFile(mmprojFile))
-            .setAllowedOverMetered(true)
-            .setAllowedOverRoaming(true)
-        manager.enqueue(mmprojRequest)
     }
 
     private fun checkConnection() { val testBody = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "ping") }) }); addProperty("max_tokens", 1) }; val request = Request.Builder().url(currentApiUrl); request.header("Authorization", "Bearer ${tokenInput.text.toString().trim()}"); request.post(testBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType())); client.newCall(request.build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { runOnUiThread { matrixHeader.connectionLost = true; setStatus("Нет связи", "red") } }; override fun onResponse(call: Call, response: Response) { runOnUiThread { if (response.isSuccessful) { matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } else { matrixHeader.connectionLost = true; setStatus("Ошибка", "red") } }; response.close() } }) }
