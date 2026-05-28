@@ -233,7 +233,7 @@ class MainActivity : AppCompatActivity() {
   ИИ запишет выводы в свою память.
 
 🔹 ЛОКАЛЬНЫЙ РЕЖИМ:
-  Положи части архива в папку Download.
+  Положи части архива в любую папку.
   Нажми МИСТРАЛЬ 3B.
         """.trimIndent()
         appendChat(helpText)
@@ -269,17 +269,12 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // Ищем части архива в папке Download
-        val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-        val partFiles = (1..5).mapNotNull { i ->
-            val file = File(downloadDir, "gemma-2b-it-gpu-int8.part${String.format("%02d", i)}.rar")
-            if (file.exists()) file else null
-        }
-
+        // Ищем части архива по всей внутренней памяти
+        appendChat("[МОЗГ] Ищу части архива по всей памяти...")
+        val partFiles = findPartFiles()
         if (partFiles.size == 5) {
             appendChat("[МОЗГ] Найдены все 5 частей. Собираю...")
             setStatus("Собираю...", "yellow")
-
             val progressDialog = ProgressDialog(this).apply {
                 setTitle("Меч Правды")
                 setMessage("Сборка и распаковка модели...\nПожалуйста, подождите.")
@@ -287,26 +282,19 @@ class MainActivity : AppCompatActivity() {
                 setProgressStyle(ProgressDialog.STYLE_SPINNER)
                 show()
             }
-
             thread {
                 try {
                     val combinedFile = File(modelDir, "model_combined.rar")
                     FileOutputStream(combinedFile).use { output ->
                         for (partFile in partFiles.sortedBy { it.name }) {
-                            partFile.inputStream().use { input ->
-                                input.copyTo(output)
-                            }
+                            partFile.inputStream().use { input -> input.copyTo(output) }
                         }
                     }
-
                     runOnUiThread { appendChat("[МОЗГ] Части собраны. Распаковываю...") }
-
-                    // Просто копируем .bin файл из архива (если это ZIP/RAR без сжатия)
-                    // Если WinRAR делал архив без сжатия, можно просто переименовать
                     if (combinedFile.renameTo(modelFile)) {
                         runOnUiThread {
                             progressDialog.dismiss()
-                            appendChat("[МОЗГ] Готово! Нажми МИСТРАЛЬ 3B ещё раз для загрузки модели.")
+                            appendChat("[МОЗГ] Готово! Нажми МИСТРАЛЬ 3B ещё раз.")
                             setStatus("Готов", "green")
                         }
                     } else {
@@ -326,10 +314,29 @@ class MainActivity : AppCompatActivity() {
             }
             return
         }
-
-        appendChat("[МОЗГ] Части архива не найдены в папке Download.")
-        appendChat("[МОЗГ] Положите файлы gemma-2b-it-gpu-int8.part01.rar ... part05.rar в Download.")
+        appendChat("[МОЗГ] Не найдены все части. Найдено: ${partFiles.size}/5.")
         setStatus("Нет файлов", "yellow")
+    }
+
+    private fun findPartFiles(): List<File> {
+        val root = File("/storage/emulated/0")
+        val found = mutableListOf<File>()
+        searchParts(root, found)
+        return found.filter { it.name.startsWith("gemma-2b-it-gpu-int8.part") && it.name.endsWith(".rar") }
+            .take(5)
+    }
+
+    private fun searchParts(dir: File, found: MutableList<File>) {
+        try {
+            val files = dir.listFiles() ?: return
+            for (file in files) {
+                if (file.isDirectory && file.canRead()) {
+                    searchParts(file, found)
+                } else if (file.name.startsWith("gemma-2b-it-gpu-int8.part") && file.name.endsWith(".rar")) {
+                    found.add(file)
+                }
+            }
+        } catch (_: Exception) {}
     }
 
     private fun checkConnection() { val testBody = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "ping") }) }); addProperty("max_tokens", 1) }; val request = Request.Builder().url(currentApiUrl); request.header("Authorization", "Bearer ${tokenInput.text.toString().trim()}"); request.post(testBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType())); client.newCall(request.build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { runOnUiThread { matrixHeader.connectionLost = true; setStatus("Нет связи", "red") } }; override fun onResponse(call: Call, response: Response) { runOnUiThread { if (response.isSuccessful) { matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } else { matrixHeader.connectionLost = true; setStatus("Ошибка", "red") } }; response.close() } }) }
@@ -403,7 +410,6 @@ System Prompt — алгоритм души.
                 inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
             }
             scrollView.addView(e)
-
             val layout = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(0, 0, 0, 0)
@@ -417,49 +423,35 @@ System Prompt — алгоритм души.
             }
             layout.addView(titleView)
             layout.addView(scrollView, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
-                1f
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
             ))
-
             val btnLayout = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = android.view.Gravity.CENTER
                 setPadding(10, 10, 10, 20)
             }
             val saveBtn = Button(this).apply {
-                text = "СОХРАНИТЬ"
-                textSize = 12f
-                setTextColor(Color.WHITE)
+                text = "СОХРАНИТЬ"; textSize = 12f; setTextColor(Color.WHITE)
                 setBackgroundColor(Color.parseColor("#21A038"))
             }
             val copyBtn = Button(this).apply {
-                text = "КОПИРОВАТЬ"
-                textSize = 12f
-                setTextColor(Color.WHITE)
+                text = "КОПИРОВАТЬ"; textSize = 12f; setTextColor(Color.WHITE)
                 setBackgroundColor(Color.parseColor("#21A038"))
             }
             val closeBtn = Button(this).apply {
-                text = "ЗАКРЫТЬ"
-                textSize = 12f
-                setTextColor(Color.WHITE)
+                text = "ЗАКРЫТЬ"; textSize = 12f; setTextColor(Color.WHITE)
                 setBackgroundColor(Color.parseColor("#21A038"))
             }
             btnLayout.addView(saveBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(4, 0, 4, 0) })
             btnLayout.addView(copyBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(4, 0, 4, 0) })
             btnLayout.addView(closeBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(4, 0, 4, 0) })
             layout.addView(btnLayout)
-
-            val dialog = AlertDialog.Builder(this)
-                .setView(layout)
-                .create()
+            val dialog = AlertDialog.Builder(this).setView(layout).create()
             dialog.show()
-
             dialog.window?.setLayout(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 (resources.displayMetrics.heightPixels * 0.85).toInt()
             )
-
             saveBtn.setOnClickListener {
                 capsuleText = e.text.toString()
                 appendChat("[КАПСУЛА] Сохранена.")
@@ -480,10 +472,7 @@ System Prompt — алгоритм души.
 
     private fun analyzePhoto(bitmap: Bitmap) {
         if (isLocalMode) {
-            if (!isModelLoaded) {
-                appendChat("[АНАЛИЗ] Локальный ИИ ещё не загружен.")
-                return
-            }
+            if (!isModelLoaded) { appendChat("[АНАЛИЗ] Локальный ИИ ещё не загружен."); return }
             setStatus("Анализ...", "yellow")
             thread {
                 appendChat("[АНАЛИЗ] Локальный анализ фото будет доступен после загрузки модели.")
@@ -494,8 +483,7 @@ System Prompt — алгоритм души.
         val token = tokenInput.text.toString().trim()
         if (token.isEmpty()) { appendChat("[АНАЛИЗ] Сгенерируйте токен."); return }
         setStatus("Анализ...", "yellow")
-        val baos = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos)
+        val baos = ByteArrayOutputStream(); bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos)
         val base64 = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
         val body = JsonObject().apply {
             addProperty("model", "GigaChat:latest")
@@ -503,8 +491,7 @@ System Prompt — алгоритм души.
                 add(JsonObject().apply { addProperty("role", "system"); addProperty("content", "Опиши, что на этом фото. Кратко, по-русски.") })
                 add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "data:image/jpeg;base64,$base64") })
             })
-            addProperty("temperature", 0.7)
-            addProperty("max_tokens", 300)
+            addProperty("temperature", 0.7); addProperty("max_tokens", 300)
         }
         client.newCall(Request.Builder().url(apiUrlGigaChat).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) { appendChat("[АНАЛИЗ] Ошибка."); setStatus("Готов", "green") }
@@ -514,8 +501,7 @@ System Prompt — алгоритм души.
                     val a = gson.fromJson(b, JsonObject::class.java).getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString
                     appendChat("[АНАЛИЗ] $a")
                 } else { appendChat("[АНАЛИЗ] Ошибка HTTP ${response.code}") }
-                setStatus("Готов", "green")
-                response.close()
+                setStatus("Готов", "green"); response.close()
             }
         })
     }
@@ -530,10 +516,7 @@ System Prompt — алгоритм души.
             if (isModelLoaded) {
                 thread {
                     val response = "[NEO] Модель загружена. Функция генерации ответа в разработке."
-                    runOnUiThread {
-                        appendChat(response)
-                        setStatus("Онлайн", "green")
-                    }
+                    runOnUiThread { appendChat(response); setStatus("Онлайн", "green") }
                 }
             } else {
                 appendChat("[NEO] Модель не загружена. Нажми МИСТРАЛЬ 3B.")
