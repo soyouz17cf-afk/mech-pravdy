@@ -67,33 +67,31 @@ class MainActivity : AppCompatActivity() {
     private var librariesLoaded = false
 
     private val requiredLibraries = listOf(
-        "libdatastore_shared_counter.so",
-        "libggml-base.so",
-        "libggml.so",
-        "libggml-cpu-android_armv8.0_1.so",
-        "libggml-cpu-android_armv8.2_1.so",
-        "libggml-cpu-android_armv8.2_2.so",
-        "libggml-cpu-android_armv8.6_1.so",
-        "libggml-cpu-android_armv9.0_1.so",
-        "libggml-cpu-android_armv9.2_1.so",
-        "libggml-cpu-android_armv9.2_2.so",
-        "libimage_processing_util_jni.so",
-        "libkleidia1.so",
-        "libomp.so",
-        "libllama.so",
-        "libllama-common.so",
-        "libsurface_util_jni.so",
-        "libmtmd.so",
-        "libai-chat.so"
+        "datastore_shared_counter",
+        "ggml-base",
+        "ggml",
+        "ggml-cpu-android_armv8.0_1",
+        "ggml-cpu-android_armv8.2_1",
+        "ggml-cpu-android_armv8.2_2",
+        "ggml-cpu-android_armv8.6_1",
+        "ggml-cpu-android_armv9.0_1",
+        "ggml-cpu-android_armv9.2_1",
+        "ggml-cpu-android_armv9.2_2",
+        "image_processing_util_jni",
+        "kleidia1",
+        "omp",
+        "llama",
+        "llama-common",
+        "surface_util_jni",
+        "mtmd",
+        "ai-chat"
     )
 
     private fun loadAllLibraries() {
         if (librariesLoaded) return
-        val nativeLibDir = applicationInfo.nativeLibDir
-        for (libFile in requiredLibraries) {
+        for (lib in requiredLibraries) {
             try {
-                val fullPath = "$nativeLibDir/$libFile"
-                System.load(fullPath)
+                System.loadLibrary(lib)
             } catch (e: Exception) {
                 appendChat("[БИБЛ] Ошибка: ${e.message}")
             }
