@@ -61,7 +61,6 @@ class MatrixHeaderView @JvmOverloads constructor(
     private var frame = 0
 
     private var murzikBitmap: android.graphics.Bitmap? = null
-    private val murzikPaint = Paint().apply { alpha = 180 } // Полупрозрачность
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -87,7 +86,7 @@ class MatrixHeaderView @JvmOverloads constructor(
         neoButtonRect = RectF(btnLeft, btnY, btnLeft + btnW, btnY + btnH)
         localButtonRect = RectF(btnLeft + btnW + gap, btnY, btnLeft + btnW + gap + btnW, btnY + btnH)
 
-        // Мурзёха поднят выше — прямо под кнопками
+        // Мурзёха — прямо под кнопками, с минимальным отступом
         val murzikSize = w * 0.25f
         murzikRect = RectF((w - murzikSize) / 2f, btnY + btnH + 2f, (w + murzikSize) / 2f, btnY + btnH + 2f + murzikSize)
 
@@ -153,18 +152,11 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRoundRect(localButtonRect, 10f, 10f, btnPaint)
         canvas.drawText("МИСТРАЛЬ 3B", localButtonRect.centerX(), localButtonRect.centerY() + 5f, btnTextPaint)
 
-        // Мурзёха — закруглённые углы, полупрозрачный
+        // Мурзёха — все 4 угла сильно закруглены (как капсула)
         murzikBitmap?.let { bitmap ->
-            val radius = 32f
+            val maxRadius = murzikRect.height() / 2
             val clipPath = android.graphics.Path().apply {
-                moveTo(murzikRect.left + radius, murzikRect.top)
-                lineTo(murzikRect.right, murzikRect.top)
-                lineTo(murzikRect.right, murzikRect.bottom - radius)
-                quadTo(murzikRect.right, murzikRect.bottom, murzikRect.right - radius, murzikRect.bottom)
-                lineTo(murzikRect.left, murzikRect.bottom)
-                lineTo(murzikRect.left, murzikRect.top + radius)
-                quadTo(murzikRect.left, murzikRect.top, murzikRect.left + radius, murzikRect.top)
-                close()
+                addRoundRect(murzikRect, maxRadius, maxRadius, android.graphics.Path.Direction.CW)
             }
             canvas.save()
             canvas.clipPath(clipPath)
@@ -179,7 +171,7 @@ class MatrixHeaderView @JvmOverloads constructor(
             val top = murzikRect.centerY() - newHeight / 2
             val fittedRect = RectF(left, top, left + newWidth, top + newHeight)
 
-            canvas.drawBitmap(bitmap, srcRect, fittedRect, murzikPaint)
+            canvas.drawBitmap(bitmap, srcRect, fittedRect, null)
             canvas.restore()
         }
 
