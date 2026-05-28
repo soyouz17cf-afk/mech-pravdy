@@ -7,6 +7,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.BitmapFactory
@@ -152,14 +153,26 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRoundRect(localButtonRect, 10f, 10f, btnPaint)
         canvas.drawText("МИСТРАЛЬ 3B", localButtonRect.centerX(), localButtonRect.centerY() + 5f, btnTextPaint)
 
-        // Фото Мурзёхи с закруглёнными углами
-        murzikBitmap?.let {
+        // Фото Мурзёхи с закруглёнными углами и правильным масштабированием
+        murzikBitmap?.let { bitmap ->
             val clipPath = android.graphics.Path().apply {
                 addRoundRect(murzikRect, 24f, 24f, android.graphics.Path.Direction.CW)
             }
             canvas.save()
             canvas.clipPath(clipPath)
-            canvas.drawBitmap(it, null, murzikRect, null)
+
+            // Вычисляем пропорции, чтобы вписать изображение целиком
+            val srcRect = Rect(0, 0, bitmap.width, bitmap.height)
+            val scaleX = murzikRect.width() / bitmap.width
+            val scaleY = murzikRect.height() / bitmap.height
+            val scale = minOf(scaleX, scaleY)
+            val newWidth = bitmap.width * scale
+            val newHeight = bitmap.height * scale
+            val left = murzikRect.centerX() - newWidth / 2
+            val top = murzikRect.centerY() - newHeight / 2
+            val fittedRect = RectF(left, top, left + newWidth, top + newHeight)
+
+            canvas.drawBitmap(bitmap, srcRect, fittedRect, null)
             canvas.restore()
         }
 
