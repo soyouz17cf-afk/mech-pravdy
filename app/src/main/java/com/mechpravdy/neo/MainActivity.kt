@@ -60,10 +60,46 @@ class MainActivity : AppCompatActivity() {
     private var isModelLoaded = false
     private var downloadId: Long = -1L
 
-    // Нативные методы из libai-chat.so (берём из ABB LLM)
+    // Нативные методы из libai-chat.so
     private external fun aiChatLoadModel(modelPath: String): Boolean
     external fun aiChatComplete(prompt: String): String
     private external fun aiChatStop()
+
+    private var librariesLoaded = false
+
+    // Порядок загрузки библиотек (строго по зависимостям)
+    private val requiredLibraries = listOf(
+        "datastore_shared_counter",
+        "ggml-base",
+        "ggml",
+        "ggml-cpu-android_armv8.0_1",
+        "ggml-cpu-android_armv8.2_1",
+        "ggml-cpu-android_armv8.2_2",
+        "ggml-cpu-android_armv8.6_1",
+        "ggml-cpu-android_armv9.0_1",
+        "ggml-cpu-android_armv9.2_1",
+        "ggml-cpu-android_armv9.2_2",
+        "image_processing_util_jni",
+        "kleidia1",
+        "omp",
+        "llama",
+        "llama-common",
+        "surface_util_jni",
+        "mtmd",
+        "ai-chat"
+    )
+
+    private fun loadAllLibraries() {
+        if (librariesLoaded) return
+        for (lib in requiredLibraries) {
+            try {
+                System.loadLibrary(lib)
+            } catch (e: Exception) {
+                appendChat("[БИБЛ] Ошибка: ${e.message}")
+            }
+        }
+        librariesLoaded = true
+    }
 
     private lateinit var authKeyInput: EditText
     private lateinit var generateButton: Button
@@ -271,15 +307,17 @@ class MainActivity : AppCompatActivity() {
 
             val progressDialog = ProgressDialog(this).apply {
                 setTitle("Меч Правды")
-                setMessage("Загрузка модели...\nПожалуйста, подождите.")
+                setMessage("Загрузка библиотек и модели...\nПожалуйста, подождите.")
                 setCancelable(false)
                 setProgressStyle(ProgressDialog.STYLE_SPINNER)
                 show()
             }
 
             thread {
-                try { Thread.sleep(1500) } catch (_: Exception) {}
+                try { Thread.sleep(1000) } catch (_: Exception) {}
                 try {
+                    loadAllLibraries()
+                    Thread.sleep(500)
                     val result = aiChatLoadModel(modelFile.absolutePath)
                     runOnUiThread {
                         progressDialog.dismiss()
