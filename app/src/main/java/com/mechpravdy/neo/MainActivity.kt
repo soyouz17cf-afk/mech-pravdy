@@ -2,7 +2,6 @@ package com.mechpravdy.neo
 
 import android.Manifest
 import android.app.AlertDialog
-import android.app.DownloadManager
 import android.app.ProgressDialog
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -10,7 +9,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.*
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
@@ -60,7 +58,6 @@ class MainActivity : AppCompatActivity() {
     private var currentApiUrl = apiUrlGigaChat
     private var isLocalMode = false
     private var isModelLoaded = false
-    private var downloadId: Long = -1L
     private var tfliteInterpreter: Interpreter? = null
 
     private lateinit var authKeyInput: EditText
@@ -87,7 +84,7 @@ class MainActivity : AppCompatActivity() {
 
     private val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager { override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}; override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}; override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf() })
     private val sslContext = SSLContext.getInstance("TLS").apply { init(null, trustAllCerts, SecureRandom()) }
-    private val client = OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS).writeTimeout(30, TimeUnit.SECONDS).retryOnConnectionFailure(true).sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager).hostnameVerifier { _, _ -> true }.build()
+    private val client = OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS).readTimeout(300, TimeUnit.SECONDS).writeTimeout(30, TimeUnit.SECONDS).retryOnConnectionFailure(true).sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager).hostnameVerifier { _, _ -> true }.build()
     private val gson = Gson()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -294,24 +291,66 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        appendChat("[МОЗГ] Запускаю загрузку Gemma 2B (3.7 ГБ)...")
-        appendChat("[МОЗГ] Смотри прогресс в шторке уведомлений.")
-        appendChat("[МОЗГ] После загрузки нажми МИСТРАЛЬ 3B ещё раз.")
+        appendChat("[МОЗГ] Скачиваю Gemma 2B (3.7 ГБ) через OkHttp...")
+        appendChat("[МОЗГ] Жди, прогресс в чате.")
         setStatus("Качаю...", "yellow")
 
-        val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val progressDialog = ProgressDialog(this).apply {
+            setTitle("Меч Правды")
+            setMessage("Скачивание модели...\nПожалуйста, подождите.")
+            setCancelable(false)
+            setProgressStyle(ProgressDialog.STYLE_SPINNER)
+            show()
+        }
 
-        val zipFile = File(modelDir, "model.zip")
-        val request = DownloadManager.Request(
-            Uri.parse("https://drive.google.com/uc?export=download&id=16mOBvgyHN0omO4tkspx8uHlC1QvWC4ZZ")
-        )
-            .setTitle("Меч Правды: мозг Gemma 2B")
-            .setDescription("Модель (3.7 ГБ)")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationUri(Uri.fromFile(zipFile))
-            .setAllowedOverMetered(true)
-            .setAllowedOverRoaming(true)
-        downloadId = manager.enqueue(request)
+        thread {
+            try {
+                val url = "https://drive.google.com/uc?export=download&id=16mOBvgyHN0omO4tkspx8uHlC1QvWC4ZZ"
+                var request = Request.Builder().url(url).build()
+                var response = client.newCall(request).execute()
+
+                // Если Google Диск просит подтверждение (для больших файлов)
+                if (response.header("Content-Disposition") == null) {
+                    val body = response.body?.string() ?: ""
+                    val confirmStart = body.indexOf("confirm=")
+                    if (confirmStart != -1) {
+                        val confirmEnd = body.indexOf("\"", confirmStart)
+                        val confirm = body.substring(confirmStart + 8, confirmEnd)
+                        val confirmUrl = "$url&confirm=$confirm"
+                        response.close()
+                        request = Request.Builder().url(confirmUrl).build()
+                        response = client.newCall(request).execute()
+                    }
+                }
+
+                val zipFile = File(modelDir, "model.zip")
+                response.body?.byteStream()?.use { input ->
+                    FileOutputStream(zipFile).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                response.close()
+
+                runOnUiThread {
+                    progressDialog.dismiss()
+                    appendChat("[МОЗГ] ZIP скачан. Распаковываю...")
+                }
+
+                // Распаковываем ZIP
+                extractZip(zipFile, modelDir)
+
+                runOnUiThread {
+                    appendChat("[МОЗГ] Готово! Нажми МИСТРАЛЬ 3B ещё раз для загрузки модели.")
+                    setStatus("Готов", "green")
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    progressDialog.dismiss()
+                    appendChat("[МОЗГ] Ошибка скачивания: ${e.message}")
+                    setStatus("Ошибка", "red")
+                }
+            }
+        }
     }
 
     private fun extractZip(zipFile: File, destDir: File) {
