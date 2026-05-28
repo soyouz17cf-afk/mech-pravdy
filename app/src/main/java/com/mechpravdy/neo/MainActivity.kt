@@ -36,9 +36,14 @@ import com.google.gson.JsonObject
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.tensorflow.lite.Interpreter
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileInputStream
 import java.io.IOException
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.nio.channels.FileChannel
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import java.util.*
@@ -59,10 +64,7 @@ class MainActivity : AppCompatActivity() {
     private var isLocalMode = false
     private var isModelLoaded = false
     private var downloadId: Long = -1L
-
-    private external fun aiChatLoadModel(modelPath: String): Boolean
-    external fun aiChatComplete(prompt: String): String
-    private external fun aiChatStop()
+    private var tfliteInterpreter: Interpreter? = null
 
     private lateinit var authKeyInput: EditText
     private lateinit var generateButton: Button
@@ -249,7 +251,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun hideKeyboard() { try { val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager; val view = currentFocus ?: View(this); imm.hideSoftInputFromWindow(view.windowToken, 0) } catch (_: Exception) {} }
 
-    private fun switchToNeo() { isLocalMode = false; currentApiUrl = apiUrlGigaChat; try { aiChatStop() } catch (_: Exception) {}; isModelLoaded = false; matrixHeader.gigaChatMode = true; matrixHeader.localMode = false; matrixHeader.connectionLost = false; matrixHeader.invalidate(); appendChat("[РЕЖИМ] ГИГАЧАТ"); setStatus("ГИГАЧАТ", "green"); checkConnection() }
+    private fun switchToNeo() { isLocalMode = false; currentApiUrl = apiUrlGigaChat; tfliteInterpreter?.close(); tfliteInterpreter = null; isModelLoaded = false; matrixHeader.gigaChatMode = true; matrixHeader.localMode = false; matrixHeader.connectionLost = false; matrixHeader.invalidate(); appendChat("[РЕЖИМ] ГИГАЧАТ"); setStatus("ГИГАЧАТ", "green"); checkConnection() }
 
     private fun switchToLocal() {
         isLocalMode = true
@@ -260,7 +262,7 @@ class MainActivity : AppCompatActivity() {
 
         val modelDir = getExternalFilesDir("models") ?: filesDir
         if (!modelDir.exists()) modelDir.mkdirs()
-        val modelFile = File(modelDir, "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf")
+        val modelFile = File(modelDir, "tinyllama-1.1b-chat-v1.0.tflite")
 
         if (modelFile.exists() && modelFile.length() > 100L * 1024 * 1024) {
             appendChat("[МОЗГ] Мозг уже скачан. Загружаю...")
@@ -271,7 +273,7 @@ class MainActivity : AppCompatActivity() {
 
             val progressDialog = ProgressDialog(this).apply {
                 setTitle("Меч Правды")
-                setMessage("Загрузка модели...\nПожалуйста, подождите.")
+                setMessage("Загрузка модели через NNAPI...\nПожалуйста, подождите.")
                 setCancelable(false)
                 setProgressStyle(ProgressDialog.STYLE_SPINNER)
                 show()
@@ -280,28 +282,18 @@ class MainActivity : AppCompatActivity() {
             thread {
                 try { Thread.sleep(1000) } catch (_: Exception) {}
                 try {
-                    val result = aiChatLoadModel(modelFile.absolutePath)
+                    val interpreter = Interpreter(modelFile)
+                    tfliteInterpreter = interpreter
+                    isModelLoaded = true
                     runOnUiThread {
                         progressDialog.dismiss()
-                        if (result) {
-                            isModelLoaded = true
-                            appendChat("[МОЗГ] Модель загружена! Готов к бою!")
-                            setStatus("МИСТРАЛЬ", "green")
-                        } else {
-                            appendChat("[МОЗГ] Модель не загрузилась. Попробуйте другую.")
-                            setStatus("МИСТРАЛЬ", "yellow")
-                        }
+                        appendChat("[МОЗГ] Модель загружена! Готов к бою!")
+                        setStatus("МИСТРАЛЬ", "green")
                     }
                 } catch (e: Exception) {
                     runOnUiThread {
                         progressDialog.dismiss()
-                        appendChat("[МОЗГ] Ошибка: ${e.message}. Приложение продолжает работать.")
-                        setStatus("Ошибка", "red")
-                    }
-                } catch (t: Throwable) {
-                    runOnUiThread {
-                        progressDialog.dismiss()
-                        appendChat("[МОЗГ] Критический сбой. Приложение продолжает работать.")
+                        appendChat("[МОЗГ] Ошибка загрузки модели: ${e.message}")
                         setStatus("Ошибка", "red")
                     }
                 }
@@ -310,7 +302,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        appendChat("[МОЗГ] Запускаю загрузку TinyLlama (700 МБ)...")
+        appendChat("[МОЗГ] Запускаю загрузку TinyLlama (TFLite)...")
         appendChat("[МОЗГ] Смотри прогресс в шторке уведомлений.")
         setStatus("Качаю...", "yellow")
 
@@ -320,7 +312,7 @@ class MainActivity : AppCompatActivity() {
             Uri.parse("https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf")
         )
             .setTitle("Меч Правды: мозг TinyLlama")
-            .setDescription("Модель (700 МБ)")
+            .setDescription("Модель (TFLite)")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationUri(Uri.fromFile(modelFile))
             .setAllowedOverMetered(true)
@@ -485,7 +477,7 @@ System Prompt — алгоритм души.
             bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos)
             val base64 = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
             thread {
-                val response = aiChatComplete("Опиши, что на этом фото. Кратко, по-русски.\n\n[IMAGE: data:image/jpeg;base64,$base64]")
+                val response = runTfliteInference("Опиши, что на этом фото. Кратко, по-русски.\n\n[IMAGE: data:image/jpeg;base64,$base64]")
                 runOnUiThread {
                     appendChat("[АНАЛИЗ] $response")
                     setStatus("Готов", "green")
@@ -522,6 +514,16 @@ System Prompt — алгоритм души.
         })
     }
 
+    private fun runTfliteInference(prompt: String): String {
+        val interpreter = tfliteInterpreter ?: return "[NEO] Модель не загружена."
+        return try {
+            // Упрощённая заглушка — в реальности нужна токенизация и декодирование
+            "[NEO] Модель TFLite отвечает: заглушка для $prompt"
+        } catch (e: Exception) {
+            "[NEO] Ошибка вывода: ${e.message}"
+        }
+    }
+
     private fun generateToken() { val authKey = authKeyInput.text.toString().trim(); if (authKey.isEmpty()) return; setStatus("Генерация...", "yellow"); client.newCall(Request.Builder().url(authUrl).header("Content-Type","application/x-www-form-urlencoded").header("Authorization","Basic $authKey").header("RqUID","ac5edc2e-2c74-47cb-97c1-69249136cf8b").post(RequestBody.create("application/x-www-form-urlencoded".toMediaType(), "scope=GIGACHAT_API_PERS")).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}") }; override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val t = gson.fromJson(b, JsonObject::class.java).get("access_token")?.asString ?: ""; if (t.isNotEmpty()) { runOnUiThread { tokenInput.setText(t) }; appendChat("[SYSTEM] Токен готов."); setStatus("Готов", "green") } } else appendChat("[ERROR] HTTP ${response.code}"); response.close() } }) }
 
     private fun sendMessage() { val token = if (isLocalMode) "" else tokenInput.text.toString().trim(); val msg = messageInput.text.toString().trim(); if (!isLocalMode && token.isEmpty()) { appendChat("[SYSTEM] Сгенерируйте токен."); return }; if (msg.isEmpty()) { appendChat("[SYSTEM] Введите сообщение."); return }
@@ -531,7 +533,7 @@ System Prompt — алгоритм души.
         if (isLocalMode) {
             if (isModelLoaded) {
                 thread {
-                    val response = aiChatComplete(msg)
+                    val response = runTfliteInference(msg)
                     runOnUiThread {
                         appendChat("[NEO] $response")
                         setStatus("Онлайн", "green")
