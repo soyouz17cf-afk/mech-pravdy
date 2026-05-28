@@ -63,6 +63,18 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- Мурзёха между authKeyInput и tokenInput -->
+        <ImageView
+            android:id="@+id/murzikImage"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:layout_gravity="center"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="4dp"
+            android:src="@drawable/murzik"
+            android:scaleType="centerCrop"
+            android:background="@drawable/murzik_rounded_corners" />
+
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
