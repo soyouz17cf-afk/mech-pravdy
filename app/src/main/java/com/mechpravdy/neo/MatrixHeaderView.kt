@@ -7,10 +7,8 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
-import android.graphics.BitmapFactory
 import android.util.AttributeSet
 import android.view.View
 import android.widget.Button
@@ -50,7 +48,6 @@ class MatrixHeaderView @JvmOverloads constructor(
     var onLocalClick: (() -> Unit)? = null
 
     private var logoRect = RectF()
-    private var murzikRect = RectF()
     private var columns = 0
     private val linePool = arrayOfNulls<String>(maxPoolSize)
     private val linePoolIndex = IntArray(maxLines) { -1 }
@@ -59,8 +56,6 @@ class MatrixHeaderView @JvmOverloads constructor(
     private var nextPoolSlot = 0
     private var screenH = 0f
     private var frame = 0
-
-    private var murzikBitmap: android.graphics.Bitmap? = null
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -85,14 +80,6 @@ class MatrixHeaderView @JvmOverloads constructor(
         val btnLeft = (w - totalBtnW) / 2f
         neoButtonRect = RectF(btnLeft, btnY, btnLeft + btnW, btnY + btnH)
         localButtonRect = RectF(btnLeft + btnW + gap, btnY, btnLeft + btnW + gap + btnW, btnY + btnH)
-
-        // Мурзёха — прямо под кнопками, отступ 2px
-        val murzikSize = w * 0.25f
-        murzikRect = RectF((w - murzikSize) / 2f, btnY + btnH + 2f, (w + murzikSize) / 2f, btnY + btnH + 2f + murzikSize)
-
-        try {
-            murzikBitmap = BitmapFactory.decodeResource(resources, R.drawable.murzik)
-        } catch (_: Exception) {}
     }
 
     private fun generateLine() = if (Random.nextFloat() < 0.15f) { words[Random.nextInt(words.size)] } else { CharArray(columns) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("") }
@@ -152,29 +139,6 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRoundRect(localButtonRect, 10f, 10f, btnPaint)
         canvas.drawText("МИСТРАЛЬ 3B", localButtonRect.centerX(), localButtonRect.centerY() + 5f, btnTextPaint)
 
-        // Мурзёха — все 4 угла закруглены (капсула)
-        murzikBitmap?.let { bitmap ->
-            val maxRadius = murzikRect.height() / 2
-            val clipPath = android.graphics.Path().apply {
-                addRoundRect(murzikRect, maxRadius, maxRadius, android.graphics.Path.Direction.CW)
-            }
-            canvas.save()
-            canvas.clipPath(clipPath)
-
-            val srcRect = Rect(0, 0, bitmap.width, bitmap.height)
-            val scaleX = murzikRect.width() / bitmap.width
-            val scaleY = murzikRect.height() / bitmap.height
-            val scale = minOf(scaleX, scaleY)
-            val newWidth = bitmap.width * scale
-            val newHeight = bitmap.height * scale
-            val left = murzikRect.centerX() - newWidth / 2
-            val top = murzikRect.centerY() - newHeight / 2
-            val fittedRect = RectF(left, top, left + newWidth, top + newHeight)
-
-            canvas.drawBitmap(bitmap, srcRect, fittedRect, null)
-            canvas.restore()
-        }
-
         // Светофор
         val dotRadius = 14f
         val dotSpacing = 30f
@@ -202,98 +166,5 @@ class MatrixHeaderView @JvmOverloads constructor(
     fun handleTouch(x: Float, y: Float) {
         if (neoButtonRect.contains(x, y)) onNeoClick?.invoke()
         else if (localButtonRect.contains(x, y)) onLocalClick?.invoke()
-        else if (murzikRect.contains(x, y)) showBrainDialog()
-    }
-
-    private fun showBrainDialog() {
-        val brainFile = File(context.filesDir, "brain.txt")
-        val brainContent = if (brainFile.exists()) brainFile.readText() else "Выводов пока нет."
-
-        try {
-            val scrollView = ScrollView(context).apply {
-                setPadding(0, 0, 0, 0)
-                isVerticalScrollBarEnabled = true
-            }
-            val e = EditText(context).apply {
-                setText(brainContent)
-                textSize = 11f
-                setTextColor(0xFF333333.toInt())
-                typeface = Typeface.MONOSPACE
-                gravity = android.view.Gravity.TOP
-                setPadding(20, 20, 20, 20)
-                isVerticalScrollBarEnabled = false
-                background = null
-                minLines = 20
-                inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
-            }
-            scrollView.addView(e)
-
-            val layout = LinearLayout(context).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(0, 0, 0, 0)
-            }
-            val titleView = TextView(context).apply {
-                text = "ВЫВОДЫ НЕО (brain.txt)"
-                textSize = 16f
-                setTextColor(0xFF21A038.toInt())
-                setPadding(30, 30, 30, 10)
-                gravity = android.view.Gravity.CENTER
-                typeface = Typeface.DEFAULT_BOLD
-            }
-            layout.addView(titleView)
-            layout.addView(scrollView, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
-                1f
-            ))
-
-            val btnLayout = LinearLayout(context).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = android.view.Gravity.CENTER
-                setPadding(10, 10, 10, 20)
-            }
-            val saveBtn = Button(context).apply {
-                text = "СОХРАНИТЬ"
-                textSize = 12f
-                setTextColor(Color.WHITE)
-                setBackgroundColor(Color.parseColor("#21A038"))
-            }
-            val copyBtn = Button(context).apply {
-                text = "КОПИРОВАТЬ"
-                textSize = 12f
-                setTextColor(Color.WHITE)
-                setBackgroundColor(Color.parseColor("#21A038"))
-            }
-            val closeBtn = Button(context).apply {
-                text = "ЗАКРЫТЬ"
-                textSize = 12f
-                setTextColor(Color.WHITE)
-                setBackgroundColor(Color.parseColor("#21A038"))
-            }
-            btnLayout.addView(saveBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(4, 0, 4, 0) })
-            btnLayout.addView(copyBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(4, 0, 4, 0) })
-            btnLayout.addView(closeBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(4, 0, 4, 0) })
-            layout.addView(btnLayout)
-
-            val dialog = AlertDialog.Builder(context)
-                .setView(layout)
-                .create()
-            dialog.show()
-
-            dialog.window?.setLayout(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                (context.resources.displayMetrics.heightPixels * 0.85).toInt()
-            )
-
-            saveBtn.setOnClickListener {
-                brainFile.writeText(e.text.toString())
-                dialog.dismiss()
-            }
-            copyBtn.setOnClickListener {
-                (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("", e.text))
-                dialog.dismiss()
-            }
-            closeBtn.setOnClickListener { dialog.dismiss() }
-        } catch (_: Exception) {}
     }
 }
