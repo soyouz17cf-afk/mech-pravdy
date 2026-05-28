@@ -60,14 +60,12 @@ class MainActivity : AppCompatActivity() {
     private var isModelLoaded = false
     private var downloadId: Long = -1L
 
-    // Нативные методы из libai-chat.so
     private external fun aiChatLoadModel(modelPath: String): Boolean
     external fun aiChatComplete(prompt: String): String
     private external fun aiChatStop()
 
     private var librariesLoaded = false
 
-    // Порядок загрузки библиотек (строго по зависимостям)
     private val requiredLibraries = listOf(
         "datastore_shared_counter",
         "ggml-base",
@@ -305,6 +303,10 @@ class MainActivity : AppCompatActivity() {
             appendChat("[МОЗГ] Мозги уже скачаны. Загружаю...")
             setStatus("Загружаю...", "yellow")
 
+            // Останавливаем матрицу и чистим память
+            matrixHeader.postInvalidate()
+            System.gc()
+
             val progressDialog = ProgressDialog(this).apply {
                 setTitle("Меч Правды")
                 setMessage("Загрузка библиотек и модели...\nПожалуйста, подождите.")
@@ -326,18 +328,26 @@ class MainActivity : AppCompatActivity() {
                             appendChat("[МОЗГ] Модель загружена! Готов к бою!")
                             setStatus("МИСТРАЛЬ", "green")
                         } else {
-                            appendChat("[МОЗГ] Ошибка загрузки модели.")
+                            appendChat("[МОЗГ] Модель не загрузилась. Попробуйте другую.")
                             setStatus("МИСТРАЛЬ", "yellow")
                         }
                     }
                 } catch (e: Exception) {
                     runOnUiThread {
                         progressDialog.dismiss()
-                        appendChat("[МОЗГ] Ошибка: ${e.message}")
+                        appendChat("[МОЗГ] Ошибка: ${e.message}. Приложение продолжает работать.")
+                        setStatus("Ошибка", "red")
+                    }
+                } catch (t: Throwable) {
+                    runOnUiThread {
+                        progressDialog.dismiss()
+                        appendChat("[МОЗГ] Критический сбой. Приложение продолжает работать.")
                         setStatus("Ошибка", "red")
                     }
                 }
             }
+            // Перезапускаем матрицу после завершения потока
+            matrixHeader.postInvalidateDelayed(100)
             return
         }
 
