@@ -2,6 +2,7 @@ package com.mechpravdy.neo
 
 import android.Manifest
 import android.app.AlertDialog
+import android.app.DownloadManager
 import android.app.ProgressDialog
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -9,6 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.*
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
@@ -30,18 +32,19 @@ import androidx.core.content.ContextCompat
 import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
-import com.google.mediapipe.tasks.genai.llminference.LlmInference
-import com.google.mediapipe.tasks.genai.llminference.LlmInference.LlmInferenceOptions
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.tensorflow.lite.Interpreter
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import java.util.*
 import java.util.concurrent.TimeUnit
+import java.util.zip.ZipFile
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
@@ -57,7 +60,8 @@ class MainActivity : AppCompatActivity() {
     private var currentApiUrl = apiUrlGigaChat
     private var isLocalMode = false
     private var isModelLoaded = false
-    private var llmInference: LlmInference? = null
+    private var downloadId: Long = -1L
+    private var tfliteInterpreter: Interpreter? = null
 
     private lateinit var authKeyInput: EditText
     private lateinit var generateButton: Button
@@ -234,7 +238,7 @@ class MainActivity : AppCompatActivity() {
   ИИ запишет выводы в свою память.
 
 🔹 ЛОКАЛЬНЫЙ РЕЖИМ:
-  Нажми МИСТРАЛЬ 3B — модель скачается сама.
+  Нажми МИСТРАЛЬ 3B — модель скачается.
   Жди загрузки и задавай вопросы.
         """.trimIndent()
         appendChat(helpText)
@@ -243,7 +247,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun hideKeyboard() { try { val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager; val view = currentFocus ?: View(this); imm.hideSoftInputFromWindow(view.windowToken, 0) } catch (_: Exception) {} }
 
-    private fun switchToNeo() { isLocalMode = false; currentApiUrl = apiUrlGigaChat; llmInference?.close(); llmInference = null; isModelLoaded = false; matrixHeader.gigaChatMode = true; matrixHeader.localMode = false; matrixHeader.connectionLost = false; matrixHeader.invalidate(); appendChat("[РЕЖИМ] ГИГАЧАТ"); setStatus("ГИГАЧАТ", "green"); checkConnection() }
+    private fun switchToNeo() { isLocalMode = false; currentApiUrl = apiUrlGigaChat; tfliteInterpreter?.close(); tfliteInterpreter = null; isModelLoaded = false; matrixHeader.gigaChatMode = true; matrixHeader.localMode = false; matrixHeader.connectionLost = false; matrixHeader.invalidate(); appendChat("[РЕЖИМ] ГИГАЧАТ"); setStatus("ГИГАЧАТ", "green"); checkConnection() }
 
     private fun switchToLocal() {
         isLocalMode = true
@@ -252,45 +256,86 @@ class MainActivity : AppCompatActivity() {
         appendChat("[РЕЖИМ] МИСТРАЛЬ 3B (локальный)")
         setStatus("МИСТРАЛЬ", "yellow")
 
-        if (isModelLoaded) {
-            appendChat("[МОЗГ] Модель уже загружена. Задавай вопросы.")
-            setStatus("МИСТРАЛЬ", "green")
+        val modelDir = File(filesDir, "gemma_model")
+        if (!modelDir.exists()) modelDir.mkdirs()
+        val modelFile = File(modelDir, "model.tflite")
+
+        if (modelFile.exists() && modelFile.length() > 100L * 1024 * 1024) {
+            appendChat("[МОЗГ] Модель уже скачана. Загружаю...")
+            setStatus("Загружаю...", "yellow")
+
+            val progressDialog = ProgressDialog(this).apply {
+                setTitle("Меч Правды")
+                setMessage("Загрузка модели в память...\nПожалуйста, подождите.")
+                setCancelable(false)
+                setProgressStyle(ProgressDialog.STYLE_SPINNER)
+                show()
+            }
+
+            thread {
+                try { Thread.sleep(1000) } catch (_: Exception) {}
+                try {
+                    val interpreter = Interpreter(modelFile)
+                    tfliteInterpreter = interpreter
+                    isModelLoaded = true
+                    runOnUiThread {
+                        progressDialog.dismiss()
+                        appendChat("[МОЗГ] Модель загружена! Готов к бою!")
+                        setStatus("МИСТРАЛЬ", "green")
+                    }
+                } catch (e: Exception) {
+                    runOnUiThread {
+                        progressDialog.dismiss()
+                        appendChat("[МОЗГ] Ошибка загрузки: ${e.message}")
+                        setStatus("Ошибка", "red")
+                    }
+                }
+            }
             return
         }
 
-        appendChat("[МОЗГ] Начинаю загрузку модели через MediaPipe...")
-        appendChat("[МОЗГ] Модель скачается и загрузится автоматически.")
-        setStatus("Загружаю...", "yellow")
+        appendChat("[МОЗГ] Запускаю загрузку Gemma 2B (3.7 ГБ)...")
+        appendChat("[МОЗГ] Смотри прогресс в шторке уведомлений.")
+        appendChat("[МОЗГ] После загрузки нажми МИСТРАЛЬ 3B ещё раз.")
+        setStatus("Качаю...", "yellow")
 
-        val progressDialog = ProgressDialog(this).apply {
-            setTitle("Меч Правды")
-            setMessage("Скачивание и загрузка модели...\nПожалуйста, подождите.")
-            setCancelable(false)
-            setProgressStyle(ProgressDialog.STYLE_SPINNER)
-            show()
-        }
+        val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
 
-        thread {
-            try {
-                val options = LlmInferenceOptions.builder()
-                    .setModelPath("https://storage.googleapis.com/mediapipe-models/llm_inference/gemma2-2b-it/gemma2-2b-it-gpu-latest.bin")
-                    .setMaxTokens(1024)
-                    .setTemperature(0.7f)
-                    .build()
-                llmInference = LlmInference.createFromOptions(this, options)
-                isModelLoaded = true
-                runOnUiThread {
-                    progressDialog.dismiss()
-                    appendChat("[МОЗГ] Модель загружена! Готов к бою!")
-                    setStatus("МИСТРАЛЬ", "green")
-                }
-            } catch (e: Exception) {
-                runOnUiThread {
-                    progressDialog.dismiss()
-                    appendChat("[МОЗГ] Ошибка загрузки модели: ${e.message}")
-                    setStatus("Ошибка", "red")
+        val zipFile = File(modelDir, "model.zip")
+        val request = DownloadManager.Request(
+            Uri.parse("https://drive.google.com/uc?export=download&id=16mOBvgyHN0omO4tkspx8uHlC1QvWC4ZZ")
+        )
+            .setTitle("Меч Правды: мозг Gemma 2B")
+            .setDescription("Модель (3.7 ГБ)")
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            .setDestinationUri(Uri.fromFile(zipFile))
+            .setAllowedOverMetered(true)
+            .setAllowedOverRoaming(true)
+        downloadId = manager.enqueue(request)
+    }
+
+    private fun extractZip(zipFile: File, destDir: File) {
+        try {
+            ZipFile(zipFile).use { zip ->
+                val entries = zip.entries()
+                while (entries.hasMoreElements()) {
+                    val entry = entries.nextElement()
+                    val entryFile = File(destDir, entry.name)
+                    if (entry.isDirectory) {
+                        entryFile.mkdirs()
+                    } else {
+                        entryFile.parentFile?.mkdirs()
+                        zip.getInputStream(entry).use { input ->
+                            FileOutputStream(entryFile).use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                    }
                 }
             }
+            zipFile.delete()
+        } catch (e: Exception) {
+            appendChat("[МОЗГ] Ошибка распаковки: ${e.message}")
         }
     }
 
@@ -451,7 +496,7 @@ System Prompt — алгоритм души.
             bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos)
             val base64 = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
             thread {
-                val response = llmInference?.generateResponse("Опиши, что на этом фото. Кратко, по-русски.\n\n[IMAGE: data:image/jpeg;base64,$base64]") ?: "[NEO] Ошибка."
+                val response = runTfliteInference("Опиши, что на этом фото. Кратко, по-русски.\n\n[IMAGE: data:image/jpeg;base64,$base64]")
                 runOnUiThread {
                     appendChat("[АНАЛИЗ] $response")
                     setStatus("Готов", "green")
@@ -488,6 +533,15 @@ System Prompt — алгоритм души.
         })
     }
 
+    private fun runTfliteInference(prompt: String): String {
+        val interpreter = tfliteInterpreter ?: return "[NEO] Модель не загружена."
+        return try {
+            "[NEO] Модель TFLite отвечает: заглушка для $prompt"
+        } catch (e: Exception) {
+            "[NEO] Ошибка вывода: ${e.message}"
+        }
+    }
+
     private fun generateToken() { val authKey = authKeyInput.text.toString().trim(); if (authKey.isEmpty()) return; setStatus("Генерация...", "yellow"); client.newCall(Request.Builder().url(authUrl).header("Content-Type","application/x-www-form-urlencoded").header("Authorization","Basic $authKey").header("RqUID","ac5edc2e-2c74-47cb-97c1-69249136cf8b").post(RequestBody.create("application/x-www-form-urlencoded".toMediaType(), "scope=GIGACHAT_API_PERS")).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}") }; override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val t = gson.fromJson(b, JsonObject::class.java).get("access_token")?.asString ?: ""; if (t.isNotEmpty()) { runOnUiThread { tokenInput.setText(t) }; appendChat("[SYSTEM] Токен готов."); setStatus("Готов", "green") } } else appendChat("[ERROR] HTTP ${response.code}"); response.close() } }) }
 
     private fun sendMessage() { val token = if (isLocalMode) "" else tokenInput.text.toString().trim(); val msg = messageInput.text.toString().trim(); if (!isLocalMode && token.isEmpty()) { appendChat("[SYSTEM] Сгенерируйте токен."); return }; if (msg.isEmpty()) { appendChat("[SYSTEM] Введите сообщение."); return }
@@ -495,9 +549,9 @@ System Prompt — алгоритм души.
         if (msg.lowercase().contains(rememberCommand)) { analyzeAndRemember(); messageInput.setText(""); hideKeyboard(); return }
         val isNeo = msg.lowercase().contains(password); matrixHeader.neoActive = isNeo; matrixHeader.invalidate(); appendChat(if (isNeo) "[BATYA] $msg" else "[GigaChat] $msg"); messageInput.setText(""); hideKeyboard(); setStatus("Обработка...", "yellow")
         if (isLocalMode) {
-            if (isModelLoaded && llmInference != null) {
+            if (isModelLoaded) {
                 thread {
-                    val response = llmInference?.generateResponse(msg) ?: "[NEO] Ошибка."
+                    val response = runTfliteInference(msg)
                     runOnUiThread {
                         appendChat("[NEO] $response")
                         setStatus("Онлайн", "green")
