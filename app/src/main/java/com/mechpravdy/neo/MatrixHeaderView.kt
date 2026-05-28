@@ -86,9 +86,9 @@ class MatrixHeaderView @JvmOverloads constructor(
         neoButtonRect = RectF(btnLeft, btnY, btnLeft + btnW, btnY + btnH)
         localButtonRect = RectF(btnLeft + btnW + gap, btnY, btnLeft + btnW + gap + btnW, btnY + btnH)
 
-        // Мурзёха — прямо под кнопками, отступ 2px
-        val murzikSize = w * 0.25f
-        murzikRect = RectF((w - murzikSize) / 2f, btnY + btnH + 2f, (w + murzikSize) / 2f, btnY + btnH + 2f + murzikSize)
+        // Мурзёха — 100px, отступ от кнопок 0
+        val murzikSize = 100f
+        murzikRect = RectF((w - murzikSize) / 2f, btnY + btnH, (w + murzikSize) / 2f, btnY + btnH + murzikSize)
 
         try {
             murzikBitmap = BitmapFactory.decodeResource(resources, R.drawable.murzik)
@@ -152,9 +152,9 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRoundRect(localButtonRect, 10f, 10f, btnPaint)
         canvas.drawText("МИСТРАЛЬ 3B", localButtonRect.centerX(), localButtonRect.centerY() + 5f, btnTextPaint)
 
-        // Мурзёха — прямоугольник с чуть закруглёнными углами (24f)
+        // Мурзёха — закруглённые углы, ровно 100x100
         murzikBitmap?.let { bitmap ->
-            val radius = 24f
+            val radius = 20f
             val clipPath = android.graphics.Path().apply {
                 addRoundRect(murzikRect, radius, radius, android.graphics.Path.Direction.CW)
             }
