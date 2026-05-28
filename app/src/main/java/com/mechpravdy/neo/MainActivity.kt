@@ -64,41 +64,6 @@ class MainActivity : AppCompatActivity() {
     external fun aiChatComplete(prompt: String): String
     private external fun aiChatStop()
 
-    private var librariesLoaded = false
-
-    private val requiredLibraries = listOf(
-        "datastore_shared_counter",
-        "ggml-base",
-        "ggml",
-        "ggml-cpu-android_armv8.0_1",
-        "ggml-cpu-android_armv8.2_1",
-        "ggml-cpu-android_armv8.2_2",
-        "ggml-cpu-android_armv8.6_1",
-        "ggml-cpu-android_armv9.0_1",
-        "ggml-cpu-android_armv9.2_1",
-        "ggml-cpu-android_armv9.2_2",
-        "image_processing_util_jni",
-        "kleidia1",
-        "omp",
-        "llama",
-        "llama-common",
-        "surface_util_jni",
-        "mtmd",
-        "ai-chat"
-    )
-
-    private fun loadAllLibraries() {
-        if (librariesLoaded) return
-        for (lib in requiredLibraries) {
-            try {
-                System.loadLibrary(lib)
-            } catch (e: Exception) {
-                appendChat("[БИБЛ] Ошибка: ${e.message}")
-            }
-        }
-        librariesLoaded = true
-    }
-
     private lateinit var authKeyInput: EditText
     private lateinit var generateButton: Button
     private lateinit var tokenInput: EditText
@@ -306,7 +271,7 @@ class MainActivity : AppCompatActivity() {
 
             val progressDialog = ProgressDialog(this).apply {
                 setTitle("Меч Правды")
-                setMessage("Загрузка библиотек и модели...\nПожалуйста, подождите.")
+                setMessage("Загрузка модели...\nПожалуйста, подождите.")
                 setCancelable(false)
                 setProgressStyle(ProgressDialog.STYLE_SPINNER)
                 show()
@@ -315,8 +280,6 @@ class MainActivity : AppCompatActivity() {
             thread {
                 try { Thread.sleep(1000) } catch (_: Exception) {}
                 try {
-                    loadAllLibraries()
-                    Thread.sleep(500)
                     val result = aiChatLoadModel(modelFile.absolutePath)
                     runOnUiThread {
                         progressDialog.dismiss()
