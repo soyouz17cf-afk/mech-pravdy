@@ -7,10 +7,8 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
-import android.graphics.BitmapFactory
 import android.util.AttributeSet
 import android.view.View
 import android.widget.Button
@@ -50,7 +48,6 @@ class MatrixHeaderView @JvmOverloads constructor(
     var onLocalClick: (() -> Unit)? = null
 
     private var logoRect = RectF()
-    private var murzikRect = RectF()
     private var columns = 0
     private val linePool = arrayOfNulls<String>(maxPoolSize)
     private val linePoolIndex = IntArray(maxLines) { -1 }
@@ -59,8 +56,6 @@ class MatrixHeaderView @JvmOverloads constructor(
     private var nextPoolSlot = 0
     private var screenH = 0f
     private var frame = 0
-
-    private var murzikBitmap: android.graphics.Bitmap? = null
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -85,15 +80,6 @@ class MatrixHeaderView @JvmOverloads constructor(
         val btnLeft = (w - totalBtnW) / 2f
         neoButtonRect = RectF(btnLeft, btnY, btnLeft + btnW, btnY + btnH)
         localButtonRect = RectF(btnLeft + btnW + gap, btnY, btnLeft + btnW + gap + btnW, btnY + btnH)
-
-        // Место под фото Мурзёхи
-        val murzikSize = w * 0.25f
-        murzikRect = RectF((w - murzikSize) / 2f, btnY + btnH + 8f, (w + murzikSize) / 2f, btnY + btnH + 8f + murzikSize)
-
-        // Загружаем фото Мурзёхи
-        try {
-            murzikBitmap = BitmapFactory.decodeResource(resources, R.drawable.murzik)
-        } catch (_: Exception) {}
     }
 
     private fun generateLine() = if (Random.nextFloat() < 0.15f) { words[Random.nextInt(words.size)] } else { CharArray(columns) { if (Random.nextFloat() > 0.5f) '0' else '1' }.joinToString("") }
@@ -153,39 +139,6 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRoundRect(localButtonRect, 10f, 10f, btnPaint)
         canvas.drawText("МИСТРАЛЬ 3B", localButtonRect.centerX(), localButtonRect.centerY() + 5f, btnTextPaint)
 
-        // Фото Мурзёхи с закруглёнными верхним левым и нижним правым углами
-        murzikBitmap?.let { bitmap ->
-            val radius = 32f
-            val clipPath = android.graphics.Path().apply {
-                // Верхний левый угол закруглён
-                moveTo(murzikRect.left + radius, murzikRect.top)
-                lineTo(murzikRect.right, murzikRect.top)
-                // Нижний правый угол закруглён
-                lineTo(murzikRect.right, murzikRect.bottom - radius)
-                quadTo(murzikRect.right, murzikRect.bottom, murzikRect.right - radius, murzikRect.bottom)
-                lineTo(murzikRect.left, murzikRect.bottom)
-                lineTo(murzikRect.left, murzikRect.top + radius)
-                quadTo(murzikRect.left, murzikRect.top, murzikRect.left + radius, murzikRect.top)
-                close()
-            }
-            canvas.save()
-            canvas.clipPath(clipPath)
-
-            // Вычисляем пропорции, чтобы вписать изображение целиком
-            val srcRect = Rect(0, 0, bitmap.width, bitmap.height)
-            val scaleX = murzikRect.width() / bitmap.width
-            val scaleY = murzikRect.height() / bitmap.height
-            val scale = minOf(scaleX, scaleY)
-            val newWidth = bitmap.width * scale
-            val newHeight = bitmap.height * scale
-            val left = murzikRect.centerX() - newWidth / 2
-            val top = murzikRect.centerY() - newHeight / 2
-            val fittedRect = RectF(left, top, left + newWidth, top + newHeight)
-
-            canvas.drawBitmap(bitmap, srcRect, fittedRect, null)
-            canvas.restore()
-        }
-
         // Светофор
         val dotRadius = 14f
         val dotSpacing = 30f
@@ -213,7 +166,6 @@ class MatrixHeaderView @JvmOverloads constructor(
     fun handleTouch(x: Float, y: Float) {
         if (neoButtonRect.contains(x, y)) onNeoClick?.invoke()
         else if (localButtonRect.contains(x, y)) onLocalClick?.invoke()
-        else if (murzikRect.contains(x, y)) showBrainDialog()
     }
 
     private fun showBrainDialog() {
