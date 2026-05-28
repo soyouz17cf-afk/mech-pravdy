@@ -11,6 +11,7 @@ import android.content.pm.PackageManager
 import android.graphics.*
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.provider.MediaStore
 import android.speech.RecognizerIntent
 import android.util.Base64
@@ -57,14 +58,6 @@ class MainActivity : AppCompatActivity() {
     private var currentApiUrl = apiUrlGigaChat
     private var isLocalMode = false
     private var isModelLoaded = false
-
-    private val partUrls = listOf(
-        "https://drive.google.com/uc?export=download&id=1y5tiaYStps0obHOoYSgOCy8jcSBM7x12",
-        "https://drive.google.com/uc?export=download&id=1ukLGottCyydidVS6sFPqjbKvWHIZF4cF",
-        "https://drive.google.com/uc?export=download&id=1MWR2NmpCPf5MJhSMkFuwd7ky8bj61ggW",
-        "https://drive.google.com/uc?export=download&id=11XMC_w7rIZ43Uy4BJybbjEyaTVV_xZ4X",
-        "https://drive.google.com/uc?export=download&id=1nRwUH2XRto1QF_wvYQhBgFwbTubsVXt8"
-    )
 
     private lateinit var authKeyInput: EditText
     private lateinit var generateButton: Button
@@ -241,8 +234,8 @@ class MainActivity : AppCompatActivity() {
   ИИ запишет выводы в свою память.
 
 🔹 ЛОКАЛЬНЫЙ РЕЖИМ:
-  Нажми МИСТРАЛЬ 3B — модель скачается.
-  Жди загрузки и задавай вопросы.
+  Положи части архива в папку Download.
+  Нажми МИСТРАЛЬ 3B.
         """.trimIndent()
         appendChat(helpText)
         setStatus("Помощь", "green")
@@ -264,7 +257,7 @@ class MainActivity : AppCompatActivity() {
         val modelFile = File(modelDir, "gemma-2b-it-gpu-int8.bin")
 
         if (modelFile.exists() && modelFile.length() > 500L * 1024 * 1024) {
-            appendChat("[МОЗГ] Модель уже скачана. Загружаю...")
+            appendChat("[МОЗГ] Модель уже собрана. Загружаю...")
             setStatus("Загружаю...", "yellow")
 
             val progressDialog = ProgressDialog(this).apply {
@@ -296,71 +289,60 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        appendChat("[МОЗГ] Скачиваю Gemma 2B (5 частей)...")
-        setStatus("Качаю...", "yellow")
-
-        val progressDialog = ProgressDialog(this).apply {
-            setTitle("Меч Правды")
-            setMessage("Скачивание модели...\nПожалуйста, подождите.")
-            setCancelable(false)
-            setProgressStyle(ProgressDialog.STYLE_SPINNER)
-            show()
+        // Ищем части архива в папке Download
+        val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        val partFiles = (1..5).mapNotNull { i ->
+            val file = File(downloadDir, "gemma-2b-it-gpu-int8.part${String.format("%02d", i)}.rar")
+            if (file.exists()) file else null
         }
 
-        thread {
-            try {
-                val partFiles = mutableListOf<File>()
-                for ((index, url) in partUrls.withIndex()) {
-                    val partFile = File(modelDir, "model.part${index + 1}.rar")
-                    downloadFile(url, partFile)
-                    partFiles.add(partFile)
-                    runOnUiThread {
-                        appendChat("[МОЗГ] Часть ${index + 1}/5 скачана.")
-                    }
-                }
+        if (partFiles.size == 5) {
+            appendChat("[МОЗГ] Найдены все 5 частей. Собираю...")
+            setStatus("Собираю...", "yellow")
 
-                val combinedFile = File(modelDir, "model_combined.rar")
-                FileOutputStream(combinedFile).use { output ->
-                    for (partFile in partFiles) {
-                        partFile.inputStream().use { input ->
-                            input.copyTo(output)
+            val progressDialog = ProgressDialog(this).apply {
+                setTitle("Меч Правды")
+                setMessage("Сборка и распаковка модели...\nПожалуйста, подождите.")
+                setCancelable(false)
+                setProgressStyle(ProgressDialog.STYLE_SPINNER)
+                show()
+            }
+
+            thread {
+                try {
+                    val combinedFile = File(modelDir, "model_combined.rar")
+                    FileOutputStream(combinedFile).use { output ->
+                        for (partFile in partFiles.sortedBy { it.name }) {
+                            partFile.inputStream().use { input ->
+                                input.copyTo(output)
+                            }
                         }
-                        partFile.delete()
+                    }
+
+                    runOnUiThread { appendChat("[МОЗГ] Части собраны. Распаковываю...") }
+
+                    Junrar.extract(combinedFile, modelDir)
+                    combinedFile.delete()
+
+                    runOnUiThread {
+                        progressDialog.dismiss()
+                        appendChat("[МОЗГ] Готово! Нажми МИСТРАЛЬ 3B ещё раз для загрузки модели.")
+                        setStatus("Готов", "green")
+                    }
+                } catch (e: Exception) {
+                    runOnUiThread {
+                        progressDialog.dismiss()
+                        appendChat("[МОЗГ] Ошибка: ${e.message}")
+                        setStatus("Ошибка", "red")
                     }
                 }
-
-                runOnUiThread {
-                    progressDialog.dismiss()
-                    appendChat("[МОЗГ] Части собраны. Распаковываю...")
-                }
-
-                // Используем junrar для распаковки
-                Junrar.extract(combinedFile, modelDir)
-                combinedFile.delete()
-
-                runOnUiThread {
-                    appendChat("[МОЗГ] Готово! Нажми МИСТРАЛЬ 3B ещё раз для загрузки модели.")
-                    setStatus("Готов", "green")
-                }
-            } catch (e: Exception) {
-                runOnUiThread {
-                    progressDialog.dismiss()
-                    appendChat("[МОЗГ] Ошибка скачивания: ${e.message}")
-                    setStatus("Ошибка", "red")
-                }
             }
+            return
         }
-    }
 
-    private fun downloadFile(url: String, destFile: File) {
-        val request = Request.Builder().url(url).build()
-        val response = client.newCall(request).execute()
-        response.body?.byteStream()?.use { input ->
-            FileOutputStream(destFile).use { output ->
-                input.copyTo(output)
-            }
-        }
-        response.close()
+        appendChat("[МОЗГ] Части архива не найдены в папке Download.")
+        appendChat("[МОЗГ] Положите файлы gemma-2b-it-gpu-int8.part01.rar ... part05.rar в Download.")
+        setStatus("Нет файлов", "yellow")
     }
 
     private fun checkConnection() { val testBody = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "ping") }) }); addProperty("max_tokens", 1) }; val request = Request.Builder().url(currentApiUrl); request.header("Authorization", "Bearer ${tokenInput.text.toString().trim()}"); request.post(testBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType())); client.newCall(request.build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { runOnUiThread { matrixHeader.connectionLost = true; setStatus("Нет связи", "red") } }; override fun onResponse(call: Call, response: Response) { runOnUiThread { if (response.isSuccessful) { matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } else { matrixHeader.connectionLost = true; setStatus("Ошибка", "red") } }; response.close() } }) }
