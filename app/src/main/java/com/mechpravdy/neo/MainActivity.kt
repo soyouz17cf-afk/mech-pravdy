@@ -22,12 +22,10 @@ import android.util.Base64
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
-import android.widget.RelativeLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.view.MotionEvent
 import android.view.View
-import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -112,87 +110,59 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // ========== МАКСИМАЛЬНОЕ ВЫДЕЛЕНИЕ ПАМЯТИ (без экономии) ==========
-        try {
-            // Убираем ограничения кучи - просим максимум
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        // Максимальное выделение памяти
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
                 val vmRuntime = Class.forName("dalvik.system.VMRuntime")
                 val getRuntime = vmRuntime.getMethod("getRuntime")
                 val runtime = getRuntime.invoke(null)
-                // Увеличиваем целевое использование кучи до 100% (без экономии)
                 val setTargetHeapUtilization = vmRuntime.getMethod("setTargetHeapUtilization", Double::class.java)
                 setTargetHeapUtilization.invoke(runtime, 1.0)
-                appendChat("[RAM] Heap utilization установлена на 100% (без экономии)")
-            }
-            
-            // Выводим информацию о памяти
-            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-            val memoryInfo = ActivityManager.MemoryInfo()
-            am.getMemoryInfo(memoryInfo)
-            val totalRAM = memoryInfo.totalMem / (1024 * 1024)
-            val availRAM = memoryInfo.availMem / (1024 * 1024)
-            val largeMemoryClass = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) am.largeMemoryClass else am.memoryClass
-            appendChat("[RAM] Всего RAM: $totalRAM MB, Свободно: $availRAM MB, LargeHeap лимит: $largeMemoryClass MB")
-            
-            // Выводим текущий heap приложения
-            val runtime = Runtime.getRuntime()
-            val maxMemory = runtime.maxMemory() / (1024 * 1024)
-            val totalMemory = runtime.totalMemory() / (1024 * 1024)
-            appendChat("[RAM] Приложение: heap max=$maxMemory MB, used=$totalMemory MB")
-            
-        } catch (e: Exception) {
-            appendChat("[RAM] Ошибка: ${e.message}")
+            } catch (e: Exception) { }
         }
-        // ===================================================
         
-        try {
-            window.statusBarColor = Color.parseColor("#1A8A2E"); setContentView(R.layout.activity_main)
-            matrixHeader = findViewById(R.id.matrixHeader)
-            authKeyInput = findViewById(R.id.authKeyInput); generateButton = findViewById(R.id.generateButton)
-            tokenInput = findViewById(R.id.tokenInput); messageInput = findViewById(R.id.messageInput)
-            sendButton = findViewById(R.id.sendButton); voiceButton = findViewById(R.id.voiceButton)
-            cameraButton = findViewById(R.id.cameraButton); checkButton = findViewById(R.id.checkButton)
-            capsuleButton = findViewById(R.id.capsuleButton); attachButton = findViewById(R.id.attachButton)
-            chatOutput = findViewById(R.id.chatOutput); statusText = findViewById(R.id.statusText); statusDot = findViewById(R.id.statusDot)
-            
-            // Добавляем TextView для памяти в шапку справа от Мурзёхи
-            val rootLayout = findViewById<View>(android.R.id.content) as ViewGroup
-            memoryTextView = TextView(this).apply {
-                textSize = 11f
-                setTextColor(Color.parseColor("#21A038"))
-                typeface = Typeface.MONOSPACE
-                setPadding(8, 0, 16, 0)
-                gravity = android.view.Gravity.END or android.view.Gravity.CENTER_VERTICAL
-                layoutParams = RelativeLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT
-                ).apply {
-                    addRule(RelativeLayout.ALIGN_PARENT_END)
-                    addRule(RelativeLayout.CENTER_VERTICAL)
-                }
-            }
-            (rootLayout.getChildAt(0) as? ViewGroup)?.addView(memoryTextView)
-            
-            updateMemoryDisplay()
-            memoryHandler.post(memoryUpdateRunnable)
+        setContentView(R.layout.activity_main)
+        
+        matrixHeader = findViewById(R.id.matrixHeader)
+        authKeyInput = findViewById(R.id.authKeyInput)
+        generateButton = findViewById(R.id.generateButton)
+        tokenInput = findViewById(R.id.tokenInput)
+        messageInput = findViewById(R.id.messageInput)
+        sendButton = findViewById(R.id.sendButton)
+        voiceButton = findViewById(R.id.voiceButton)
+        cameraButton = findViewById(R.id.cameraButton)
+        checkButton = findViewById(R.id.checkButton)
+        capsuleButton = findViewById(R.id.capsuleButton)
+        attachButton = findViewById(R.id.attachButton)
+        chatOutput = findViewById(R.id.chatOutput)
+        statusText = findViewById(R.id.statusText)
+        statusDot = findViewById(R.id.statusDot)
+        memoryTextView = findViewById(R.id.memoryText)
+        
+        updateMemoryDisplay()
+        memoryHandler.post(memoryUpdateRunnable)
 
-            matrixHeader.onNeoClick = { switchToNeo() }
-            matrixHeader.onLocalClick = { switchToLocal() }
-            matrixHeader.setOnTouchListener { _, event -> if (event.action == MotionEvent.ACTION_DOWN) { matrixHeader.handleTouch(event.x, event.y) }; true }
+        matrixHeader.onNeoClick = { switchToNeo() }
+        matrixHeader.onLocalClick = { switchToLocal() }
+        matrixHeader.setOnTouchListener { _, event -> if (event.action == MotionEvent.ACTION_DOWN) { matrixHeader.handleTouch(event.x, event.y) }; true }
 
-            val savedMemory = loadMemory()
-            if (savedMemory.isNotBlank()) { chatOutput.setText(savedMemory) }
+        val savedMemory = loadMemory()
+        if (savedMemory.isNotBlank()) { chatOutput.setText(savedMemory) }
 
-            generateButton.setOnClickListener { hideKeyboard(); generateToken() }
-            sendButton.setOnClickListener { hideKeyboard(); appendChat("[ℹ] Отправка сообщения"); sendMessage() }
-            voiceButton.setOnClickListener { hideKeyboard(); appendChat("[ℹ] Голосовой ввод"); startVoiceInput() }
-            cameraButton.setOnClickListener { hideKeyboard(); appendChat("[ℹ] Анализ фото"); captureAndAnalyze() }
-            attachButton.setOnClickListener { hideKeyboard(); appendChat("[ℹ] Вставка текста из буфера"); pasteFromClipboard() }
-            checkButton.setOnClickListener { hideKeyboard(); appendChat("[ℹ] Проверка токена"); checkToken() }
-            capsuleButton.setOnClickListener { hideKeyboard(); showCapsuleDialog() }
+        generateButton.setOnClickListener { hideKeyboard(); generateToken() }
+        sendButton.setOnClickListener { hideKeyboard(); appendChat("[ℹ] Отправка сообщения"); sendMessage() }
+        voiceButton.setOnClickListener { hideKeyboard(); appendChat("[ℹ] Голосовой ввод"); startVoiceInput() }
+        cameraButton.setOnClickListener { hideKeyboard(); appendChat("[ℹ] Анализ фото"); captureAndAnalyze() }
+        attachButton.setOnClickListener { hideKeyboard(); appendChat("[ℹ] Вставка текста из буфера"); pasteFromClipboard() }
+        checkButton.setOnClickListener { hideKeyboard(); appendChat("[ℹ] Проверка токена"); checkToken() }
+        capsuleButton.setOnClickListener { hideKeyboard(); showCapsuleDialog() }
 
-            requestAllPermissions()
-        } catch (e: Exception) { Toast.makeText(this, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show() }
+        requestAllPermissions()
+        
+        // Вывод информации о памяти в чат
+        val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        val largeMemoryClass = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) am.largeMemoryClass else am.memoryClass
+        appendChat("[RAM] LargeHeap лимит: $largeMemoryClass MB")
     }
     
     private fun updateMemoryDisplay() {
@@ -205,7 +175,7 @@ class MainActivity : AppCompatActivity() {
         activityManager.getMemoryInfo(memoryInfo)
         val totalRAM = memoryInfo.totalMem / (1024 * 1024)
         
-        memoryTextView.text = "🧠 $usedMemory/$maxMemory MB\n📱 $totalRAM MB"
+        memoryTextView.text = "🧠 $usedMemory/$maxMemory MB | 📱 $totalRAM MB"
     }
     
     override fun onDestroy() {
@@ -213,13 +183,9 @@ class MainActivity : AppCompatActivity() {
         memoryHandler.removeCallbacks(memoryUpdateRunnable)
     }
 
-    // Отключаем только матрицу в чате, память не экономим
     private fun disableChatMatrixForLocalMode(disable: Boolean) {
-        if (disable) {
-            matrixHeader.stopMatrixInChat()
-        } else {
-            matrixHeader.startMatrixInChat()
-        }
+        if (disable) matrixHeader.stopMatrixInChat()
+        else matrixHeader.startMatrixInChat()
     }
 
     private fun requestAllPermissions() {
@@ -391,7 +357,7 @@ class MainActivity : AppCompatActivity() {
                 try {
                     val options = LlmInference.LlmInferenceOptions.builder()
                         .setModelPath(modelFile.absolutePath)
-                        .setMaxTokens(1024)  // Полный размер, никакой экономии
+                        .setMaxTokens(1024)
                         .setTemperature(0.7f)
                         .setTopK(40)
                         .build()
@@ -401,7 +367,6 @@ class MainActivity : AppCompatActivity() {
                         progressDialog.dismiss()
                         appendChat("[МОЗГ] Модель загружена! Готов к бою!")
                         setStatus("МИСТРАЛЬ", "green")
-                        // Отключаем только матрицу в чате, чтобы не мешала, но память не экономим
                         disableChatMatrixForLocalMode(true)
                     }
                 } catch (e: Exception) {
@@ -829,7 +794,7 @@ System Prompt — алгоритм души.
                     } catch (e: Exception) {
                         runOnUiThread {
                             appendChat("[NEO] ОШИБКА: ${e.message}")
-                            appendChat("[NEO] Проверь память: ${Runtime.getRuntime().maxMemory() / (1024 * 1024)} MB max")
+                            appendChat("[NEO] Max heap: ${Runtime.getRuntime().maxMemory() / (1024 * 1024)} MB")
                             setStatus("Ошибка", "red")
                             e.printStackTrace()
                         }
