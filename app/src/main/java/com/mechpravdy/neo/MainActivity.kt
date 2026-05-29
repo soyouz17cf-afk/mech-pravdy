@@ -13,9 +13,9 @@ import android.graphics.*
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Environment
 import android.provider.MediaStore
 import android.speech.RecognizerIntent
+import android.text.format.DateFormat
 import android.util.Base64
 import android.widget.Button
 import android.widget.EditText
@@ -69,6 +69,10 @@ class MainActivity : AppCompatActivity() {
         "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-2b-it-cpu-int8.part5.rar"
     )
 
+    private external fun llamaLoadModel(modelPath: String): Boolean
+    external fun llamaComplete(prompt: String): String
+    private external fun llamaStop()
+
     private lateinit var authKeyInput: EditText
     private lateinit var generateButton: Button
     private lateinit var tokenInput: EditText
@@ -93,7 +97,7 @@ class MainActivity : AppCompatActivity() {
 
     private val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager { override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}; override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}; override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf() })
     private val sslContext = SSLContext.getInstance("TLS").apply { init(null, trustAllCerts, SecureRandom()) }
-    private val client = OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS).readTimeout(300, TimeUnit.SECONDS).writeTimeout(30, TimeUnit.SECONDS).retryOnConnectionFailure(true).sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager).hostnameVerifier { _, _ -> true }.build()
+    private val client = OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS).writeTimeout(30, TimeUnit.SECONDS).retryOnConnectionFailure(true).sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager).hostnameVerifier { _, _ -> true }.build()
     private val gson = Gson()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -253,7 +257,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun hideKeyboard() { try { val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager; val view = currentFocus ?: View(this); imm.hideSoftInputFromWindow(view.windowToken, 0) } catch (_: Exception) {} }
 
-    private fun switchToNeo() { isLocalMode = false; currentApiUrl = apiUrlGigaChat; isModelLoaded = false; matrixHeader.gigaChatMode = true; matrixHeader.localMode = false; matrixHeader.connectionLost = false; matrixHeader.invalidate(); appendChat("[РЕЖИМ] ГИГАЧАТ"); setStatus("ГИГАЧАТ", "green"); checkConnection() }
+    private fun switchToNeo() { isLocalMode = false; currentApiUrl = apiUrlGigaChat; try { llamaStop() } catch (_: Exception) {}; isModelLoaded = false; matrixHeader.gigaChatMode = true; matrixHeader.localMode = false; matrixHeader.connectionLost = false; matrixHeader.invalidate(); appendChat("[РЕЖИМ] ГИГАЧАТ"); setStatus("ГИГАЧАТ", "green"); checkConnection() }
 
     private fun switchToLocal() {
         isLocalMode = true
@@ -262,19 +266,41 @@ class MainActivity : AppCompatActivity() {
         appendChat("[РЕЖИМ] МИСТРАЛЬ 3B (локальный)")
         setStatus("МИСТРАЛЬ", "yellow")
 
-        val modelDir = File(filesDir, "gemma_model")
+        val modelDir = getExternalFilesDir("models") ?: filesDir
         if (!modelDir.exists()) modelDir.mkdirs()
         val modelFile = File(modelDir, "gemma-2b-it-gpu-int8.bin")
 
         if (modelFile.exists() && modelFile.length() > 500L * 1024 * 1024) {
             appendChat("[МОЗГ] Модель уже собрана. Загружаю...")
             setStatus("Загружаю...", "yellow")
+            val progressDialog = ProgressDialog(this).apply {
+                setTitle("Меч Правды")
+                setMessage("Загрузка модели...\nПожалуйста, подождите.")
+                setCancelable(false)
+                setProgressStyle(ProgressDialog.STYLE_SPINNER)
+                show()
+            }
             thread {
-                try { Thread.sleep(1000) } catch (_: Exception) {}
-                isModelLoaded = true
-                runOnUiThread {
-                    appendChat("[МОЗГ] Модель загружена! Готов к бою!")
-                    setStatus("МИСТРАЛЬ", "green")
+                try { Thread.sleep(1500) } catch (_: Exception) {}
+                try {
+                    val result = llamaLoadModel(modelFile.absolutePath)
+                    runOnUiThread {
+                        progressDialog.dismiss()
+                        if (result) {
+                            isModelLoaded = true
+                            appendChat("[МОЗГ] Модель загружена! Готов к бою!")
+                            setStatus("МИСТРАЛЬ", "green")
+                        } else {
+                            appendChat("[МОЗГ] Ошибка загрузки модели.")
+                            setStatus("МИСТРАЛЬ", "yellow")
+                        }
+                    }
+                } catch (e: Exception) {
+                    runOnUiThread {
+                        progressDialog.dismiss()
+                        appendChat("[МОЗГ] Ошибка: ${e.message}")
+                        setStatus("Ошибка", "red")
+                    }
                 }
             }
             return
@@ -286,6 +312,7 @@ class MainActivity : AppCompatActivity() {
         setStatus("Качаю...", "yellow")
 
         val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        downloadIds.clear()
         for ((index, url) in partUrls.withIndex()) {
             val partFile = File(modelDir, "gemma-2b-it-cpu-int8.part${index + 1}.rar")
             val request = DownloadManager.Request(Uri.parse(url))
@@ -434,9 +461,11 @@ System Prompt — алгоритм души.
         if (isLocalMode) {
             if (!isModelLoaded) { appendChat("[АНАЛИЗ] Локальный ИИ ещё не загружен."); return }
             setStatus("Анализ...", "yellow")
+            val baos = ByteArrayOutputStream(); bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos)
+            val base64 = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
             thread {
-                appendChat("[АНАЛИЗ] Локальный анализ фото будет доступен после загрузки модели.")
-                runOnUiThread { setStatus("Готов", "green") }
+                val response = llamaComplete("Опиши, что на этом фото. Кратко, по-русски.\n\n[IMAGE: data:image/jpeg;base64,$base64]")
+                runOnUiThread { appendChat("[АНАЛИЗ] $response"); setStatus("Готов", "green") }
             }
             return
         }
@@ -457,10 +486,7 @@ System Prompt — алгоритм души.
             override fun onFailure(call: Call, e: IOException) { appendChat("[АНАЛИЗ] Ошибка."); setStatus("Готов", "green") }
             override fun onResponse(call: Call, response: Response) {
                 val b = response.body?.string() ?: ""
-                if (response.isSuccessful) {
-                    val a = gson.fromJson(b, JsonObject::class.java).getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString
-                    appendChat("[АНАЛИЗ] $a")
-                } else { appendChat("[АНАЛИЗ] Ошибка HTTP ${response.code}") }
+                if (response.isSuccessful) { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString; appendChat("[АНАЛИЗ] $a") } else { appendChat("[АНАЛИЗ] Ошибка HTTP ${response.code}") }
                 setStatus("Готов", "green"); response.close()
             }
         })
@@ -474,14 +500,8 @@ System Prompt — алгоритм души.
         val isNeo = msg.lowercase().contains(password); matrixHeader.neoActive = isNeo; matrixHeader.invalidate(); appendChat(if (isNeo) "[BATYA] $msg" else "[GigaChat] $msg"); messageInput.setText(""); hideKeyboard(); setStatus("Обработка...", "yellow")
         if (isLocalMode) {
             if (isModelLoaded) {
-                thread {
-                    val response = "[NEO] Модель загружена. Функция генерации ответа в разработке."
-                    runOnUiThread { appendChat(response); setStatus("Онлайн", "green") }
-                }
-            } else {
-                appendChat("[NEO] Модель не загружена. Нажми МИСТРАЛЬ 3B.")
-                setStatus("Онлайн", "green")
-            }
+                thread { val response = llamaComplete(msg); runOnUiThread { appendChat("[NEO] $response"); setStatus("Онлайн", "green") } }
+            } else { appendChat("[NEO] Модель не загружена. Нажми МИСТРАЛЬ 3B."); setStatus("Онлайн", "green") }
         } else { val memoryContext = getLastContext(); val prompt = (if (memoryContext.isNotBlank()) "$memoryContext\n\n" else "") + selectPrompt(msg); val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", prompt) }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", msg) }) }); addProperty("temperature", 0.7); addProperty("max_tokens", 1000) }; client.newCall(Request.Builder().url(currentApiUrl).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}"); matrixHeader.connectionLost = true; setStatus("Нет связи", "red") }; override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString; appendChat(if (isNeo) "[NEO] $a" else "[GigaChat] $a"); matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } else { appendChat("[ERROR] HTTP ${response.code}"); matrixHeader.connectionLost = true; setStatus("Ошибка", "red") }; response.close() } }) } }
     private fun checkToken() { val token = tokenInput.text.toString().trim(); if (token.isEmpty()) return; val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", "One word: alive.") }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "check") }) }); addProperty("max_tokens", 10) }; client.newCall(Request.Builder().url(apiUrlGigaChat).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}") }; override fun onResponse(call: Call, response: Response) { appendChat(if (response.isSuccessful) "[SYSTEM] Токен активен." else "[ERROR] Токен мёртв."); response.close() } }) }
 }
