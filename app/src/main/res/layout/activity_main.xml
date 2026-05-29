@@ -19,7 +19,7 @@
         <com.mechpravdy.neo.MatrixHeaderView
             android:id="@+id/matrixHeader"
             android:layout_width="match_parent"
-            android:layout_height="140dp"
+            android:layout_height="wrap_content"
             android:layout_marginBottom="3dp" />
 
         <com.google.android.material.card.MaterialCardView
