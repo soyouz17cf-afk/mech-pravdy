@@ -221,6 +221,18 @@
                 android:text="Ожидание"
                 android:textSize="9sp"
                 android:textColor="#888888" />
+
+            <!-- Мониторинг памяти - помещаем сюда справа от статуса -->
+            <TextView
+                android:id="@+id/memoryText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="8sp"
+                android:textColor="#21A038"
+                android:fontFamily="monospace"
+                android:layout_marginStart="8dp"
+                android:gravity="end" />
         </LinearLayout>
 
         <FrameLayout
