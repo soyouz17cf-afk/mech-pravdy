@@ -61,16 +61,6 @@ class MainActivity : AppCompatActivity() {
     private var isModelLoaded = false
     private var llmInference: LlmInference? = null
     private var downloadIds = mutableListOf<Long>()
-    
-    // Мониторинг памяти
-    private lateinit var memoryTextView: TextView
-    private val memoryHandler = Handler(Looper.getMainLooper())
-    private val memoryUpdateRunnable = object : Runnable {
-        override fun run() {
-            updateMemoryDisplay()
-            memoryHandler.postDelayed(this, 1000)
-        }
-    }
 
     private val partUrls = listOf(
         "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-2b-it-cpu-int8.001",
@@ -137,10 +127,6 @@ class MainActivity : AppCompatActivity() {
         chatOutput = findViewById(R.id.chatOutput)
         statusText = findViewById(R.id.statusText)
         statusDot = findViewById(R.id.statusDot)
-        memoryTextView = findViewById(R.id.memoryText)
-        
-        updateMemoryDisplay()
-        memoryHandler.post(memoryUpdateRunnable)
 
         matrixHeader.onNeoClick = { switchToNeo() }
         matrixHeader.onLocalClick = { switchToLocal() }
@@ -159,28 +145,15 @@ class MainActivity : AppCompatActivity() {
 
         requestAllPermissions()
         
-        // Вывод информации о памяти в чат
         val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val largeMemoryClass = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) am.largeMemoryClass else am.memoryClass
         appendChat("[RAM] LargeHeap лимит: $largeMemoryClass MB")
-    }
-    
-    private fun updateMemoryDisplay() {
-        val runtime = Runtime.getRuntime()
-        val usedMemory = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
-        val maxMemory = runtime.maxMemory() / (1024 * 1024)
-        
-        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        val memoryInfo = ActivityManager.MemoryInfo()
-        activityManager.getMemoryInfo(memoryInfo)
-        val totalRAM = memoryInfo.totalMem / (1024 * 1024)
-        
-        memoryTextView.text = "🧠 $usedMemory/$maxMemory MB | 📱 $totalRAM MB"
+        appendChat("[RAM] Приложение может использовать до ${Runtime.getRuntime().maxMemory() / (1024 * 1024)} MB")
     }
     
     override fun onDestroy() {
         super.onDestroy()
-        memoryHandler.removeCallbacks(memoryUpdateRunnable)
+        matrixHeader.stopMemoryMonitoring()
     }
 
     private fun disableChatMatrixForLocalMode(disable: Boolean) {
