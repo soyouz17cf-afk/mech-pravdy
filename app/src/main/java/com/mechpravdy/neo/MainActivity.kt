@@ -29,6 +29,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.github.junrar.Junrar
 import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
@@ -267,9 +268,9 @@ class MainActivity : AppCompatActivity() {
         if (!modelDir.exists()) modelDir.mkdirs()
         val modelFile = File(modelDir, "gemma-2b-it-gpu-int8.bin")
 
-        // Если модель уже собрана — загружаем
+        // Если модель уже готова — загружаем
         if (modelFile.exists() && modelFile.length() > 500L * 1024 * 1024) {
-            appendChat("[МОЗГ] Модель уже собрана. Загружаю через MediaPipe...")
+            appendChat("[МОЗГ] Модель готова. Загружаю через MediaPipe...")
             setStatus("Загружаю...", "yellow")
             val progressDialog = ProgressDialog(this).apply {
                 setTitle("Меч Правды")
@@ -290,13 +291,13 @@ class MainActivity : AppCompatActivity() {
                     isModelLoaded = true
                     runOnUiThread {
                         progressDialog.dismiss()
-                        appendChat("[МОЗГ] Модель загружена через MediaPipe! Готов к бою!")
+                        appendChat("[МОЗГ] Модель загружена! Готов к бою!")
                         setStatus("МИСТРАЛЬ", "green")
                     }
                 } catch (e: Exception) {
                     runOnUiThread {
                         progressDialog.dismiss()
-                        appendChat("[МОЗГ] Ошибка MediaPipe: ${e.message}")
+                        appendChat("[МОЗГ] Ошибка: ${e.message}")
                         setStatus("Ошибка", "red")
                     }
                 }
@@ -304,47 +305,55 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // Проверяем, есть ли 5 частей
+        // Проверяем, есть ли 5 частей RAR
         val partFiles = (1..5).mapNotNull { i ->
             val f = File(modelDir, "gemma-2b-it-cpu-int8.part${i}.rar")
             if (f.exists() && f.length() > 100L * 1024 * 1024) f else null
         }
 
         if (partFiles.size == 5) {
-            appendChat("[МОЗГ] Найдены все 5 частей. Собираю модель...")
-            setStatus("Собираю...", "yellow")
+            appendChat("[МОЗГ] Найдены все 5 частей. Распаковываю...")
+            setStatus("Распаковка...", "yellow")
             val progressDialog = ProgressDialog(this).apply {
                 setTitle("Меч Правды")
-                setMessage("Сборка модели из частей...\nПожалуйста, подождите.")
+                setMessage("Распаковка RAR архива...\nПожалуйста, подождите.")
                 setCancelable(false)
                 setProgressStyle(ProgressDialog.STYLE_SPINNER)
                 show()
             }
             thread {
                 try {
-                    // Собираем части в один файл
-                    val combinedFile = File(modelDir, "model_combined.rar")
-                    FileOutputStream(combinedFile).use { output ->
+                    // Собираем части в один RAR
+                    val combinedRar = File(modelDir, "combined.rar")
+                    FileOutputStream(combinedRar).use { output ->
                         for (partFile in partFiles.sortedBy { it.name }) {
-                            partFile.inputStream().use { input ->
-                                input.copyTo(output)
-                            }
+                            partFile.inputStream().use { input -> input.copyTo(output) }
                         }
                     }
-                    // Переименовываем в .bin
-                    combinedFile.renameTo(modelFile)
-                    // Удаляем части
+                    // Распаковываем RAR
+                    Junrar.extract(combinedRar, modelDir)
+                    // Удаляем RAR и части
+                    combinedRar.delete()
                     partFiles.forEach { it.delete() }
-
-                    runOnUiThread {
-                        progressDialog.dismiss()
-                        appendChat("[МОЗГ] Модель собрана! Нажми МИСТРАЛЬ 3B ещё раз для загрузки.")
-                        setStatus("Готов", "green")
+                    // Проверяем, появился ли .bin
+                    val binFile = File(modelDir, "gemma-2b-it-gpu-int8.bin")
+                    if (binFile.exists() && binFile.length() > 500L * 1024 * 1024) {
+                        runOnUiThread {
+                            progressDialog.dismiss()
+                            appendChat("[МОЗГ] Распаковка завершена! Нажми МИСТРАЛЬ 3B ещё раз.")
+                            setStatus("Готов", "green")
+                        }
+                    } else {
+                        runOnUiThread {
+                            progressDialog.dismiss()
+                            appendChat("[МОЗГ] .bin файл не найден после распаковки.")
+                            setStatus("Ошибка", "red")
+                        }
                     }
                 } catch (e: Exception) {
                     runOnUiThread {
                         progressDialog.dismiss()
-                        appendChat("[МОЗГ] Ошибка сборки: ${e.message}")
+                        appendChat("[МОЗГ] Ошибка распаковки: ${e.message}")
                         setStatus("Ошибка", "red")
                     }
                 }
@@ -352,12 +361,11 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // Если нет ни модели, ни частей — начинаем загрузку
+        // Если ничего нет — начинаем загрузку
         appendChat("[МОЗГ] Запускаю загрузку 5 частей Gemma 2B...")
         appendChat("[МОЗГ] Смотри прогресс в шторке уведомлений.")
         appendChat("[МОЗГ] Когда все скачаются — нажми МИСТРАЛЬ 3B ещё раз.")
         setStatus("Качаю...", "yellow")
-
         val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         downloadIds.clear()
         for ((index, url) in partUrls.withIndex()) {
