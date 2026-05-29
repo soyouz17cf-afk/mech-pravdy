@@ -64,7 +64,10 @@ class MatrixHeaderView @JvmOverloads constructor(
 
     private var murzikBitmap: Bitmap? = null
 
-    // Хендлер для управления анимацией (экономия памяти при локальном ИИ)
+    // Флаг для управления анимацией чата
+    private var isMatrixInChatEnabled = true
+    
+    // Хендлер для управления анимацией
     private val handler = android.os.Handler()
     private val updateRunnable = object : Runnable {
         override fun run() {
@@ -83,6 +86,16 @@ class MatrixHeaderView @JvmOverloads constructor(
 
     fun stopAnimation() {
         handler.removeCallbacks(updateRunnable)
+    }
+    
+    // Остановить только анимацию матрицы в чате (падающие цифры)
+    fun stopMatrixInChat() {
+        isMatrixInChatEnabled = false
+    }
+    
+    // Запустить анимацию матрицы в чате обратно
+    fun startMatrixInChat() {
+        isMatrixInChatEnabled = true
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -109,7 +122,6 @@ class MatrixHeaderView @JvmOverloads constructor(
         neoButtonRect = RectF(btnLeft, btnY, btnLeft + btnW, btnY + btnH)
         localButtonRect = RectF(btnLeft + btnW + gap, btnY, btnLeft + btnW + gap + btnW, btnY + btnH)
 
-        // Мурзёха — круглая кнопка, размер 100x100
         val murzikSize = 100f
         murzikRect = RectF((w - murzikSize) / 2f, btnY + btnH, (w + murzikSize) / 2f, btnY + btnH + murzikSize)
 
@@ -126,46 +138,49 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawColor(Color.WHITE)
         frame++
 
-        for (i in 0 until maxLines) {
-            val poolIdx = linePoolIndex[i]
-            if (poolIdx < 0) continue
-            val line = linePool[poolIdx] ?: continue
-            if (frame % 2 == 0 && printed[i] < line.length) printed[i] += 2
-            lineY[i] -= speed
-        }
-        if (lineY[0] < -lineHeight) {
-            for (i in 0 until maxLines - 1) {
-                linePoolIndex[i] = linePoolIndex[i + 1]
-                lineY[i] = lineY[i + 1]
-                printed[i] = printed[i + 1]
+        // Рисуем падающую матрицу только если включено
+        if (isMatrixInChatEnabled) {
+            for (i in 0 until maxLines) {
+                val poolIdx = linePoolIndex[i]
+                if (poolIdx < 0) continue
+                val line = linePool[poolIdx] ?: continue
+                if (frame % 2 == 0 && printed[i] < line.length) printed[i] += 2
+                lineY[i] -= speed
             }
-            linePool[nextPoolSlot] = generateLine()
-            linePoolIndex[maxLines - 1] = nextPoolSlot
-            lineY[maxLines - 1] = lineY[maxLines - 2] + lineHeight
-            printed[maxLines - 1] = 0
-            nextPoolSlot = (nextPoolSlot + 1) % maxPoolSize
-        }
-        for (i in 0 until maxLines) {
-            val poolIdx = linePoolIndex[i]
-            if (poolIdx < 0) continue
-            val line = linePool[poolIdx] ?: continue
-            val y = lineY[i]
-            if (y > screenH + lineHeight || y < -lineHeight) continue
-            val limit = printed[i].coerceAtMost(line.length)
-            for (c in 0 until limit) {
-                val x = c * fontSize
-                if (x >= logoRect.left && x <= logoRect.right && y >= logoRect.top && y <= logoRect.bottom) continue
-                canvas.drawText(line[c].toString(), x, y, matrixPaint)
+            if (lineY[0] < -lineHeight) {
+                for (i in 0 until maxLines - 1) {
+                    linePoolIndex[i] = linePoolIndex[i + 1]
+                    lineY[i] = lineY[i + 1]
+                    printed[i] = printed[i + 1]
+                }
+                linePool[nextPoolSlot] = generateLine()
+                linePoolIndex[maxLines - 1] = nextPoolSlot
+                lineY[maxLines - 1] = lineY[maxLines - 2] + lineHeight
+                printed[maxLines - 1] = 0
+                nextPoolSlot = (nextPoolSlot + 1) % maxPoolSize
+            }
+            for (i in 0 until maxLines) {
+                val poolIdx = linePoolIndex[i]
+                if (poolIdx < 0) continue
+                val line = linePool[poolIdx] ?: continue
+                val y = lineY[i]
+                if (y > screenH + lineHeight || y < -lineHeight) continue
+                val limit = printed[i].coerceAtMost(line.length)
+                for (c in 0 until limit) {
+                    val x = c * fontSize
+                    if (x >= logoRect.left && x <= logoRect.right && y >= logoRect.top && y <= logoRect.bottom) continue
+                    canvas.drawText(line[c].toString(), x, y, matrixPaint)
+                }
             }
         }
 
-        // Логотип
+        // Логотип (всегда рисуется)
         canvas.drawRoundRect(logoRect, 16f, 16f, logoBgPaint)
         val centerY = logoRect.centerY()
         canvas.drawText("СБЕР", w / 2, centerY - 6f, titlePaint)
         canvas.drawText("ГигаЧат", w / 2, centerY + 18f, subtitlePaint)
 
-        // Кнопки
+        // Кнопки (всегда)
         val btnPaint = Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 15f; typeface = Typeface.DEFAULT_BOLD }
         val btnTextPaint = Paint().apply { color = Color.WHITE; isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 15f; typeface = Typeface.DEFAULT_BOLD }
         btnPaint.color = if (gigaChatMode) Color.parseColor("#21A038") else Color.parseColor("#555555")
@@ -175,9 +190,9 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRoundRect(localButtonRect, 10f, 10f, btnPaint)
         canvas.drawText("МИСТРАЛЬ 3B", localButtonRect.centerX(), localButtonRect.centerY() + 5f, btnTextPaint)
 
-        // Мурзёха — КРУГЛАЯ кнопка (вызов brain.txt)
+        // Мурзёха — круглая (всегда)
         murzikBitmap?.let { bitmap ->
-            val radius = murzikRect.width() / 2f  // круг
+            val radius = murzikRect.width() / 2f
             val clipPath = Path().apply {
                 addRoundRect(murzikRect, radius, radius, Path.Direction.CW)
             }
@@ -198,7 +213,7 @@ class MatrixHeaderView @JvmOverloads constructor(
             canvas.restore()
         }
 
-        // Светофор
+        // Светофор (всегда)
         val dotRadius = 14f
         val dotSpacing = 30f
         val trafficX = logoRect.right + 16f
@@ -216,8 +231,6 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawText("НЕО", trafficX + 20f, trafficY + 4f, labelPaint)
         canvas.drawText("ГИГАЧАТ", trafficX + 20f, trafficY + dotSpacing + 4f, labelPaint)
         canvas.drawText("МИСТРАЛЬ", trafficX + 20f, trafficY + dotSpacing * 2 + 4f, labelPaint)
-
-        // Анимация уже запущена через handler
     }
 
     override fun performClick(): Boolean { return super.performClick() }
