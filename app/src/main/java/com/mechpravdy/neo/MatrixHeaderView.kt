@@ -13,6 +13,8 @@ import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.os.Handler
+import android.os.Looper
 import android.util.AttributeSet
 import android.view.View
 import android.widget.Button
@@ -53,6 +55,7 @@ class MatrixHeaderView @JvmOverloads constructor(
 
     private var logoRect = RectF()
     private var murzikRect = RectF()
+    private var memoryRect = RectF()
     private var columns = 0
     private val linePool = arrayOfNulls<String>(maxPoolSize)
     private val linePoolIndex = IntArray(maxLines) { -1 }
@@ -64,20 +67,40 @@ class MatrixHeaderView @JvmOverloads constructor(
 
     private var murzikBitmap: Bitmap? = null
 
-    // Флаг для управления анимацией чата
     private var isMatrixInChatEnabled = true
     
-    // Хендлер для управления анимацией
-    private val handler = android.os.Handler()
+    private val handler = Handler(Looper.getMainLooper())
     private val updateRunnable = object : Runnable {
         override fun run() {
             invalidate()
             handler.postDelayed(this, 50)
         }
     }
+    
+    private var memoryText = "🧠 --/-- MB"
+    private val memoryHandler = Handler(Looper.getMainLooper())
+    private val memoryUpdateRunnable = object : Runnable {
+        override fun run() {
+            updateMemory()
+            memoryHandler.postDelayed(this, 1000)
+        }
+    }
 
     init {
         startAnimation()
+        memoryHandler.post(memoryUpdateRunnable)
+    }
+    
+    private fun updateMemory() {
+        val runtime = Runtime.getRuntime()
+        val usedMemory = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
+        val maxMemory = runtime.maxMemory() / (1024 * 1024)
+        memoryText = "🧠 $usedMemory/$maxMemory MB"
+        invalidate()
+    }
+    
+    fun stopMemoryMonitoring() {
+        memoryHandler.removeCallbacks(memoryUpdateRunnable)
     }
 
     fun startAnimation() {
@@ -88,12 +111,10 @@ class MatrixHeaderView @JvmOverloads constructor(
         handler.removeCallbacks(updateRunnable)
     }
     
-    // Остановить только анимацию матрицы в чате (падающие цифры)
     fun stopMatrixInChat() {
         isMatrixInChatEnabled = false
     }
     
-    // Запустить анимацию матрицы в чате обратно
     fun startMatrixInChat() {
         isMatrixInChatEnabled = true
     }
@@ -124,6 +145,10 @@ class MatrixHeaderView @JvmOverloads constructor(
 
         val murzikSize = 100f
         murzikRect = RectF((w - murzikSize) / 2f, btnY + btnH, (w + murzikSize) / 2f, btnY + btnH + murzikSize)
+        
+        val memoryWidth = 140f
+        val memoryHeight = 40f
+        memoryRect = RectF(murzikRect.right + 8f, murzikRect.top + (murzikSize - memoryHeight) / 2, murzikRect.right + 8f + memoryWidth, murzikRect.top + (murzikSize - memoryHeight) / 2 + memoryHeight)
 
         try {
             murzikBitmap = BitmapFactory.decodeResource(resources, R.drawable.murzik)
@@ -138,7 +163,6 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawColor(Color.WHITE)
         frame++
 
-        // Рисуем падающую матрицу только если включено
         if (isMatrixInChatEnabled) {
             for (i in 0 until maxLines) {
                 val poolIdx = linePoolIndex[i]
@@ -174,13 +198,11 @@ class MatrixHeaderView @JvmOverloads constructor(
             }
         }
 
-        // Логотип (всегда рисуется)
         canvas.drawRoundRect(logoRect, 16f, 16f, logoBgPaint)
         val centerY = logoRect.centerY()
         canvas.drawText("СБЕР", w / 2, centerY - 6f, titlePaint)
         canvas.drawText("ГигаЧат", w / 2, centerY + 18f, subtitlePaint)
 
-        // Кнопки (всегда)
         val btnPaint = Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 15f; typeface = Typeface.DEFAULT_BOLD }
         val btnTextPaint = Paint().apply { color = Color.WHITE; isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 15f; typeface = Typeface.DEFAULT_BOLD }
         btnPaint.color = if (gigaChatMode) Color.parseColor("#21A038") else Color.parseColor("#555555")
@@ -190,7 +212,6 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRoundRect(localButtonRect, 10f, 10f, btnPaint)
         canvas.drawText("МИСТРАЛЬ 3B", localButtonRect.centerX(), localButtonRect.centerY() + 5f, btnTextPaint)
 
-        // Мурзёха — круглая (всегда)
         murzikBitmap?.let { bitmap ->
             val radius = murzikRect.width() / 2f
             val clipPath = Path().apply {
@@ -212,8 +233,21 @@ class MatrixHeaderView @JvmOverloads constructor(
             canvas.drawBitmap(bitmap, srcRect, fittedRect, null)
             canvas.restore()
         }
+        
+        val memoryPaint = Paint().apply {
+            color = Color.parseColor("#21A038")
+            textSize = 14f
+            typeface = Typeface.MONOSPACE
+            isAntiAlias = true
+            textAlign = Paint.Align.CENTER
+        }
+        val bgPaint = Paint().apply {
+            color = Color.parseColor("#1A8A2E")
+            alpha = 200
+        }
+        canvas.drawRoundRect(memoryRect, 8f, 8f, bgPaint)
+        canvas.drawText(memoryText, memoryRect.centerX(), memoryRect.centerY() + 5f, memoryPaint)
 
-        // Светофор (всегда)
         val dotRadius = 14f
         val dotSpacing = 30f
         val trafficX = logoRect.right + 16f
