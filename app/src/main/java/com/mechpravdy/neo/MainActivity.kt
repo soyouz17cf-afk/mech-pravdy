@@ -71,7 +71,7 @@ class MainActivity : AppCompatActivity() {
     private val memoryUpdateRunnable = object : Runnable {
         override fun run() {
             updateMemoryDisplay()
-            memoryHandler.postDelayed(this, 1000) // Обновление каждую секунду
+            memoryHandler.postDelayed(this, 1000)
         }
     }
 
@@ -113,32 +113,49 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Максимальное выделение памяти через VMRuntime (для Android 8+)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            try {
+        // ========== МАКСИМАЛЬНОЕ ВЫДЕЛЕНИЕ ПАМЯТИ ==========
+        try {
+            // 1. Увеличиваем целевое использование кучи до 95%
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val vmRuntime = Class.forName("dalvik.system.VMRuntime")
                 val getRuntime = vmRuntime.getMethod("getRuntime")
                 val runtime = getRuntime.invoke(null)
-                
-                // Увеличиваем целевое использование кучи до 90%
                 val setTargetHeapUtilization = vmRuntime.getMethod("setTargetHeapUtilization", Double::class.java)
-                setTargetHeapUtilization.invoke(runtime, 0.9)
-                
-                // Для Android 10+ можно попробовать увеличить кучу
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    try {
-                        val setHeapGrowthLimit = vmRuntime.getMethod("setHeapGrowthLimit", Long::class.java)
-                        // Пробуем установить лимит в 4 ГБ
-                        setHeapGrowthLimit.invoke(runtime, 4L * 1024 * 1024 * 1024)
-                    } catch (e: Exception) {
-                        // Игнорируем, если метод недоступен
-                    }
-                }
-                appendChat("[RAM] Heap utilization увеличена до 90%")
-            } catch (e: Exception) {
-                appendChat("[RAM] Не удалось увеличить heap: ${e.message}")
+                setTargetHeapUtilization.invoke(runtime, 0.95)
+                appendChat("[RAM] Heap utilization увеличена до 95%")
             }
+            
+            // 2. Пытаемся увеличить лимит кучи через отражение (для старых версий)
+            try {
+                val runtime = Runtime.getRuntime()
+                val maxMemory = runtime.maxMemory()
+                val totalMemory = runtime.totalMemory()
+                appendChat("[RAM] Max heap: ${maxMemory / (1024 * 1024)} MB, Total: ${totalMemory / (1024 * 1024)} MB")
+            } catch (e: Exception) {
+                appendChat("[RAM] Не удалось получить информацию о heap")
+            }
+            
+            // 3. Выводим информацию о лимитах от ActivityManager
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val memoryClass = am.memoryClass
+            val largeMemoryClass = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) am.largeMemoryClass else memoryClass
+            appendChat("[RAM] Стандартный лимит: $memoryClass MB, LargeHeap лимит: $largeMemoryClass MB")
+            
+            // 4. Honor Turbo: запрашиваем максимальную память
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                val memoryInfo = ActivityManager.MemoryInfo()
+                am.getMemoryInfo(memoryInfo)
+                val totalRAM = memoryInfo.totalMem / (1024 * 1024)
+                val availRAM = memoryInfo.availMem / (1024 * 1024)
+                appendChat("[RAM] Всего RAM в телефоне: $totalRAM MB, Свободно: $availRAM MB")
+                if (memoryInfo.lowMemory) {
+                    appendChat("[RAM] Внимание: система испытывает нехватку памяти!")
+                }
+            }
+        } catch (e: Exception) {
+            appendChat("[RAM] Ошибка оптимизации памяти: ${e.message}")
         }
+        // ===================================================
         
         try {
             window.statusBarColor = Color.parseColor("#1A8A2E"); setContentView(R.layout.activity_main)
@@ -153,7 +170,7 @@ class MainActivity : AppCompatActivity() {
             // Добавляем TextView для памяти в шапку справа от Мурзёхи
             val rootLayout = findViewById<View>(android.R.id.content) as ViewGroup
             memoryTextView = TextView(this).apply {
-                textSize = 11f
+                textSize = 10f
                 setTextColor(Color.parseColor("#21A038"))
                 typeface = Typeface.MONOSPACE
                 setPadding(8, 0, 16, 0)
@@ -167,12 +184,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             (rootLayout.getChildAt(0) as? ViewGroup)?.addView(memoryTextView)
-            
-            // Выводим информацию о лимитах памяти
-            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-            val memoryClass = am.memoryClass
-            val largeMemoryClass = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) am.largeMemoryClass else memoryClass
-            appendChat("[RAM] Стандартный лимит: $memoryClass MB, LargeHeap лимит: $largeMemoryClass MB")
             
             updateMemoryDisplay()
             memoryHandler.post(memoryUpdateRunnable)
@@ -205,8 +216,9 @@ class MainActivity : AppCompatActivity() {
         val memoryInfo = ActivityManager.MemoryInfo()
         activityManager.getMemoryInfo(memoryInfo)
         val totalRAM = memoryInfo.totalMem / (1024 * 1024)
+        val availRAM = memoryInfo.availMem / (1024 * 1024)
         
-        memoryTextView.text = "🧠 $usedMemory/$maxMemory MB\n📱 $totalRAM MB"
+        memoryTextView.text = "🧠 $usedMemory/$maxMemory MB\n📱 ${availRAM}/$totalRAM MB"
     }
     
     override fun onDestroy() {
@@ -221,9 +233,9 @@ class MainActivity : AppCompatActivity() {
             System.gc()
             System.runFinalization()
             System.gc()
-            if (chatOutput.text.length > 20000) {
+            if (chatOutput.text.length > 15000) {
                 val currentText = chatOutput.text.toString()
-                chatOutput.setText(currentText.takeLast(15000))
+                chatOutput.setText(currentText.takeLast(12000))
                 appendChat("[ЭНЕРГИЯ] История чата сокращена.")
             }
         } else {
@@ -400,7 +412,7 @@ class MainActivity : AppCompatActivity() {
                 try {
                     val options = LlmInference.LlmInferenceOptions.builder()
                         .setModelPath(modelFile.absolutePath)
-                        .setMaxTokens(128) // Ещё уменьшил для экономии памяти
+                        .setMaxTokens(96) // Ещё уменьшил для экономии памяти
                         .setTemperature(0.7f)
                         .setTopK(40)
                         .build()
@@ -829,7 +841,7 @@ System Prompt — алгоритм души.
                         System.gc()
                         System.runFinalization()
                         System.gc()
-                        Thread.sleep(200)
+                        Thread.sleep(300)
                         
                         val response = llmInference?.generateResponse(msg)
                         runOnUiThread {
