@@ -4,13 +4,15 @@ import android.app.AlertDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
-import android.graphics.BitmapFactory
 import android.util.AttributeSet
 import android.view.View
 import android.widget.Button
@@ -18,8 +20,8 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import kotlin.random.Random
 import java.io.File
+import kotlin.random.Random
 
 class MatrixHeaderView @JvmOverloads constructor(
     context: Context,
@@ -60,7 +62,28 @@ class MatrixHeaderView @JvmOverloads constructor(
     private var screenH = 0f
     private var frame = 0
 
-    private var murzikBitmap: android.graphics.Bitmap? = null
+    private var murzikBitmap: Bitmap? = null
+
+    // Хендлер для управления анимацией (экономия памяти при локальном ИИ)
+    private val handler = android.os.Handler()
+    private val updateRunnable = object : Runnable {
+        override fun run() {
+            invalidate()
+            handler.postDelayed(this, 50)
+        }
+    }
+
+    init {
+        startAnimation()
+    }
+
+    fun startAnimation() {
+        handler.post(updateRunnable)
+    }
+
+    fun stopAnimation() {
+        handler.removeCallbacks(updateRunnable)
+    }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -86,7 +109,7 @@ class MatrixHeaderView @JvmOverloads constructor(
         neoButtonRect = RectF(btnLeft, btnY, btnLeft + btnW, btnY + btnH)
         localButtonRect = RectF(btnLeft + btnW + gap, btnY, btnLeft + btnW + gap + btnW, btnY + btnH)
 
-        // Мурзёха — 100px, отступ от кнопок 0
+        // Мурзёха — круглая кнопка, размер 100x100
         val murzikSize = 100f
         murzikRect = RectF((w - murzikSize) / 2f, btnY + btnH, (w + murzikSize) / 2f, btnY + btnH + murzikSize)
 
@@ -152,11 +175,11 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRoundRect(localButtonRect, 10f, 10f, btnPaint)
         canvas.drawText("МИСТРАЛЬ 3B", localButtonRect.centerX(), localButtonRect.centerY() + 5f, btnTextPaint)
 
-        // Мурзёха — закруглённые углы, ровно 100x100
+        // Мурзёха — КРУГЛАЯ кнопка (вызов brain.txt)
         murzikBitmap?.let { bitmap ->
-            val radius = 20f
-            val clipPath = android.graphics.Path().apply {
-                addRoundRect(murzikRect, radius, radius, android.graphics.Path.Direction.CW)
+            val radius = murzikRect.width() / 2f  // круг
+            val clipPath = Path().apply {
+                addRoundRect(murzikRect, radius, radius, Path.Direction.CW)
             }
             canvas.save()
             canvas.clipPath(clipPath)
@@ -194,7 +217,7 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawText("ГИГАЧАТ", trafficX + 20f, trafficY + dotSpacing + 4f, labelPaint)
         canvas.drawText("МИСТРАЛЬ", trafficX + 20f, trafficY + dotSpacing * 2 + 4f, labelPaint)
 
-        postInvalidateDelayed(50)
+        // Анимация уже запущена через handler
     }
 
     override fun performClick(): Boolean { return super.performClick() }
