@@ -42,7 +42,6 @@ import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.*
-import java.lang.reflect.Method
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import java.util.*
@@ -113,47 +112,36 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // ========== МАКСИМАЛЬНОЕ ВЫДЕЛЕНИЕ ПАМЯТИ ==========
+        // ========== МАКСИМАЛЬНОЕ ВЫДЕЛЕНИЕ ПАМЯТИ (без экономии) ==========
         try {
-            // 1. Увеличиваем целевое использование кучи до 95%
+            // Убираем ограничения кучи - просим максимум
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val vmRuntime = Class.forName("dalvik.system.VMRuntime")
                 val getRuntime = vmRuntime.getMethod("getRuntime")
                 val runtime = getRuntime.invoke(null)
+                // Увеличиваем целевое использование кучи до 100% (без экономии)
                 val setTargetHeapUtilization = vmRuntime.getMethod("setTargetHeapUtilization", Double::class.java)
-                setTargetHeapUtilization.invoke(runtime, 0.95)
-                appendChat("[RAM] Heap utilization увеличена до 95%")
+                setTargetHeapUtilization.invoke(runtime, 1.0)
+                appendChat("[RAM] Heap utilization установлена на 100% (без экономии)")
             }
             
-            // 2. Пытаемся увеличить лимит кучи через отражение (для старых версий)
-            try {
-                val runtime = Runtime.getRuntime()
-                val maxMemory = runtime.maxMemory()
-                val totalMemory = runtime.totalMemory()
-                appendChat("[RAM] Max heap: ${maxMemory / (1024 * 1024)} MB, Total: ${totalMemory / (1024 * 1024)} MB")
-            } catch (e: Exception) {
-                appendChat("[RAM] Не удалось получить информацию о heap")
-            }
-            
-            // 3. Выводим информацию о лимитах от ActivityManager
+            // Выводим информацию о памяти
             val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-            val memoryClass = am.memoryClass
-            val largeMemoryClass = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) am.largeMemoryClass else memoryClass
-            appendChat("[RAM] Стандартный лимит: $memoryClass MB, LargeHeap лимит: $largeMemoryClass MB")
+            val memoryInfo = ActivityManager.MemoryInfo()
+            am.getMemoryInfo(memoryInfo)
+            val totalRAM = memoryInfo.totalMem / (1024 * 1024)
+            val availRAM = memoryInfo.availMem / (1024 * 1024)
+            val largeMemoryClass = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) am.largeMemoryClass else am.memoryClass
+            appendChat("[RAM] Всего RAM: $totalRAM MB, Свободно: $availRAM MB, LargeHeap лимит: $largeMemoryClass MB")
             
-            // 4. Honor Turbo: запрашиваем максимальную память
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                val memoryInfo = ActivityManager.MemoryInfo()
-                am.getMemoryInfo(memoryInfo)
-                val totalRAM = memoryInfo.totalMem / (1024 * 1024)
-                val availRAM = memoryInfo.availMem / (1024 * 1024)
-                appendChat("[RAM] Всего RAM в телефоне: $totalRAM MB, Свободно: $availRAM MB")
-                if (memoryInfo.lowMemory) {
-                    appendChat("[RAM] Внимание: система испытывает нехватку памяти!")
-                }
-            }
+            // Выводим текущий heap приложения
+            val runtime = Runtime.getRuntime()
+            val maxMemory = runtime.maxMemory() / (1024 * 1024)
+            val totalMemory = runtime.totalMemory() / (1024 * 1024)
+            appendChat("[RAM] Приложение: heap max=$maxMemory MB, used=$totalMemory MB")
+            
         } catch (e: Exception) {
-            appendChat("[RAM] Ошибка оптимизации памяти: ${e.message}")
+            appendChat("[RAM] Ошибка: ${e.message}")
         }
         // ===================================================
         
@@ -170,7 +158,7 @@ class MainActivity : AppCompatActivity() {
             // Добавляем TextView для памяти в шапку справа от Мурзёхи
             val rootLayout = findViewById<View>(android.R.id.content) as ViewGroup
             memoryTextView = TextView(this).apply {
-                textSize = 10f
+                textSize = 11f
                 setTextColor(Color.parseColor("#21A038"))
                 typeface = Typeface.MONOSPACE
                 setPadding(8, 0, 16, 0)
@@ -216,9 +204,8 @@ class MainActivity : AppCompatActivity() {
         val memoryInfo = ActivityManager.MemoryInfo()
         activityManager.getMemoryInfo(memoryInfo)
         val totalRAM = memoryInfo.totalMem / (1024 * 1024)
-        val availRAM = memoryInfo.availMem / (1024 * 1024)
         
-        memoryTextView.text = "🧠 $usedMemory/$maxMemory MB\n📱 ${availRAM}/$totalRAM MB"
+        memoryTextView.text = "🧠 $usedMemory/$maxMemory MB\n📱 $totalRAM MB"
     }
     
     override fun onDestroy() {
@@ -226,18 +213,10 @@ class MainActivity : AppCompatActivity() {
         memoryHandler.removeCallbacks(memoryUpdateRunnable)
     }
 
-    private fun enablePowerSavingForLocalMode(enabled: Boolean) {
-        if (enabled) {
+    // Отключаем только матрицу в чате, память не экономим
+    private fun disableChatMatrixForLocalMode(disable: Boolean) {
+        if (disable) {
             matrixHeader.stopMatrixInChat()
-            // Агрессивная очистка памяти
-            System.gc()
-            System.runFinalization()
-            System.gc()
-            if (chatOutput.text.length > 15000) {
-                val currentText = chatOutput.text.toString()
-                chatOutput.setText(currentText.takeLast(12000))
-                appendChat("[ЭНЕРГИЯ] История чата сокращена.")
-            }
         } else {
             matrixHeader.startMatrixInChat()
         }
@@ -379,7 +358,7 @@ class MainActivity : AppCompatActivity() {
         matrixHeader.localMode = false
         matrixHeader.connectionLost = false
         matrixHeader.invalidate()
-        enablePowerSavingForLocalMode(false)
+        disableChatMatrixForLocalMode(false)
         appendChat("[РЕЖИМ] ГИГАЧАТ")
         setStatus("ГИГАЧАТ", "green")
         checkConnection()
@@ -412,7 +391,7 @@ class MainActivity : AppCompatActivity() {
                 try {
                     val options = LlmInference.LlmInferenceOptions.builder()
                         .setModelPath(modelFile.absolutePath)
-                        .setMaxTokens(96) // Ещё уменьшил для экономии памяти
+                        .setMaxTokens(1024)  // Полный размер, никакой экономии
                         .setTemperature(0.7f)
                         .setTopK(40)
                         .build()
@@ -422,7 +401,8 @@ class MainActivity : AppCompatActivity() {
                         progressDialog.dismiss()
                         appendChat("[МОЗГ] Модель загружена! Готов к бою!")
                         setStatus("МИСТРАЛЬ", "green")
-                        enablePowerSavingForLocalMode(true)
+                        // Отключаем только матрицу в чате, чтобы не мешала, но память не экономим
+                        disableChatMatrixForLocalMode(true)
                     }
                 } catch (e: Exception) {
                     runOnUiThread {
@@ -834,32 +814,23 @@ System Prompt — алгоритм души.
         
         if (isLocalMode) {
             if (isModelLoaded && llmInference != null) {
-                enablePowerSavingForLocalMode(true)
                 thread {
                     try {
-                        // Агрессивная очистка памяти перед генерацией
-                        System.gc()
-                        System.runFinalization()
-                        System.gc()
-                        Thread.sleep(300)
-                        
                         val response = llmInference?.generateResponse(msg)
                         runOnUiThread {
                             if (response != null && response.isNotEmpty()) {
                                 appendChat("[NEO] $response")
                                 setStatus("МИСТРАЛЬ", "green")
                             } else {
-                                appendChat("[NEO] Модель вернула пустой ответ. Попробуй ещё раз.")
+                                appendChat("[NEO] Модель вернула пустой ответ.")
                                 setStatus("МИСТРАЛЬ", "yellow")
                             }
-                            enablePowerSavingForLocalMode(false)
                         }
                     } catch (e: Exception) {
                         runOnUiThread {
                             appendChat("[NEO] ОШИБКА: ${e.message}")
-                            appendChat("[NEO] Не хватает памяти. Попробуй перезагрузить телефон.")
+                            appendChat("[NEO] Проверь память: ${Runtime.getRuntime().maxMemory() / (1024 * 1024)} MB max")
                             setStatus("Ошибка", "red")
-                            enablePowerSavingForLocalMode(false)
                             e.printStackTrace()
                         }
                     }
