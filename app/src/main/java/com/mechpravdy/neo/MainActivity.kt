@@ -13,6 +13,8 @@ import android.graphics.*
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
 import android.speech.RecognizerIntent
 import android.util.Base64
@@ -58,6 +60,16 @@ class MainActivity : AppCompatActivity() {
     private var isModelLoaded = false
     private var llmInference: LlmInference? = null
     private var downloadIds = mutableListOf<Long>()
+    
+    // Мониторинг памяти
+    private lateinit var memoryTextView: TextView
+    private val memoryHandler = Handler(Looper.getMainLooper())
+    private val memoryUpdateRunnable = object : Runnable {
+        override fun run() {
+            updateMemoryDisplay()
+            memoryHandler.postDelayed(this, 2000) // Обновление каждые 2 секунды
+        }
+    }
 
     private val partUrls = listOf(
         "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-2b-it-cpu-int8.001",
@@ -105,6 +117,22 @@ class MainActivity : AppCompatActivity() {
             cameraButton = findViewById(R.id.cameraButton); checkButton = findViewById(R.id.checkButton)
             capsuleButton = findViewById(R.id.capsuleButton); attachButton = findViewById(R.id.attachButton)
             chatOutput = findViewById(R.id.chatOutput); statusText = findViewById(R.id.statusText); statusDot = findViewById(R.id.statusDot)
+            
+            // Добавляем TextView для памяти справа от Мурзёхи (через код, так как в layout его нет)
+            memoryTextView = TextView(this).apply {
+                textSize = 12f
+                setTextColor(Color.parseColor("#21A038"))
+                typeface = Typeface.MONOSPACE
+                setPadding(0, 0, 16, 0)
+                gravity = android.view.Gravity.END or android.view.Gravity.CENTER_VERTICAL
+            }
+            // Находим родительский контейнер и добавляем
+            (matrixHeader.parent as? android.view.ViewGroup)?.addView(memoryTextView, android.view.ViewGroup.LayoutParams(
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            ))
+            updateMemoryDisplay()
+            memoryHandler.post(memoryUpdateRunnable)
 
             matrixHeader.onNeoClick = { switchToNeo() }
             matrixHeader.onLocalClick = { switchToLocal() }
@@ -124,11 +152,24 @@ class MainActivity : AppCompatActivity() {
             requestAllPermissions()
         } catch (e: Exception) { Toast.makeText(this, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show() }
     }
+    
+    private fun updateMemoryDisplay() {
+        val runtime = Runtime.getRuntime()
+        val freeMem = runtime.freeMemory() / (1024 * 1024)
+        val totalMem = runtime.totalMemory() / (1024 * 1024)
+        val maxMem = runtime.maxMemory() / (1024 * 1024)
+        memoryTextView.text = "RAM: $freeMem/$totalMem MB\nMax: $maxMem MB"
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        memoryHandler.removeCallbacks(memoryUpdateRunnable)
+    }
 
     // РЕЖИМ ЭНЕРГОСБЕРЕЖЕНИЯ ДЛЯ ЛОКАЛЬНОГО ИИ
     private fun enablePowerSavingForLocalMode(enabled: Boolean) {
         if (enabled) {
-            matrixHeader.stopAnimation()
+            matrixHeader.stopMatrixInChat() // Останавливаем только падающие цифры, шапка остаётся
             // Очищаем память
             System.gc()
             // Очищаем историю чата если она слишком большая
@@ -137,10 +178,10 @@ class MainActivity : AppCompatActivity() {
                 chatOutput.setText(currentText.takeLast(15000))
                 appendChat("[ЭНЕРГИЯ] История чата сокращена для экономии памяти.")
             }
-            appendChat("[ЭНЕРГИЯ] Режим экономии включён. Анимация отключена.")
+            appendChat("[ЭНЕРГИЯ] Режим экономии включён. Матрица в чате отключена.")
         } else {
-            matrixHeader.startAnimation()
-            appendChat("[ЭНЕРГИЯ] Режим экономии выключен. Анимация включена.")
+            matrixHeader.startMatrixInChat() // Включаем обратно
+            appendChat("[ЭНЕРГИЯ] Режим экономии выключен. Матрица в чате включена.")
         }
     }
 
@@ -281,7 +322,7 @@ class MainActivity : AppCompatActivity() {
         matrixHeader.localMode = false
         matrixHeader.connectionLost = false
         matrixHeader.invalidate()
-        // Выходим из локального режима — включаем анимацию обратно
+        // Выходим из локального режима — включаем анимацию чата обратно
         enablePowerSavingForLocalMode(false)
         appendChat("[РЕЖИМ] ГИГАЧАТ")
         setStatus("ГИГАЧАТ", "green")
