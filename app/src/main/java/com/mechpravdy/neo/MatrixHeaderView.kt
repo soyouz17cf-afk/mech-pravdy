@@ -131,7 +131,9 @@ class MatrixHeaderView @JvmOverloads constructor(
         }
         nextPoolSlot = maxLines % maxPoolSize
 
-        val logoW = w * 0.50f; val logoH = h * 0.35f
+        // Логотип Сбера - оригинальный размер
+        val logoW = w * 0.50f
+        val logoH = h * 0.35f
         logoRect = RectF((w - logoW) / 2f, 6f, (w + logoW) / 2f, 6f + logoH)
 
         val btnW = w * 0.43f
@@ -143,13 +145,13 @@ class MatrixHeaderView @JvmOverloads constructor(
         neoButtonRect = RectF(btnLeft, btnY, btnLeft + btnW, btnY + btnH)
         localButtonRect = RectF(btnLeft + btnW + gap, btnY, btnLeft + btnW + gap + btnW, btnY + btnH)
 
-        // Мурзёха оригинального размера 100px
+        // Мурзёха оригинального размера
         val murzikSize = 100f
         murzikRect = RectF((w - murzikSize) / 2f, btnY + btnH + 6f, (w + murzikSize) / 2f, btnY + btnH + 6f + murzikSize)
         
-        // Счётчик памяти под Мурзёхой, по центру, компактная ширина
-        val memoryWidth = 280f
-        val memoryHeight = 50f
+        // Счётчик памяти под Мурзёхой, по центру
+        val memoryWidth = 260f
+        val memoryHeight = 40f
         memoryRect = RectF((w - memoryWidth) / 2f, murzikRect.bottom + 6f, (w + memoryWidth) / 2f, murzikRect.bottom + 6f + memoryHeight)
 
         try {
@@ -200,11 +202,13 @@ class MatrixHeaderView @JvmOverloads constructor(
             }
         }
 
+        // Логотип
         canvas.drawRoundRect(logoRect, 16f, 16f, logoBgPaint)
         val centerY = logoRect.centerY()
         canvas.drawText("СБЕР", w / 2, centerY - 6f, titlePaint)
         canvas.drawText("ГигаЧат", w / 2, centerY + 18f, subtitlePaint)
 
+        // Кнопки
         val btnPaint = Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 15f; typeface = Typeface.DEFAULT_BOLD }
         val btnTextPaint = Paint().apply { color = Color.WHITE; isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 15f; typeface = Typeface.DEFAULT_BOLD }
         btnPaint.color = if (gigaChatMode) Color.parseColor("#21A038") else Color.parseColor("#555555")
@@ -214,6 +218,7 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRoundRect(localButtonRect, 10f, 10f, btnPaint)
         canvas.drawText("МИСТРАЛЬ 3B", localButtonRect.centerX(), localButtonRect.centerY() + 5f, btnTextPaint)
 
+        // Мурзёха
         murzikBitmap?.let { bitmap ->
             val radius = murzikRect.width() / 2f
             val clipPath = Path().apply {
@@ -236,17 +241,17 @@ class MatrixHeaderView @JvmOverloads constructor(
             canvas.restore()
         }
         
-        // Счётчик памяти — прозрачный фон, крупный шрифт 36sp, жирный
+        // Счётчик памяти - прозрачный фон, крупный шрифт
         val memoryPaint = Paint().apply {
             color = Color.parseColor("#21A038")
-            textSize = 36f
+            textSize = 32f
             typeface = Typeface.DEFAULT_BOLD
             isAntiAlias = true
             textAlign = Paint.Align.CENTER
         }
-        // Без фона, только текст
         canvas.drawText(memoryText, memoryRect.centerX(), memoryRect.centerY() + 12f, memoryPaint)
 
+        // Светофор
         val dotRadius = 14f
         val dotSpacing = 30f
         val trafficX = logoRect.right + 16f
