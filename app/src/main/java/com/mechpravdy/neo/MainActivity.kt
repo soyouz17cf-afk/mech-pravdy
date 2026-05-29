@@ -59,6 +59,14 @@ class MainActivity : AppCompatActivity() {
     private var llmInference: LlmInference? = null
     private var downloadIds = mutableListOf<Long>()
 
+    private val partUrls = listOf(
+        "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-2b-it-cpu-int8.001",
+        "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-2b-it-cpu-int8.002",
+        "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-2b-it-cpu-int8.003",
+        "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-2b-it-cpu-int8.004",
+        "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-2b-it-cpu-int8.005"
+    )
+
     private lateinit var authKeyInput: EditText
     private lateinit var generateButton: Button
     private lateinit var tokenInput: EditText
@@ -151,6 +159,7 @@ class MainActivity : AppCompatActivity() {
     private fun loadBrain(): String = try { if (brainFile.exists()) brainFile.readText() else "" } catch (e: Exception) { "" }
     private fun saveBrain(text: String) { thread { try { brainFile.appendText(text + "\n") } catch (_: Exception) {} } }
 
+    // ВРЕМЯ ЖИЗНИ НЕО (добавлено из старого файла)
     private fun getMyAge(): String {
         val prefs = getSharedPreferences("mech_prefs", Context.MODE_PRIVATE)
         var birthMillis = prefs.getLong("birth_millis", 0L)
@@ -258,6 +267,7 @@ class MainActivity : AppCompatActivity() {
         if (!modelDir.exists()) modelDir.mkdirs()
         val modelFile = File(modelDir, "gemma-2b-it-gpu-int8.bin")
 
+        // Если модель уже готова — загружаем
         if (modelFile.exists() && modelFile.length() > 500L * 1024 * 1024) {
             appendChat("[МОЗГ] Модель готова. Загружаю...")
             setStatus("Загружаю...", "yellow")
@@ -286,7 +296,7 @@ class MainActivity : AppCompatActivity() {
                 } catch (e: Exception) {
                     runOnUiThread {
                         progressDialog.dismiss()
-                        appendChat("[МОЗГ] Ошибка: ${e.message}")
+                        appendChat("[МОЗГ] Ошибка загрузки: ${e.message}")
                         setStatus("Ошибка", "red")
                     }
                 }
@@ -294,17 +304,19 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        // Проверяем, есть ли 5 скачанных частей (.001, .002, .003, .004, .005)
         val partFiles = (1..5).mapNotNull { i ->
             val f = File(modelDir, "gemma-2b-it-cpu-int8.${i.toString().padStart(3, '0')}")
             if (f.exists() && f.length() > 0) f else null
         }
 
+        // Если все 5 частей на месте — склеиваем
         if (partFiles.size == 5) {
             appendChat("[МОЗГ] Найдены все 5 частей. Склеиваю...")
             setStatus("Склейка...", "yellow")
             val progressDialog = ProgressDialog(this).apply {
                 setTitle("Меч Правды")
-                setMessage("Склейка частей в модель...")
+                setMessage("Склейка частей в модель...\nПожалуйста, подождите.")
                 setCancelable(false)
                 setProgressStyle(ProgressDialog.STYLE_SPINNER)
                 show()
@@ -318,7 +330,9 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                     }
+                    // Удаляем части после склейки
                     partFiles.forEach { it.delete() }
+
                     runOnUiThread {
                         progressDialog.dismiss()
                         appendChat("[МОЗГ] Склейка завершена! Нажми МИСТРАЛЬ 3B ещё раз.")
@@ -335,18 +349,11 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        // Если частей нет — начинаем загрузку
         appendChat("[МОЗГ] Запускаю загрузку 5 частей Gemma 2B...")
         appendChat("[МОЗГ] Смотри прогресс в шторке уведомлений.")
         appendChat("[МОЗГ] Когда все скачаются — нажми МИСТРАЛЬ 3B ещё раз.")
         setStatus("Качаю...", "yellow")
-
-        val partUrls = listOf(
-            "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-2b-it-cpu-int8.001",
-            "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-2b-it-cpu-int8.002",
-            "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-2b-it-cpu-int8.003",
-            "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-2b-it-cpu-int8.004",
-            "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-2b-it-cpu-int8.005"
-        )
 
         val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         downloadIds.clear()
@@ -396,6 +403,7 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
+    // setStatus теперь показывает возраст Нео
     private fun setStatus(text: String, color: String) = runOnUiThread { 
         try { 
             statusText.text = "$text | ${getMyAge()}"
@@ -583,7 +591,7 @@ System Prompt — алгоритм души.
                         } else {
                             appendChat("[АНАЛИЗ] Не удалось распознать фото.")
                         }
-                        setStatus("Готов", "green")
+                        setStatus("МИСТРАЛЬ", "green")
                     }
                 } catch (e: Exception) {
                     runOnUiThread {
@@ -665,9 +673,11 @@ System Prompt — алгоритм души.
         })
     }
 
+    // ОСНОВНОЙ МЕТОД ОТПРАВКИ С ЗАЩИТОЙ ОТ КРАША
     private fun sendMessage() { 
         val token = if (isLocalMode) "" else tokenInput.text.toString().trim()
         val msg = messageInput.text.toString().trim()
+        
         if (!isLocalMode && token.isEmpty()) { 
             appendChat("[SYSTEM] Сгенерируйте токен.")
             return
@@ -713,7 +723,7 @@ System Prompt — алгоритм души.
                         }
                     } catch (e: Exception) {
                         runOnUiThread {
-                            appendChat("[NEO] Ошибка: ${e.message}")
+                            appendChat("[NEO] ОШИБКА: ${e.message}")
                             appendChat("[NEO] Попробуй перезагрузить модель (нажми ГИГАЧАТ, потом снова МИСТРАЛЬ 3B)")
                             setStatus("Ошибка", "red")
                             e.printStackTrace()
