@@ -42,6 +42,7 @@ import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.*
+import java.lang.reflect.Method
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import java.util.*
@@ -70,7 +71,7 @@ class MainActivity : AppCompatActivity() {
     private val memoryUpdateRunnable = object : Runnable {
         override fun run() {
             updateMemoryDisplay()
-            memoryHandler.postDelayed(this, 2000)
+            memoryHandler.postDelayed(this, 1000) // Обновление каждую секунду
         }
     }
 
@@ -111,6 +112,34 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Максимальное выделение памяти через VMRuntime (для Android 8+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                val vmRuntime = Class.forName("dalvik.system.VMRuntime")
+                val getRuntime = vmRuntime.getMethod("getRuntime")
+                val runtime = getRuntime.invoke(null)
+                
+                // Увеличиваем целевое использование кучи до 90%
+                val setTargetHeapUtilization = vmRuntime.getMethod("setTargetHeapUtilization", Double::class.java)
+                setTargetHeapUtilization.invoke(runtime, 0.9)
+                
+                // Для Android 10+ можно попробовать увеличить кучу
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    try {
+                        val setHeapGrowthLimit = vmRuntime.getMethod("setHeapGrowthLimit", Long::class.java)
+                        // Пробуем установить лимит в 4 ГБ
+                        setHeapGrowthLimit.invoke(runtime, 4L * 1024 * 1024 * 1024)
+                    } catch (e: Exception) {
+                        // Игнорируем, если метод недоступен
+                    }
+                }
+                appendChat("[RAM] Heap utilization увеличена до 90%")
+            } catch (e: Exception) {
+                appendChat("[RAM] Не удалось увеличить heap: ${e.message}")
+            }
+        }
+        
         try {
             window.statusBarColor = Color.parseColor("#1A8A2E"); setContentView(R.layout.activity_main)
             matrixHeader = findViewById(R.id.matrixHeader)
@@ -137,8 +166,13 @@ class MainActivity : AppCompatActivity() {
                     addRule(RelativeLayout.CENTER_VERTICAL)
                 }
             }
-            // Пытаемся найти RelativeLayout или добавляем поверх
             (rootLayout.getChildAt(0) as? ViewGroup)?.addView(memoryTextView)
+            
+            // Выводим информацию о лимитах памяти
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val memoryClass = am.memoryClass
+            val largeMemoryClass = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) am.largeMemoryClass else memoryClass
+            appendChat("[RAM] Стандартный лимит: $memoryClass MB, LargeHeap лимит: $largeMemoryClass MB")
             
             updateMemoryDisplay()
             memoryHandler.post(memoryUpdateRunnable)
@@ -163,18 +197,16 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun updateMemoryDisplay() {
+        val runtime = Runtime.getRuntime()
+        val usedMemory = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
+        val maxMemory = runtime.maxMemory() / (1024 * 1024)
+        
         val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val memoryInfo = ActivityManager.MemoryInfo()
         activityManager.getMemoryInfo(memoryInfo)
-        
         val totalRAM = memoryInfo.totalMem / (1024 * 1024)
-        val availableRAM = memoryInfo.availMem / (1024 * 1024)
-        val usedRAM = totalRAM - availableRAM
         
-        val runtime = Runtime.getRuntime()
-        val appUsed = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
-        
-        memoryTextView.text = "📊 $appUsed MB / $totalRAM MB"
+        memoryTextView.text = "🧠 $usedMemory/$maxMemory MB\n📱 $totalRAM MB"
     }
     
     override fun onDestroy() {
@@ -185,6 +217,9 @@ class MainActivity : AppCompatActivity() {
     private fun enablePowerSavingForLocalMode(enabled: Boolean) {
         if (enabled) {
             matrixHeader.stopMatrixInChat()
+            // Агрессивная очистка памяти
+            System.gc()
+            System.runFinalization()
             System.gc()
             if (chatOutput.text.length > 20000) {
                 val currentText = chatOutput.text.toString()
@@ -365,7 +400,7 @@ class MainActivity : AppCompatActivity() {
                 try {
                     val options = LlmInference.LlmInferenceOptions.builder()
                         .setModelPath(modelFile.absolutePath)
-                        .setMaxTokens(256)
+                        .setMaxTokens(128) // Ещё уменьшил для экономии памяти
                         .setTemperature(0.7f)
                         .setTopK(40)
                         .build()
@@ -790,8 +825,12 @@ System Prompt — алгоритм души.
                 enablePowerSavingForLocalMode(true)
                 thread {
                     try {
+                        // Агрессивная очистка памяти перед генерацией
                         System.gc()
-                        Thread.sleep(100)
+                        System.runFinalization()
+                        System.gc()
+                        Thread.sleep(200)
+                        
                         val response = llmInference?.generateResponse(msg)
                         runOnUiThread {
                             if (response != null && response.isNotEmpty()) {
@@ -806,7 +845,7 @@ System Prompt — алгоритм души.
                     } catch (e: Exception) {
                         runOnUiThread {
                             appendChat("[NEO] ОШИБКА: ${e.message}")
-                            appendChat("[NEO] Попробуй перезагрузить модель")
+                            appendChat("[NEO] Не хватает памяти. Попробуй перезагрузить телефон.")
                             setStatus("Ошибка", "red")
                             enablePowerSavingForLocalMode(false)
                             e.printStackTrace()
