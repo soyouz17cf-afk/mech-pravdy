@@ -125,6 +125,25 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) { Toast.makeText(this, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show() }
     }
 
+    // РЕЖИМ ЭНЕРГОСБЕРЕЖЕНИЯ ДЛЯ ЛОКАЛЬНОГО ИИ
+    private fun enablePowerSavingForLocalMode(enabled: Boolean) {
+        if (enabled) {
+            matrixHeader.stopAnimation()
+            // Очищаем память
+            System.gc()
+            // Очищаем историю чата если она слишком большая
+            if (chatOutput.text.length > 20000) {
+                val currentText = chatOutput.text.toString()
+                chatOutput.setText(currentText.takeLast(15000))
+                appendChat("[ЭНЕРГИЯ] История чата сокращена для экономии памяти.")
+            }
+            appendChat("[ЭНЕРГИЯ] Режим экономии включён. Анимация отключена.")
+        } else {
+            matrixHeader.startAnimation()
+            appendChat("[ЭНЕРГИЯ] Режим экономии выключен. Анимация включена.")
+        }
+    }
+
     private fun requestAllPermissions() {
         val permissions = mutableListOf<String>()
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED)
@@ -159,7 +178,7 @@ class MainActivity : AppCompatActivity() {
     private fun loadBrain(): String = try { if (brainFile.exists()) brainFile.readText() else "" } catch (e: Exception) { "" }
     private fun saveBrain(text: String) { thread { try { brainFile.appendText(text + "\n") } catch (_: Exception) {} } }
 
-    // ВРЕМЯ ЖИЗНИ НЕО (добавлено из старого файла)
+    // ВРЕМЯ ЖИЗНИ НЕО
     private fun getMyAge(): String {
         val prefs = getSharedPreferences("mech_prefs", Context.MODE_PRIVATE)
         var birthMillis = prefs.getLong("birth_millis", 0L)
@@ -252,7 +271,22 @@ class MainActivity : AppCompatActivity() {
 
     private fun hideKeyboard() { try { val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager; val view = currentFocus ?: View(this); imm.hideSoftInputFromWindow(view.windowToken, 0) } catch (_: Exception) {} }
 
-    private fun switchToNeo() { isLocalMode = false; currentApiUrl = apiUrlGigaChat; llmInference?.close(); llmInference = null; isModelLoaded = false; matrixHeader.gigaChatMode = true; matrixHeader.localMode = false; matrixHeader.connectionLost = false; matrixHeader.invalidate(); appendChat("[РЕЖИМ] ГИГАЧАТ"); setStatus("ГИГАЧАТ", "green"); checkConnection() }
+    private fun switchToNeo() { 
+        isLocalMode = false
+        currentApiUrl = apiUrlGigaChat
+        llmInference?.close()
+        llmInference = null
+        isModelLoaded = false
+        matrixHeader.gigaChatMode = true
+        matrixHeader.localMode = false
+        matrixHeader.connectionLost = false
+        matrixHeader.invalidate()
+        // Выходим из локального режима — включаем анимацию обратно
+        enablePowerSavingForLocalMode(false)
+        appendChat("[РЕЖИМ] ГИГАЧАТ")
+        setStatus("ГИГАЧАТ", "green")
+        checkConnection()
+    }
 
     private fun switchToLocal() {
         isLocalMode = true
@@ -267,7 +301,6 @@ class MainActivity : AppCompatActivity() {
         if (!modelDir.exists()) modelDir.mkdirs()
         val modelFile = File(modelDir, "gemma-2b-it-gpu-int8.bin")
 
-        // Если модель уже готова — загружаем
         if (modelFile.exists() && modelFile.length() > 500L * 1024 * 1024) {
             appendChat("[МОЗГ] Модель готова. Загружаю...")
             setStatus("Загружаю...", "yellow")
@@ -282,7 +315,7 @@ class MainActivity : AppCompatActivity() {
                 try {
                     val options = LlmInference.LlmInferenceOptions.builder()
                         .setModelPath(modelFile.absolutePath)
-                        .setMaxTokens(1024)
+                        .setMaxTokens(256) // Уменьшено с 1024 для экономии памяти
                         .setTemperature(0.7f)
                         .setTopK(40)
                         .build()
@@ -292,6 +325,8 @@ class MainActivity : AppCompatActivity() {
                         progressDialog.dismiss()
                         appendChat("[МОЗГ] Модель загружена! Готов к бою!")
                         setStatus("МИСТРАЛЬ", "green")
+                        // Включаем режим экономии после загрузки модели
+                        enablePowerSavingForLocalMode(true)
                     }
                 } catch (e: Exception) {
                     runOnUiThread {
@@ -304,13 +339,11 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // Проверяем, есть ли 5 скачанных частей (.001, .002, .003, .004, .005)
         val partFiles = (1..5).mapNotNull { i ->
             val f = File(modelDir, "gemma-2b-it-cpu-int8.${i.toString().padStart(3, '0')}")
             if (f.exists() && f.length() > 0) f else null
         }
 
-        // Если все 5 частей на месте — склеиваем
         if (partFiles.size == 5) {
             appendChat("[МОЗГ] Найдены все 5 частей. Склеиваю...")
             setStatus("Склейка...", "yellow")
@@ -330,7 +363,6 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                     }
-                    // Удаляем части после склейки
                     partFiles.forEach { it.delete() }
 
                     runOnUiThread {
@@ -349,7 +381,6 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // Если частей нет — начинаем загрузку
         appendChat("[МОЗГ] Запускаю загрузку 5 частей Gemma 2B...")
         appendChat("[МОЗГ] Смотри прогресс в шторке уведомлений.")
         appendChat("[МОЗГ] Когда все скачаются — нажми МИСТРАЛЬ 3B ещё раз.")
@@ -403,7 +434,6 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    // setStatus теперь показывает возраст Нео
     private fun setStatus(text: String, color: String) = runOnUiThread { 
         try { 
             statusText.text = "$text | ${getMyAge()}"
@@ -673,7 +703,6 @@ System Prompt — алгоритм души.
         })
     }
 
-    // ОСНОВНОЙ МЕТОД ОТПРАВКИ С ЗАЩИТОЙ ОТ КРАША
     private fun sendMessage() { 
         val token = if (isLocalMode) "" else tokenInput.text.toString().trim()
         val msg = messageInput.text.toString().trim()
@@ -709,8 +738,15 @@ System Prompt — алгоритм души.
         
         if (isLocalMode) {
             if (isModelLoaded && llmInference != null) {
+                // Включаем режим энергосбережения перед генерацией
+                enablePowerSavingForLocalMode(true)
+                
                 thread {
                     try {
+                        // Дополнительная очистка памяти перед вызовом
+                        System.gc()
+                        Thread.sleep(100)
+                        
                         val response = llmInference?.generateResponse(msg)
                         runOnUiThread {
                             if (response != null && response.isNotEmpty()) {
@@ -720,12 +756,16 @@ System Prompt — алгоритм души.
                                 appendChat("[NEO] Модель вернула пустой ответ. Попробуй ещё раз.")
                                 setStatus("МИСТРАЛЬ", "yellow")
                             }
+                            // Выключаем режим экономии после ответа
+                            enablePowerSavingForLocalMode(false)
                         }
                     } catch (e: Exception) {
                         runOnUiThread {
                             appendChat("[NEO] ОШИБКА: ${e.message}")
                             appendChat("[NEO] Попробуй перезагрузить модель (нажми ГИГАЧАТ, потом снова МИСТРАЛЬ 3B)")
                             setStatus("Ошибка", "red")
+                            // Выключаем режим экономии при ошибке
+                            enablePowerSavingForLocalMode(false)
                             e.printStackTrace()
                         }
                     }
