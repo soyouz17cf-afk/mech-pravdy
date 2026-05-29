@@ -77,26 +77,24 @@ class MatrixHeaderView @JvmOverloads constructor(
         }
     }
     
-    private var memoryText = "🧠 --/-- MB"
+    // ===== СЧЁТЧИК ПАМЯТИ (ДОБАВЛЕНО) =====
+    private var memoryText = "--/-- MB"
     private val memoryHandler = Handler(Looper.getMainLooper())
     private val memoryUpdateRunnable = object : Runnable {
         override fun run() {
-            updateMemory()
+            val runtime = Runtime.getRuntime()
+            val usedMemory = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
+            val maxMemory = runtime.maxMemory() / (1024 * 1024)
+            memoryText = "$usedMemory/$maxMemory MB"
+            invalidate()
             memoryHandler.postDelayed(this, 1000)
         }
     }
+    // ====================================
 
     init {
         startAnimation()
         memoryHandler.post(memoryUpdateRunnable)
-    }
-    
-    private fun updateMemory() {
-        val runtime = Runtime.getRuntime()
-        val usedMemory = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
-        val maxMemory = runtime.maxMemory() / (1024 * 1024)
-        memoryText = "$usedMemory/$maxMemory MB"
-        invalidate()
     }
     
     fun stopMemoryMonitoring() {
@@ -131,8 +129,7 @@ class MatrixHeaderView @JvmOverloads constructor(
         }
         nextPoolSlot = maxLines % maxPoolSize
 
-        val logoW = w * 0.50f
-        val logoH = h * 0.35f
+        val logoW = w * 0.50f; val logoH = h * 0.35f
         logoRect = RectF((w - logoW) / 2f, 6f, (w + logoW) / 2f, 6f + logoH)
 
         val btnW = w * 0.43f
@@ -145,11 +142,18 @@ class MatrixHeaderView @JvmOverloads constructor(
         localButtonRect = RectF(btnLeft + btnW + gap, btnY, btnLeft + btnW + gap + btnW, btnY + btnH)
 
         val murzikSize = 100f
-        murzikRect = RectF((w - murzikSize) / 2f, btnY + btnH + 6f, (w + murzikSize) / 2f, btnY + btnH + 6f + murzikSize)
+        murzikRect = RectF((w - murzikSize) / 2f, btnY + btnH, (w + murzikSize) / 2f, btnY + btnH + murzikSize)
         
+        // ===== СЧЁТЧИК ПАМЯТИ (РАСПОЛОЖЕНИЕ) =====
         val memoryWidth = 260f
         val memoryHeight = 40f
-        memoryRect = RectF((w - memoryWidth) / 2f, murzikRect.bottom + 6f, (w + memoryWidth) / 2f, murzikRect.bottom + 6f + memoryHeight)
+        memoryRect = RectF(
+            (w - memoryWidth) / 2f,
+            murzikRect.bottom + 6f,
+            (w + memoryWidth) / 2f,
+            murzikRect.bottom + 6f + memoryHeight
+        )
+        // ========================================
 
         try {
             murzikBitmap = BitmapFactory.decodeResource(resources, R.drawable.murzik)
@@ -199,11 +203,13 @@ class MatrixHeaderView @JvmOverloads constructor(
             }
         }
 
+        // Логотип
         canvas.drawRoundRect(logoRect, 16f, 16f, logoBgPaint)
         val centerY = logoRect.centerY()
         canvas.drawText("СБЕР", w / 2, centerY - 6f, titlePaint)
         canvas.drawText("ГигаЧат", w / 2, centerY + 18f, subtitlePaint)
 
+        // Кнопки
         val btnPaint = Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 15f; typeface = Typeface.DEFAULT_BOLD }
         val btnTextPaint = Paint().apply { color = Color.WHITE; isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 15f; typeface = Typeface.DEFAULT_BOLD }
         btnPaint.color = if (gigaChatMode) Color.parseColor("#21A038") else Color.parseColor("#555555")
@@ -213,6 +219,7 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRoundRect(localButtonRect, 10f, 10f, btnPaint)
         canvas.drawText("МИСТРАЛЬ 3B", localButtonRect.centerX(), localButtonRect.centerY() + 5f, btnTextPaint)
 
+        // Мурзёха
         murzikBitmap?.let { bitmap ->
             val radius = murzikRect.width() / 2f
             val clipPath = Path().apply {
@@ -234,7 +241,8 @@ class MatrixHeaderView @JvmOverloads constructor(
             canvas.drawBitmap(bitmap, srcRect, fittedRect, null)
             canvas.restore()
         }
-        
+
+        // ===== СЧЁТЧИК ПАМЯТИ (ОТРИСОВКА) =====
         val memoryPaint = Paint().apply {
             color = Color.parseColor("#21A038")
             textSize = 32f
@@ -242,8 +250,10 @@ class MatrixHeaderView @JvmOverloads constructor(
             isAntiAlias = true
             textAlign = Paint.Align.CENTER
         }
-        canvas.drawText(memoryText, memoryRect.centerX(), memoryRect.centerY() + 12f, memoryPaint)
+        canvas.drawText("🧠 $memoryText", memoryRect.centerX(), memoryRect.centerY() + 12f, memoryPaint)
+        // =====================================
 
+        // Светофор
         val dotRadius = 14f
         val dotSpacing = 30f
         val trafficX = logoRect.right + 16f
