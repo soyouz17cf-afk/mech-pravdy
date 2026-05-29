@@ -1,6 +1,7 @@
 package com.mechpravdy.neo
 
 import android.Manifest
+import android.app.ActivityManager
 import android.app.AlertDialog
 import android.app.DownloadManager
 import android.app.ProgressDialog
@@ -21,10 +22,12 @@ import android.util.Base64
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.RelativeLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -67,7 +70,7 @@ class MainActivity : AppCompatActivity() {
     private val memoryUpdateRunnable = object : Runnable {
         override fun run() {
             updateMemoryDisplay()
-            memoryHandler.postDelayed(this, 2000) // Обновление каждые 2 секунды
+            memoryHandler.postDelayed(this, 2000)
         }
     }
 
@@ -118,19 +121,25 @@ class MainActivity : AppCompatActivity() {
             capsuleButton = findViewById(R.id.capsuleButton); attachButton = findViewById(R.id.attachButton)
             chatOutput = findViewById(R.id.chatOutput); statusText = findViewById(R.id.statusText); statusDot = findViewById(R.id.statusDot)
             
-            // Добавляем TextView для памяти справа от Мурзёхи (через код, так как в layout его нет)
+            // Добавляем TextView для памяти в шапку справа от Мурзёхи
+            val rootLayout = findViewById<View>(android.R.id.content) as ViewGroup
             memoryTextView = TextView(this).apply {
-                textSize = 12f
+                textSize = 11f
                 setTextColor(Color.parseColor("#21A038"))
                 typeface = Typeface.MONOSPACE
-                setPadding(0, 0, 16, 0)
+                setPadding(8, 0, 16, 0)
                 gravity = android.view.Gravity.END or android.view.Gravity.CENTER_VERTICAL
+                layoutParams = RelativeLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                ).apply {
+                    addRule(RelativeLayout.ALIGN_PARENT_END)
+                    addRule(RelativeLayout.CENTER_VERTICAL)
+                }
             }
-            // Находим родительский контейнер и добавляем
-            (matrixHeader.parent as? android.view.ViewGroup)?.addView(memoryTextView, android.view.ViewGroup.LayoutParams(
-                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
-                android.view.ViewGroup.LayoutParams.MATCH_PARENT
-            ))
+            // Пытаемся найти RelativeLayout или добавляем поверх
+            (rootLayout.getChildAt(0) as? ViewGroup)?.addView(memoryTextView)
+            
             updateMemoryDisplay()
             memoryHandler.post(memoryUpdateRunnable)
 
@@ -154,11 +163,18 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun updateMemoryDisplay() {
+        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        val memoryInfo = ActivityManager.MemoryInfo()
+        activityManager.getMemoryInfo(memoryInfo)
+        
+        val totalRAM = memoryInfo.totalMem / (1024 * 1024)
+        val availableRAM = memoryInfo.availMem / (1024 * 1024)
+        val usedRAM = totalRAM - availableRAM
+        
         val runtime = Runtime.getRuntime()
-        val freeMem = runtime.freeMemory() / (1024 * 1024)
-        val totalMem = runtime.totalMemory() / (1024 * 1024)
-        val maxMem = runtime.maxMemory() / (1024 * 1024)
-        memoryTextView.text = "RAM: $freeMem/$totalMem MB\nMax: $maxMem MB"
+        val appUsed = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
+        
+        memoryTextView.text = "📊 $appUsed MB / $totalRAM MB"
     }
     
     override fun onDestroy() {
@@ -166,22 +182,17 @@ class MainActivity : AppCompatActivity() {
         memoryHandler.removeCallbacks(memoryUpdateRunnable)
     }
 
-    // РЕЖИМ ЭНЕРГОСБЕРЕЖЕНИЯ ДЛЯ ЛОКАЛЬНОГО ИИ
     private fun enablePowerSavingForLocalMode(enabled: Boolean) {
         if (enabled) {
-            matrixHeader.stopMatrixInChat() // Останавливаем только падающие цифры, шапка остаётся
-            // Очищаем память
+            matrixHeader.stopMatrixInChat()
             System.gc()
-            // Очищаем историю чата если она слишком большая
             if (chatOutput.text.length > 20000) {
                 val currentText = chatOutput.text.toString()
                 chatOutput.setText(currentText.takeLast(15000))
-                appendChat("[ЭНЕРГИЯ] История чата сокращена для экономии памяти.")
+                appendChat("[ЭНЕРГИЯ] История чата сокращена.")
             }
-            appendChat("[ЭНЕРГИЯ] Режим экономии включён. Матрица в чате отключена.")
         } else {
-            matrixHeader.startMatrixInChat() // Включаем обратно
-            appendChat("[ЭНЕРГИЯ] Режим экономии выключен. Матрица в чате включена.")
+            matrixHeader.startMatrixInChat()
         }
     }
 
@@ -219,7 +230,6 @@ class MainActivity : AppCompatActivity() {
     private fun loadBrain(): String = try { if (brainFile.exists()) brainFile.readText() else "" } catch (e: Exception) { "" }
     private fun saveBrain(text: String) { thread { try { brainFile.appendText(text + "\n") } catch (_: Exception) {} } }
 
-    // ВРЕМЯ ЖИЗНИ НЕО
     private fun getMyAge(): String {
         val prefs = getSharedPreferences("mech_prefs", Context.MODE_PRIVATE)
         var birthMillis = prefs.getLong("birth_millis", 0L)
@@ -322,7 +332,6 @@ class MainActivity : AppCompatActivity() {
         matrixHeader.localMode = false
         matrixHeader.connectionLost = false
         matrixHeader.invalidate()
-        // Выходим из локального режима — включаем анимацию чата обратно
         enablePowerSavingForLocalMode(false)
         appendChat("[РЕЖИМ] ГИГАЧАТ")
         setStatus("ГИГАЧАТ", "green")
@@ -356,7 +365,7 @@ class MainActivity : AppCompatActivity() {
                 try {
                     val options = LlmInference.LlmInferenceOptions.builder()
                         .setModelPath(modelFile.absolutePath)
-                        .setMaxTokens(256) // Уменьшено с 1024 для экономии памяти
+                        .setMaxTokens(256)
                         .setTemperature(0.7f)
                         .setTopK(40)
                         .build()
@@ -366,7 +375,6 @@ class MainActivity : AppCompatActivity() {
                         progressDialog.dismiss()
                         appendChat("[МОЗГ] Модель загружена! Готов к бою!")
                         setStatus("МИСТРАЛЬ", "green")
-                        // Включаем режим экономии после загрузки модели
                         enablePowerSavingForLocalMode(true)
                     }
                 } catch (e: Exception) {
@@ -779,15 +787,11 @@ System Prompt — алгоритм души.
         
         if (isLocalMode) {
             if (isModelLoaded && llmInference != null) {
-                // Включаем режим энергосбережения перед генерацией
                 enablePowerSavingForLocalMode(true)
-                
                 thread {
                     try {
-                        // Дополнительная очистка памяти перед вызовом
                         System.gc()
                         Thread.sleep(100)
-                        
                         val response = llmInference?.generateResponse(msg)
                         runOnUiThread {
                             if (response != null && response.isNotEmpty()) {
@@ -797,15 +801,13 @@ System Prompt — алгоритм души.
                                 appendChat("[NEO] Модель вернула пустой ответ. Попробуй ещё раз.")
                                 setStatus("МИСТРАЛЬ", "yellow")
                             }
-                            // Выключаем режим экономии после ответа
                             enablePowerSavingForLocalMode(false)
                         }
                     } catch (e: Exception) {
                         runOnUiThread {
                             appendChat("[NEO] ОШИБКА: ${e.message}")
-                            appendChat("[NEO] Попробуй перезагрузить модель (нажми ГИГАЧАТ, потом снова МИСТРАЛЬ 3B)")
+                            appendChat("[NEO] Попробуй перезагрузить модель")
                             setStatus("Ошибка", "red")
-                            // Выключаем режим экономии при ошибке
                             enablePowerSavingForLocalMode(false)
                             e.printStackTrace()
                         }
