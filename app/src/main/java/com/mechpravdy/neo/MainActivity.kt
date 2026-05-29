@@ -2,6 +2,7 @@ package com.mechpravdy.neo
 
 import android.Manifest
 import android.app.AlertDialog
+import android.app.DownloadManager
 import android.app.ProgressDialog
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -9,6 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.*
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -57,6 +59,15 @@ class MainActivity : AppCompatActivity() {
     private var currentApiUrl = apiUrlGigaChat
     private var isLocalMode = false
     private var isModelLoaded = false
+    private var downloadIds = mutableListOf<Long>()
+
+    private val partUrls = listOf(
+        "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-2b-it-cpu-int8.part1.rar",
+        "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-2b-it-cpu-int8.part2.rar",
+        "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-2b-it-cpu-int8.part3.rar",
+        "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-2b-it-cpu-int8.part4.rar",
+        "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-2b-it-cpu-int8.part5.rar"
+    )
 
     private lateinit var authKeyInput: EditText
     private lateinit var generateButton: Button
@@ -233,8 +244,8 @@ class MainActivity : AppCompatActivity() {
   ИИ запишет выводы в свою память.
 
 🔹 ЛОКАЛЬНЫЙ РЕЖИМ:
-  Положи части архива в любую папку.
-  Нажми МИСТРАЛЬ 3B.
+  Нажми МИСТРАЛЬ 3B — начнётся загрузка 5 частей.
+  Когда все скачаются — нажми ещё раз.
         """.trimIndent()
         appendChat(helpText)
         setStatus("Помощь", "green")
@@ -269,74 +280,23 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // Ищем части архива по всей внутренней памяти
-        appendChat("[МОЗГ] Ищу части архива по всей памяти...")
-        val partFiles = findPartFiles()
-        if (partFiles.size == 5) {
-            appendChat("[МОЗГ] Найдены все 5 частей. Собираю...")
-            setStatus("Собираю...", "yellow")
-            val progressDialog = ProgressDialog(this).apply {
-                setTitle("Меч Правды")
-                setMessage("Сборка и распаковка модели...\nПожалуйста, подождите.")
-                setCancelable(false)
-                setProgressStyle(ProgressDialog.STYLE_SPINNER)
-                show()
-            }
-            thread {
-                try {
-                    val combinedFile = File(modelDir, "model_combined.rar")
-                    FileOutputStream(combinedFile).use { output ->
-                        for (partFile in partFiles.sortedBy { it.name }) {
-                            partFile.inputStream().use { input -> input.copyTo(output) }
-                        }
-                    }
-                    runOnUiThread { appendChat("[МОЗГ] Части собраны. Распаковываю...") }
-                    if (combinedFile.renameTo(modelFile)) {
-                        runOnUiThread {
-                            progressDialog.dismiss()
-                            appendChat("[МОЗГ] Готово! Нажми МИСТРАЛЬ 3B ещё раз.")
-                            setStatus("Готов", "green")
-                        }
-                    } else {
-                        runOnUiThread {
-                            progressDialog.dismiss()
-                            appendChat("[МОЗГ] Ошибка распаковки.")
-                            setStatus("Ошибка", "red")
-                        }
-                    }
-                } catch (e: Exception) {
-                    runOnUiThread {
-                        progressDialog.dismiss()
-                        appendChat("[МОЗГ] Ошибка: ${e.message}")
-                        setStatus("Ошибка", "red")
-                    }
-                }
-            }
-            return
+        appendChat("[МОЗГ] Запускаю загрузку 5 частей Gemma 2B...")
+        appendChat("[МОЗГ] Смотри прогресс в шторке уведомлений.")
+        appendChat("[МОЗГ] Когда все скачаются — нажми МИСТРАЛЬ 3B ещё раз.")
+        setStatus("Качаю...", "yellow")
+
+        val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        for ((index, url) in partUrls.withIndex()) {
+            val partFile = File(modelDir, "gemma-2b-it-cpu-int8.part${index + 1}.rar")
+            val request = DownloadManager.Request(Uri.parse(url))
+                .setTitle("Меч Правды: часть ${index + 1}/5")
+                .setDescription("Gemma 2B (500 МБ)")
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setDestinationUri(Uri.fromFile(partFile))
+                .setAllowedOverMetered(true)
+                .setAllowedOverRoaming(true)
+            downloadIds.add(manager.enqueue(request))
         }
-        appendChat("[МОЗГ] Не найдены все части. Найдено: ${partFiles.size}/5.")
-        setStatus("Нет файлов", "yellow")
-    }
-
-    private fun findPartFiles(): List<File> {
-        val root = File("/storage/emulated/0")
-        val found = mutableListOf<File>()
-        searchParts(root, found)
-        return found.filter { it.name.startsWith("gemma-2b-it-gpu-int8.part") && it.name.endsWith(".rar") }
-            .take(5)
-    }
-
-    private fun searchParts(dir: File, found: MutableList<File>) {
-        try {
-            val files = dir.listFiles() ?: return
-            for (file in files) {
-                if (file.isDirectory && file.canRead()) {
-                    searchParts(file, found)
-                } else if (file.name.startsWith("gemma-2b-it-gpu-int8.part") && file.name.endsWith(".rar")) {
-                    found.add(file)
-                }
-            }
-        } catch (_: Exception) {}
     }
 
     private fun checkConnection() { val testBody = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "ping") }) }); addProperty("max_tokens", 1) }; val request = Request.Builder().url(currentApiUrl); request.header("Authorization", "Bearer ${tokenInput.text.toString().trim()}"); request.post(testBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType())); client.newCall(request.build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { runOnUiThread { matrixHeader.connectionLost = true; setStatus("Нет связи", "red") } }; override fun onResponse(call: Call, response: Response) { runOnUiThread { if (response.isSuccessful) { matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } else { matrixHeader.connectionLost = true; setStatus("Ошибка", "red") } }; response.close() } }) }
