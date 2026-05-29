@@ -95,7 +95,7 @@ class MatrixHeaderView @JvmOverloads constructor(
         val runtime = Runtime.getRuntime()
         val usedMemory = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
         val maxMemory = runtime.maxMemory() / (1024 * 1024)
-        memoryText = "🧠 $usedMemory/$maxMemory MB"
+        memoryText = "$usedMemory/$maxMemory MB"
         invalidate()
     }
     
@@ -143,12 +143,14 @@ class MatrixHeaderView @JvmOverloads constructor(
         neoButtonRect = RectF(btnLeft, btnY, btnLeft + btnW, btnY + btnH)
         localButtonRect = RectF(btnLeft + btnW + gap, btnY, btnLeft + btnW + gap + btnW, btnY + btnH)
 
+        // Мурзёха оригинального размера 100px
         val murzikSize = 100f
-        murzikRect = RectF((w - murzikSize) / 2f, btnY + btnH, (w + murzikSize) / 2f, btnY + btnH + murzikSize)
+        murzikRect = RectF((w - murzikSize) / 2f, btnY + btnH + 6f, (w + murzikSize) / 2f, btnY + btnH + 6f + murzikSize)
         
-        val memoryWidth = 140f
-        val memoryHeight = 40f
-        memoryRect = RectF(murzikRect.right + 8f, murzikRect.top + (murzikSize - memoryHeight) / 2, murzikRect.right + 8f + memoryWidth, murzikRect.top + (murzikSize - memoryHeight) / 2 + memoryHeight)
+        // Счётчик памяти под Мурзёхой, по центру, компактная ширина
+        val memoryWidth = 280f
+        val memoryHeight = 50f
+        memoryRect = RectF((w - memoryWidth) / 2f, murzikRect.bottom + 6f, (w + memoryWidth) / 2f, murzikRect.bottom + 6f + memoryHeight)
 
         try {
             murzikBitmap = BitmapFactory.decodeResource(resources, R.drawable.murzik)
@@ -234,19 +236,16 @@ class MatrixHeaderView @JvmOverloads constructor(
             canvas.restore()
         }
         
+        // Счётчик памяти — прозрачный фон, крупный шрифт 36sp, жирный
         val memoryPaint = Paint().apply {
             color = Color.parseColor("#21A038")
-            textSize = 14f
-            typeface = Typeface.MONOSPACE
+            textSize = 36f
+            typeface = Typeface.DEFAULT_BOLD
             isAntiAlias = true
             textAlign = Paint.Align.CENTER
         }
-        val bgPaint = Paint().apply {
-            color = Color.parseColor("#1A8A2E")
-            alpha = 200
-        }
-        canvas.drawRoundRect(memoryRect, 8f, 8f, bgPaint)
-        canvas.drawText(memoryText, memoryRect.centerX(), memoryRect.centerY() + 5f, memoryPaint)
+        // Без фона, только текст
+        canvas.drawText(memoryText, memoryRect.centerX(), memoryRect.centerY() + 12f, memoryPaint)
 
         val dotRadius = 14f
         val dotSpacing = 30f
