@@ -77,20 +77,19 @@ class MatrixHeaderView @JvmOverloads constructor(
         }
     }
     
-    // ===== СЧЁТЧИК ПАМЯТИ (ДОБАВЛЕНО) =====
+    // Счётчик памяти
     private var memoryText = "--/-- MB"
     private val memoryHandler = Handler(Looper.getMainLooper())
     private val memoryUpdateRunnable = object : Runnable {
         override fun run() {
             val runtime = Runtime.getRuntime()
-            val usedMemory = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
-            val maxMemory = runtime.maxMemory() / (1024 * 1024)
-            memoryText = "$usedMemory/$maxMemory MB"
+            val used = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
+            val max = runtime.maxMemory() / (1024 * 1024)
+            memoryText = "$used/$max MB"
             invalidate()
             memoryHandler.postDelayed(this, 1000)
         }
     }
-    // ====================================
 
     init {
         startAnimation()
@@ -144,7 +143,7 @@ class MatrixHeaderView @JvmOverloads constructor(
         val murzikSize = 100f
         murzikRect = RectF((w - murzikSize) / 2f, btnY + btnH, (w + murzikSize) / 2f, btnY + btnH + murzikSize)
         
-        // ===== СЧЁТЧИК ПАМЯТИ (РАСПОЛОЖЕНИЕ) =====
+        // Счётчик памяти под Мурзёхой
         val memoryWidth = 260f
         val memoryHeight = 40f
         memoryRect = RectF(
@@ -153,7 +152,6 @@ class MatrixHeaderView @JvmOverloads constructor(
             (w + memoryWidth) / 2f,
             murzikRect.bottom + 6f + memoryHeight
         )
-        // ========================================
 
         try {
             murzikBitmap = BitmapFactory.decodeResource(resources, R.drawable.murzik)
@@ -242,7 +240,7 @@ class MatrixHeaderView @JvmOverloads constructor(
             canvas.restore()
         }
 
-        // ===== СЧЁТЧИК ПАМЯТИ (ОТРИСОВКА) =====
+        // Счётчик памяти (прозрачный фон, крупный шрифт)
         val memoryPaint = Paint().apply {
             color = Color.parseColor("#21A038")
             textSize = 32f
@@ -251,7 +249,6 @@ class MatrixHeaderView @JvmOverloads constructor(
             textAlign = Paint.Align.CENTER
         }
         canvas.drawText("🧠 $memoryText", memoryRect.centerX(), memoryRect.centerY() + 12f, memoryPaint)
-        // =====================================
 
         // Светофор
         val dotRadius = 14f
