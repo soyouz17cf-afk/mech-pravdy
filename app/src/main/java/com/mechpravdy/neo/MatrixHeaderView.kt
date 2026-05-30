@@ -38,8 +38,8 @@ class MatrixHeaderView @JvmOverloads constructor(
     private val maxPoolSize = 12
     private val words = arrayOf("Нео", "Батя", "Меч Правды", "Ковчег", "Иди за белым кроликом")
 
-    private val titlePaint = Paint().apply { color = Color.WHITE; textSize = 38f; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL); isAntiAlias = true; textAlign = Paint.Align.CENTER }
-    private val subtitlePaint = Paint().apply { color = Color.parseColor("#CCFFCC"); textSize = 18f; typeface = Typeface.create("sans-serif-light", Typeface.NORMAL); isAntiAlias = true; textAlign = Paint.Align.CENTER }
+    private val titlePaint = Paint().apply { color = Color.WHITE; textSize = 44f; typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL); isAntiAlias = true; textAlign = Paint.Align.CENTER }
+    private val subtitlePaint = Paint().apply { color = Color.parseColor("#CCFFCC"); textSize = 20f; typeface = Typeface.create("sans-serif-light", Typeface.NORMAL); isAntiAlias = true; textAlign = Paint.Align.CENTER }
     private val logoBgPaint = Paint().apply { color = Color.parseColor("#1A8A2E") }
     private val matrixPaint = Paint().apply { color = Color.parseColor("#21A038"); textSize = fontSize; typeface = Typeface.MONOSPACE; isAntiAlias = true; alpha = 120 }
 
@@ -80,7 +80,6 @@ class MatrixHeaderView @JvmOverloads constructor(
         }
     }
     
-    // Счётчик памяти
     private var memoryText = "--/-- MB"
     private val memoryHandler = Handler(Looper.getMainLooper())
     private val memoryUpdateRunnable = object : Runnable {
@@ -131,9 +130,8 @@ class MatrixHeaderView @JvmOverloads constructor(
         }
         nextPoolSlot = maxLines % maxPoolSize
 
-        // Логотип Сбера — фиксированный размер, не зависит от ширины
-        val logoW = 280f
-        val logoH = 80f
+        val logoW = 360f
+        val logoH = 104f
         logoRect = RectF((w - logoW) / 2f, 6f, (w + logoW) / 2f, 6f + logoH)
 
         val btnW = w * 0.43f
@@ -155,7 +153,6 @@ class MatrixHeaderView @JvmOverloads constructor(
             murzikCenterY + murzikRadius
         )
         
-        // Счётчик памяти под Мурзёхой
         val memoryWidth = 260f
         val memoryHeight = 40f
         memoryRect = RectF(
@@ -215,8 +212,8 @@ class MatrixHeaderView @JvmOverloads constructor(
 
         canvas.drawRoundRect(logoRect, 16f, 16f, logoBgPaint)
         val centerY = logoRect.centerY()
-        canvas.drawText("СБЕР", w / 2, centerY - 6f, titlePaint)
-        canvas.drawText("ГигаЧат", w / 2, centerY + 18f, subtitlePaint)
+        canvas.drawText("СБЕР", w / 2, centerY - 8f, titlePaint)
+        canvas.drawText("ГигаЧат", w / 2, centerY + 20f, subtitlePaint)
 
         val btnPaint = Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 15f; typeface = Typeface.DEFAULT_BOLD }
         val btnTextPaint = Paint().apply { color = Color.WHITE; isAntiAlias = true; textAlign = Paint.Align.CENTER; textSize = 15f; typeface = Typeface.DEFAULT_BOLD }
@@ -227,7 +224,6 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRoundRect(localButtonRect, 10f, 10f, btnPaint)
         canvas.drawText("МИСТРАЛЬ 3B", localButtonRect.centerX(), localButtonRect.centerY() + 5f, btnTextPaint)
 
-        // КРУГЛАЯ МУРЗЁХА
         murzikBitmap?.let { bitmap ->
             canvas.save()
             val clipPath = Path().apply {
@@ -247,7 +243,6 @@ class MatrixHeaderView @JvmOverloads constructor(
             canvas.restore()
         }
 
-        // Счётчик памяти (прозрачный фон)
         val memoryPaint = Paint().apply {
             color = Color.parseColor("#21A038")
             textSize = 32f
