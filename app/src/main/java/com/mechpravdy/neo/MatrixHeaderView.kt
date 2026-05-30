@@ -131,7 +131,9 @@ class MatrixHeaderView @JvmOverloads constructor(
         }
         nextPoolSlot = maxLines % maxPoolSize
 
-        val logoW = w * 0.50f; val logoH = h * 0.35f
+        // Логотип Сбера — фиксированный размер, не зависит от ширины
+        val logoW = 280f
+        val logoH = 80f
         logoRect = RectF((w - logoW) / 2f, 6f, (w + logoW) / 2f, 6f + logoH)
 
         val btnW = w * 0.43f
