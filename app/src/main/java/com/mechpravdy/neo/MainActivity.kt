@@ -181,66 +181,47 @@ class MainActivity : AppCompatActivity() {
         appendChat("[РЕЖИМ] GEMMA 3n (локальный)")
         setStatus("GEMMA 3n", "yellow")
 
-        val modelDir = getExternalFilesDir("models") ?: filesDir
-        if (!modelDir.exists()) modelDir.mkdirs()
-        val modelFile = File(modelDir, "gemma-3n-e2b-int4.task")
+        val modelPath = "/data/local/tmp/llm/gemma-3n-E2B-it-int4.task"
+        val modelFile = File(modelPath)
 
-        if (modelFile.exists() && modelFile.length() > 2500L * 1024 * 1024) {
-            appendChat("[МОЗГ] Модель найдена. Загружаю...")
-            setStatus("Загружаю...", "yellow")
-            val progressDialog = ProgressDialog(this).apply { setTitle("Меч Правды"); setMessage("Загрузка модели..."); setCancelable(false); setProgressStyle(ProgressDialog.STYLE_SPINNER); show() }
-            thread {
-                try {
-                    // Пробуем системную папку
-                    var modelPath = modelFile.absolutePath
-                    try {
-                        val systemDir = File("/data/local/tmp/llm/")
-                        if (!systemDir.exists()) systemDir.mkdirs()
-                        val systemModel = File(systemDir, "gemma-3n-e2b-int4.task")
-                        if (!systemModel.exists() || systemModel.length() != modelFile.length()) {
-                            modelFile.copyTo(systemModel, overwrite = true)
-                        }
-                        modelPath = systemModel.absolutePath
-                        appendChat("[МОЗГ] Использую системный путь")
-                    } catch (e: Exception) {
-                        appendChat("[МОЗГ] Нет доступа к системе, использую песочницу")
-                    }
-                    
-                    val options = LlmInference.LlmInferenceOptions.builder()
-                        .setModelPath(modelPath)
-                        .setMaxTokens(256)
-                        .setTemperature(0.7f)
-                        .setTopK(20)
-                        .build()
-                    llmInference = LlmInference.createFromOptions(this@MainActivity, options)
-                    isModelLoaded = true
-                    runOnUiThread { progressDialog.dismiss(); appendChat("[МОЗГ] Модель загружена!"); setStatus("GEMMA 3n", "green") }
-                } catch (e: Exception) {
-                    runOnUiThread { progressDialog.dismiss(); appendChat("[МОЗГ] ОШИБКА: ${e.message}"); setStatus("Ошибка", "red") }
+        if (!modelFile.exists()) {
+            appendChat("[МОЗГ] Модель не найдена в $modelPath")
+            appendChat("[МОЗГ] Загрузите модель через adb")
+            setStatus("Нет модели", "red")
+            return
+        }
+
+        appendChat("[МОЗГ] Модель найдена. Загружаю...")
+        setStatus("Загружаю...", "yellow")
+        val progressDialog = ProgressDialog(this).apply {
+            setTitle("Меч Правды")
+            setMessage("Загрузка модели...")
+            setCancelable(false)
+            setProgressStyle(ProgressDialog.STYLE_SPINNER)
+            show()
+        }
+        thread {
+            try {
+                val options = LlmInference.LlmInferenceOptions.builder()
+                    .setModelPath(modelPath)
+                    .setMaxTokens(512)
+                    .setTemperature(0.7f)
+                    .setTopK(40)
+                    .build()
+                llmInference = LlmInference.createFromOptions(this@MainActivity, options)
+                isModelLoaded = true
+                runOnUiThread {
+                    progressDialog.dismiss()
+                    appendChat("[МОЗГ] Модель загружена!")
+                    setStatus("GEMMA 3n", "green")
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    progressDialog.dismiss()
+                    appendChat("[МОЗГ] ОШИБКА: ${e.message}")
+                    setStatus("Ошибка", "red")
                 }
             }
-            return
-        }
-
-        val partFiles = (1..2).mapNotNull { i -> val f = File(modelDir, "gemma-3n-E2B-it-int4.task.${i.toString().padStart(3, '0')}"); if (f.exists() && f.length() > 0) f else null }
-        if (partFiles.size == 2) {
-            appendChat("[МОЗГ] Склеиваю 2 части...")
-            setStatus("Склейка...", "yellow")
-            val progressDialog = ProgressDialog(this).apply { setTitle("Меч Правды"); setMessage("Склейка..."); setCancelable(false); setProgressStyle(ProgressDialog.STYLE_SPINNER); show() }
-            thread {
-                try { FileOutputStream(modelFile).use { o -> partFiles.sortedBy { it.name }.forEach { it.inputStream().use { i -> i.copyTo(o) } } }; partFiles.forEach { it.delete() }; runOnUiThread { progressDialog.dismiss(); appendChat("[МОЗГ] Готово! Нажми GEMMA 3n ещё раз."); setStatus("Готов", "green") } }
-                catch (e: Exception) { runOnUiThread { progressDialog.dismiss(); appendChat("[МОЗГ] Ошибка: ${e.message}"); setStatus("Ошибка", "red") } }
-            }
-            return
-        }
-
-        appendChat("[МОЗГ] Загружаю 2 части...")
-        setStatus("Качаю...", "yellow")
-        val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        downloadIds.clear()
-        for ((index, url) in partUrls.withIndex()) {
-            val partFile = File(modelDir, "gemma-3n-E2B-it-int4.task.${(index+1).toString().padStart(3, '0')}")
-            manager.enqueue(DownloadManager.Request(Uri.parse(url)).setTitle("Часть ${index+1}/2").setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED).setDestinationUri(Uri.fromFile(partFile)).setAllowedOverMetered(true).setAllowedOverRoaming(true))
         }
     }
 
