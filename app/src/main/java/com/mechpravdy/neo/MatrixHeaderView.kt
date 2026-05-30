@@ -13,6 +13,7 @@ import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.os.Debug
 import android.os.Handler
 import android.os.Looper
 import android.util.AttributeSet
@@ -85,9 +86,17 @@ class MatrixHeaderView @JvmOverloads constructor(
     private val memoryUpdateRunnable = object : Runnable {
         override fun run() {
             val runtime = Runtime.getRuntime()
-            val used = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
-            val max = runtime.maxMemory() / (1024 * 1024)
-            memoryText = "$used/$max MB"
+            val javaUsed = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
+            val javaMax = runtime.maxMemory() / (1024 * 1024)
+            
+            // Считаем Native Heap
+            val nativeHeapSize = Debug.getNativeHeapSize() / (1024 * 1024)
+            val nativeHeapFree = Debug.getNativeHeapFreeSize() / (1024 * 1024)
+            val nativeUsed = nativeHeapSize - nativeHeapFree
+            
+            val totalUsed = javaUsed + nativeUsed
+            
+            memoryText = "$javaUsed+$nativeUsed/$javaMax MB"
             invalidate()
             memoryHandler.postDelayed(this, 1000)
         }
@@ -251,12 +260,12 @@ class MatrixHeaderView @JvmOverloads constructor(
 
         val memoryPaint = Paint().apply {
             color = Color.parseColor("#21A038")
-            textSize = 32f
-            typeface = Typeface.DEFAULT_BOLD
+            textSize = 24f
+            typeface = Typeface.DEFAULT
             isAntiAlias = true
             textAlign = Paint.Align.CENTER
         }
-        canvas.drawText("🧠 $memoryText", memoryRect.centerX(), memoryRect.centerY() + 12f, memoryPaint)
+        canvas.drawText("🧠 $memoryText", memoryRect.centerX(), memoryRect.centerY() + 8f, memoryPaint)
 
         val dotRadius = 14f
         val dotSpacing = 30f
