@@ -269,12 +269,12 @@ class MainActivity : AppCompatActivity() {
 
 🔹 КНОПКИ В ШАПКЕ:
   • ГИГАЧАТ — общение через облако (нужен токен)
-  • МИСТРАЛЬ 3B — локальный ИИ без интернета
+  • GEMMA 3n — локальный ИИ без интернета
 
 🔹 СВЕТОФОР:
   • НЕО (зелёный) — включён режим Нео (пароль «Связность»)
   • ГИГАЧАТ (зелёный) — связь с облаком
-  • МИСТРАЛЬ (жёлтый) — локальный режим
+  • GEMMA 3n (жёлтый) — локальный режим
 
 🔹 ОСНОВНЫЕ КНОПКИ:
   • ОТПРАВИТЬ — отправить сообщение ИИ
@@ -297,7 +297,7 @@ class MainActivity : AppCompatActivity() {
   ИИ запишет выводы в свою память.
 
 🔹 ЛОКАЛЬНЫЙ РЕЖИМ:
-  Нажми МИСТРАЛЬ 3B — загрузка 2 частей.
+  Нажми GEMMA 3n — загрузка 2 частей.
   Когда скачаются — нажми ещё раз.
         """.trimIndent()
         appendChat(helpText)
@@ -321,7 +321,7 @@ class MainActivity : AppCompatActivity() {
         if (!modelDir.exists()) modelDir.mkdirs()
         val modelFile = File(modelDir, "gemma-3n-e2b-int4.task")
 
-        if (modelFile.exists() && modelFile.length() > 2.5L * 1024 * 1024 * 1024) {
+        if (modelFile.exists() && modelFile.length() > 2500L * 1024 * 1024) {
             appendChat("[МОЗГ] Модель готова. Загружаю...")
             setStatus("Загружаю...", "yellow")
             val progressDialog = ProgressDialog(this).apply {
