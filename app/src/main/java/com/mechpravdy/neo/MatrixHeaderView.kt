@@ -55,6 +55,9 @@ class MatrixHeaderView @JvmOverloads constructor(
 
     private var logoRect = RectF()
     private var murzikRect = RectF()
+    private var murzikCenterX = 0f
+    private var murzikCenterY = 0f
+    private var murzikRadius = 0f
     private var memoryRect = RectF()
     private var columns = 0
     private val linePool = arrayOfNulls<String>(maxPoolSize)
@@ -140,8 +143,15 @@ class MatrixHeaderView @JvmOverloads constructor(
         neoButtonRect = RectF(btnLeft, btnY, btnLeft + btnW, btnY + btnH)
         localButtonRect = RectF(btnLeft + btnW + gap, btnY, btnLeft + btnW + gap + btnW, btnY + btnH)
 
-        val murzikSize = 100f
-        murzikRect = RectF((w - murzikSize) / 2f, btnY + btnH, (w + murzikSize) / 2f, btnY + btnH + murzikSize)
+        murzikRadius = 50f
+        murzikCenterX = w / 2f
+        murzikCenterY = btnY + btnH + murzikRadius + 12f
+        murzikRect = RectF(
+            murzikCenterX - murzikRadius,
+            murzikCenterY - murzikRadius,
+            murzikCenterX + murzikRadius,
+            murzikCenterY + murzikRadius
+        )
         
         // Счётчик памяти под Мурзёхой
         val memoryWidth = 260f
@@ -215,22 +225,20 @@ class MatrixHeaderView @JvmOverloads constructor(
         canvas.drawRoundRect(localButtonRect, 10f, 10f, btnPaint)
         canvas.drawText("МИСТРАЛЬ 3B", localButtonRect.centerX(), localButtonRect.centerY() + 5f, btnTextPaint)
 
+        // КРУГЛАЯ МУРЗЁХА
         murzikBitmap?.let { bitmap ->
-            val radius = murzikRect.width() / 2f
-            val clipPath = Path().apply {
-                addRoundRect(murzikRect, radius, radius, Path.Direction.CW)
-            }
             canvas.save()
+            val clipPath = Path().apply {
+                addCircle(murzikCenterX, murzikCenterY, murzikRadius, Path.Direction.CW)
+            }
             canvas.clipPath(clipPath)
 
             val srcRect = Rect(0, 0, bitmap.width, bitmap.height)
-            val scaleX = murzikRect.width() / bitmap.width
-            val scaleY = murzikRect.height() / bitmap.height
-            val scale = minOf(scaleX, scaleY)
+            val scale = murzikRadius * 2 / minOf(bitmap.width, bitmap.height)
             val newWidth = bitmap.width * scale
             val newHeight = bitmap.height * scale
-            val left = murzikRect.centerX() - newWidth / 2
-            val top = murzikRect.centerY() - newHeight / 2
+            val left = murzikCenterX - newWidth / 2
+            val top = murzikCenterY - newHeight / 2
             val fittedRect = RectF(left, top, left + newWidth, top + newHeight)
 
             canvas.drawBitmap(bitmap, srcRect, fittedRect, null)
