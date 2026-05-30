@@ -119,7 +119,7 @@ class MatrixHeaderView @JvmOverloads constructor(
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val desiredHeight = (160 * resources.displayMetrics.density).toInt()
+        val desiredHeight = (105 * resources.displayMetrics.density).toInt()
         super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(desiredHeight, MeasureSpec.EXACTLY))
     }
 
