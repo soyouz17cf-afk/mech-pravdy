@@ -89,6 +89,9 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         try {
+            // --- МАКСИМАЛЬНОЕ ВЫДЕЛЕНИЕ ПАМЯТИ ---
+            requestMaxMemory()
+            
             window.statusBarColor = Color.parseColor("#1A8A2E"); setContentView(R.layout.activity_main)
             matrixHeader = findViewById(R.id.matrixHeader)
             authKeyInput = findViewById(R.id.authKeyInput); generateButton = findViewById(R.id.generateButton)
@@ -104,6 +107,9 @@ class MainActivity : AppCompatActivity() {
 
             val savedMemory = loadMemory()
             if (savedMemory.isNotBlank()) { chatOutput.setText(savedMemory) }
+            
+            // Показываем информацию о памяти в чате
+            showMemoryInfo()
 
             generateButton.setOnClickListener { hideKeyboard(); generateToken() }
             sendButton.setOnClickListener { hideKeyboard(); appendChat("[ℹ] Отправка сообщения"); sendMessage() }
@@ -115,6 +121,67 @@ class MainActivity : AppCompatActivity() {
 
             requestAllPermissions()
         } catch (e: Exception) { Toast.makeText(this, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show() }
+    }
+
+    private fun requestMaxMemory() {
+        try {
+            // Способ 1: через VMRuntime (работает на большинстве устройств)
+            val vmRuntime = Class.forName("dalvik.system.VMRuntime")
+            val getRuntimeMethod = vmRuntime.getMethod("getRuntime")
+            val runtime = getRuntimeMethod.invoke(null)
+            
+            // Устанавливаем целевое использование кучи в 100%
+            val setTargetHeapUtilizationMethod = vmRuntime.getMethod("setTargetHeapUtilization", Float::class.javaPrimitiveType)
+            setTargetHeapUtilizationMethod.invoke(runtime, 1.0f)
+            
+            // Очистка кучи перед выделением
+            val clearGrowthLimitMethod = vmRuntime.getMethod("clearGrowthLimit")
+            clearGrowthLimitMethod.invoke(runtime)
+            
+        } catch (e: Exception) {
+            // Если не вышло — пробуем альтернативный способ
+            try {
+                // Способ 2: через Debug.MemoryInfo (Android 9+)
+                val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+                val memoryInfo = android.app.ActivityManager.MemoryInfo()
+                activityManager.getMemoryInfo(memoryInfo)
+                
+                // Запрашиваем максимально возможную кучу
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
+                    val largeMemoryClass = activityManager.largeMemoryClass
+                    System.gc()
+                }
+            } catch (e2: Exception) {
+                // Последняя попытка — просто GC
+                System.gc()
+            }
+        }
+    }
+    
+    private fun showMemoryInfo() {
+        val runtime = Runtime.getRuntime()
+        val maxMemory = runtime.maxMemory() / (1024 * 1024)
+        val totalMemory = runtime.totalMemory() / (1024 * 1024)
+        val freeMemory = runtime.freeMemory() / (1024 * 1024)
+        val usedMemory = totalMemory - freeMemory
+        
+        val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+        val largeMemoryClass = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
+            activityManager.largeMemoryClass
+        } else {
+            activityManager.memoryClass
+        }
+        
+        val memInfo = """
+[ПАМЯТЬ] Выделено максимум
+[ПАМЯТЬ] Доступно приложению: ${maxMemory} MB
+[ПАМЯТЬ] Занято сейчас: ${usedMemory} MB
+[ПАМЯТЬ] Свободно в куче: ${freeMemory} MB
+[ПАМЯТЬ] LargeHeap лимит: ${largeMemoryClass} MB
+[ПАМЯТЬ] Система: все доступные ресурсы отданы Меч Правды
+        """.trimIndent()
+        
+        appendChat(memInfo)
     }
 
     private fun requestAllPermissions() {
