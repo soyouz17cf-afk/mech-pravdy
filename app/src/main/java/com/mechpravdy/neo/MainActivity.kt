@@ -3,6 +3,9 @@ package com.mechpravdy.neo
 import android.Manifest
 import android.app.AlertDialog
 import android.app.DownloadManager
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.ProgressDialog
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -28,6 +31,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.google.gson.Gson
 import com.google.gson.JsonArray
@@ -58,11 +62,6 @@ class MainActivity : AppCompatActivity() {
     private var isModelLoaded = false
     private var llmInference: LlmInference? = null
     private var downloadIds = mutableListOf<Long>()
-
-    private val partUrls = listOf(
-        "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-3n-E2B-it-int4.task.001",
-        "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-3n-E2B-it-int4.task.002"
-    )
 
     private lateinit var authKeyInput: EditText
     private lateinit var generateButton: Button
@@ -121,7 +120,20 @@ class MainActivity : AppCompatActivity() {
             capsuleButton.setOnClickListener { hideKeyboard(); showCapsuleDialog() }
 
             requestAllPermissions()
+            createNotificationChannel()
         } catch (e: Exception) { Toast.makeText(this, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show() }
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                "mech_pravdy_channel",
+                "Меч Правды",
+                NotificationManager.IMPORTANCE_LOW
+            )
+            val manager = getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
+        }
     }
 
     private fun requestMaxMemory() {
@@ -186,20 +198,26 @@ class MainActivity : AppCompatActivity() {
 
         if (!modelFile.exists()) {
             appendChat("[МОЗГ] Модель не найдена в $modelPath")
-            appendChat("[МОЗГ] Загрузите модель через adb")
             setStatus("Нет модели", "red")
             return
         }
 
         appendChat("[МОЗГ] Модель найдена. Загружаю...")
         setStatus("Загружаю...", "yellow")
-        val progressDialog = ProgressDialog(this).apply {
-            setTitle("Меч Правды")
-            setMessage("Загрузка модели...")
-            setCancelable(false)
-            setProgressStyle(ProgressDialog.STYLE_SPINNER)
-            show()
-        }
+
+        // Запускаем foreground-уведомление
+        val notificationIntent = Intent(this, MainActivity::class.java)
+        val pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE)
+        val notification = NotificationCompat.Builder(this, "mech_pravdy_channel")
+            .setContentTitle("Меч Правды")
+            .setContentText("Загрузка модели Gemma 3n...")
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .setContentIntent(pendingIntent)
+            .build()
+        startForeground(1, notification)
+
         thread {
             try {
                 val options = LlmInference.LlmInferenceOptions.builder()
@@ -211,13 +229,13 @@ class MainActivity : AppCompatActivity() {
                 llmInference = LlmInference.createFromOptions(this@MainActivity, options)
                 isModelLoaded = true
                 runOnUiThread {
-                    progressDialog.dismiss()
+                    stopForeground(true)
                     appendChat("[МОЗГ] Модель загружена!")
                     setStatus("GEMMA 3n", "green")
                 }
             } catch (e: Exception) {
                 runOnUiThread {
-                    progressDialog.dismiss()
+                    stopForeground(true)
                     appendChat("[МОЗГ] ОШИБКА: ${e.message}")
                     setStatus("Ошибка", "red")
                 }
