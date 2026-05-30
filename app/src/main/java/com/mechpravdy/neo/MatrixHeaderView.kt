@@ -118,6 +118,12 @@ class MatrixHeaderView @JvmOverloads constructor(
         isMatrixInChatEnabled = true
     }
 
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        // Фиксированная высота шапки: логотип (104) + отступ (6) + кнопки (40) + отступ (12) + Мурзёха (100) + отступ (6) + память (40) = 308dp
+        val desiredHeight = (308 * resources.displayMetrics.density).toInt()
+        super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(desiredHeight, MeasureSpec.EXACTLY))
+    }
+
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         screenH = h.toFloat()
@@ -172,9 +178,11 @@ class MatrixHeaderView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val w = width.toFloat()
+        val h = height.toFloat()
         canvas.drawColor(Color.WHITE)
         frame++
 
+        // Матричный дождь только в пределах шапки
         if (isMatrixInChatEnabled) {
             for (i in 0 until maxLines) {
                 val poolIdx = linePoolIndex[i]
@@ -200,7 +208,8 @@ class MatrixHeaderView @JvmOverloads constructor(
                 if (poolIdx < 0) continue
                 val line = linePool[poolIdx] ?: continue
                 val y = lineY[i]
-                if (y > screenH + lineHeight || y < -lineHeight) continue
+                // Рисуем только в пределах шапки
+                if (y > h + lineHeight || y < -lineHeight) continue
                 val limit = printed[i].coerceAtMost(line.length)
                 for (c in 0 until limit) {
                     val x = c * fontSize
