@@ -59,6 +59,11 @@ class MainActivity : AppCompatActivity() {
     private var llmInference: LlmInference? = null
     private var downloadIds = mutableListOf<Long>()
 
+    private val partUrls = listOf(
+        "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-3n-E2B-it-int4.task.001",
+        "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-3n-E2B-it-int4.task.002"
+    )
+
     private lateinit var authKeyInput: EditText
     private lateinit var generateButton: Button
     private lateinit var tokenInput: EditText
@@ -89,7 +94,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         try {
-            // --- МАКСИМАЛЬНОЕ ВЫДЕЛЕНИЕ ПАМЯТИ ---
             requestMaxMemory()
             
             window.statusBarColor = Color.parseColor("#1A8A2E"); setContentView(R.layout.activity_main)
@@ -108,7 +112,6 @@ class MainActivity : AppCompatActivity() {
             val savedMemory = loadMemory()
             if (savedMemory.isNotBlank()) { chatOutput.setText(savedMemory) }
             
-            // Показываем информацию о памяти в чате
             showMemoryInfo()
 
             generateButton.setOnClickListener { hideKeyboard(); generateToken() }
@@ -125,34 +128,27 @@ class MainActivity : AppCompatActivity() {
 
     private fun requestMaxMemory() {
         try {
-            // Способ 1: через VMRuntime (работает на большинстве устройств)
             val vmRuntime = Class.forName("dalvik.system.VMRuntime")
             val getRuntimeMethod = vmRuntime.getMethod("getRuntime")
             val runtime = getRuntimeMethod.invoke(null)
             
-            // Устанавливаем целевое использование кучи в 100%
             val setTargetHeapUtilizationMethod = vmRuntime.getMethod("setTargetHeapUtilization", Float::class.javaPrimitiveType)
             setTargetHeapUtilizationMethod.invoke(runtime, 1.0f)
             
-            // Очистка кучи перед выделением
             val clearGrowthLimitMethod = vmRuntime.getMethod("clearGrowthLimit")
             clearGrowthLimitMethod.invoke(runtime)
             
         } catch (e: Exception) {
-            // Если не вышло — пробуем альтернативный способ
             try {
-                // Способ 2: через Debug.MemoryInfo (Android 9+)
                 val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
                 val memoryInfo = android.app.ActivityManager.MemoryInfo()
                 activityManager.getMemoryInfo(memoryInfo)
                 
-                // Запрашиваем максимально возможную кучу
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
                     val largeMemoryClass = activityManager.largeMemoryClass
                     System.gc()
                 }
             } catch (e2: Exception) {
-                // Последняя попытка — просто GC
                 System.gc()
             }
         }
@@ -301,7 +297,7 @@ class MainActivity : AppCompatActivity() {
   ИИ запишет выводы в свою память.
 
 🔹 ЛОКАЛЬНЫЙ РЕЖИМ:
-  Нажми МИСТРАЛЬ 3B — загрузка 5 частей.
+  Нажми МИСТРАЛЬ 3B — загрузка 2 частей.
   Когда скачаются — нажми ещё раз.
         """.trimIndent()
         appendChat(helpText)
@@ -318,15 +314,14 @@ class MainActivity : AppCompatActivity() {
         matrixHeader.gigaChatMode = false
         matrixHeader.connectionLost = false
         matrixHeader.invalidate()
-        appendChat("[РЕЖИМ] МИСТРАЛЬ 3B (локальный)")
-        setStatus("МИСТРАЛЬ", "yellow")
+        appendChat("[РЕЖИМ] GEMMA 3n E2B (локальный)")
+        setStatus("GEMMA 3n", "yellow")
 
         val modelDir = getExternalFilesDir("models") ?: filesDir
         if (!modelDir.exists()) modelDir.mkdirs()
-        val modelFile = File(modelDir, "gemma-2b-it-gpu-int8.bin")
+        val modelFile = File(modelDir, "gemma-3n-e2b-int4.task")
 
-        // Если модель уже готова — загружаем
-        if (modelFile.exists() && modelFile.length() > 500L * 1024 * 1024) {
+        if (modelFile.exists() && modelFile.length() > 2.5L * 1024 * 1024 * 1024) {
             appendChat("[МОЗГ] Модель готова. Загружаю...")
             setStatus("Загружаю...", "yellow")
             val progressDialog = ProgressDialog(this).apply {
@@ -340,7 +335,7 @@ class MainActivity : AppCompatActivity() {
                 try {
                     val options = LlmInference.LlmInferenceOptions.builder()
                         .setModelPath(modelFile.absolutePath)
-                        .setMaxTokens(1024)
+                        .setMaxTokens(512)
                         .setTemperature(0.7f)
                         .setTopK(40)
                         .build()
@@ -349,7 +344,7 @@ class MainActivity : AppCompatActivity() {
                     runOnUiThread {
                         progressDialog.dismiss()
                         appendChat("[МОЗГ] Модель загружена! Готов к бою!")
-                        setStatus("МИСТРАЛЬ", "green")
+                        setStatus("GEMMA 3n", "green")
                     }
                 } catch (e: Exception) {
                     runOnUiThread {
@@ -362,15 +357,13 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // Проверяем, есть ли 5 скачанных частей
-        val partFiles = (1..5).mapNotNull { i ->
-            val f = File(modelDir, "gemma-2b-it-cpu-int8.${i.toString().padStart(3, '0')}")
+        val partFiles = (1..2).mapNotNull { i ->
+            val f = File(modelDir, "gemma-3n-E2B-it-int4.task.${i.toString().padStart(3, '0')}")
             if (f.exists() && f.length() > 0) f else null
         }
 
-        // Если все 5 частей на месте — склеиваем
-        if (partFiles.size == 5) {
-            appendChat("[МОЗГ] Найдены все 5 частей. Склеиваю...")
+        if (partFiles.size == 2) {
+            appendChat("[МОЗГ] Найдены 2 части. Склеиваю...")
             setStatus("Склейка...", "yellow")
             val progressDialog = ProgressDialog(this).apply {
                 setTitle("Меч Правды")
@@ -392,7 +385,7 @@ class MainActivity : AppCompatActivity() {
 
                     runOnUiThread {
                         progressDialog.dismiss()
-                        appendChat("[МОЗГ] Склейка завершена! Нажми МИСТРАЛЬ 3B ещё раз.")
+                        appendChat("[МОЗГ] Склейка завершена! Нажми GEMMA 3n ещё раз.")
                         setStatus("Готов", "green")
                     }
                 } catch (e: Exception) {
@@ -406,27 +399,18 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // Если частей нет — начинаем загрузку
-        appendChat("[МОЗГ] Запускаю загрузку 5 частей Gemma 2B...")
+        appendChat("[МОЗГ] Запускаю загрузку 2 частей Gemma 3n E2B...")
         appendChat("[МОЗГ] Смотри прогресс в шторке уведомлений.")
-        appendChat("[МОЗГ] Когда все скачаются — нажми МИСТРАЛЬ 3B ещё раз.")
+        appendChat("[МОЗГ] Когда все скачаются — нажми GEMMA 3n ещё раз.")
         setStatus("Качаю...", "yellow")
-
-        val partUrls = listOf(
-            "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-2b-it-cpu-int8.001",
-            "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-2b-it-cpu-int8.002",
-            "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-2b-it-cpu-int8.003",
-            "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-2b-it-cpu-int8.004",
-            "https://github.com/soyouz17cf-afk/mech-pravdy/releases/download/v1.0/gemma-2b-it-cpu-int8.005"
-        )
 
         val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         downloadIds.clear()
         for ((index, url) in partUrls.withIndex()) {
-            val partFile = File(modelDir, "gemma-2b-it-cpu-int8.${(index+1).toString().padStart(3, '0')}")
+            val partFile = File(modelDir, "gemma-3n-E2B-it-int4.task.${(index+1).toString().padStart(3, '0')}")
             val request = DownloadManager.Request(Uri.parse(url))
-                .setTitle("Меч Правды: часть ${index+1}/5")
-                .setDescription("Gemma 2B (500 МБ)")
+                .setTitle("Меч Правды: часть ${index+1}/2")
+                .setDescription("Gemma 3n E2B (1.6 ГБ)")
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                 .setDestinationUri(Uri.fromFile(partFile))
                 .setAllowedOverMetered(true)
@@ -530,6 +514,6 @@ System Prompt — алгоритм души.
         if (msg.lowercase().trim() == "help") { showHelpDialog(); messageInput.setText(""); hideKeyboard(); return }
         if (msg.lowercase().contains(rememberCommand)) { analyzeAndRemember(); messageInput.setText(""); hideKeyboard(); return }
         val isNeo = msg.lowercase().contains(password); matrixHeader.neoActive = isNeo; matrixHeader.invalidate(); appendChat(if (isNeo) "[BATYA] $msg" else "[GigaChat] $msg"); messageInput.setText(""); hideKeyboard(); setStatus("Обработка...", "yellow")
-        if (isLocalMode) { if (isModelLoaded && llmInference != null) { thread { val response = llmInference?.generateResponse(msg) ?: "[NEO] Ошибка."; runOnUiThread { appendChat("[NEO] $response"); setStatus("Онлайн", "green") } } } else { appendChat("[NEO] Модель не загружена. Нажми МИСТРАЛЬ 3B."); setStatus("Онлайн", "green") } } else { val memoryContext = getLastContext(); val prompt = (if (memoryContext.isNotBlank()) "$memoryContext\n\n" else "") + selectPrompt(msg); val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", prompt) }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", msg) }) }); addProperty("temperature", 0.7); addProperty("max_tokens", 1000) }; client.newCall(Request.Builder().url(currentApiUrl).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}"); matrixHeader.connectionLost = true; setStatus("Нет связи", "red") }; override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString; appendChat(if (isNeo) "[NEO] $a" else "[GigaChat] $a"); matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } else { appendChat("[ERROR] HTTP ${response.code}"); matrixHeader.connectionLost = true; setStatus("Ошибка", "red") }; response.close() } }) } }
+        if (isLocalMode) { if (isModelLoaded && llmInference != null) { thread { val response = llmInference?.generateResponse(msg) ?: "[NEO] Ошибка."; runOnUiThread { appendChat("[NEO] $response"); setStatus("Онлайн", "green") } } } else { appendChat("[NEO] Модель не загружена. Нажми GEMMA 3n."); setStatus("Онлайн", "green") } } else { val memoryContext = getLastContext(); val prompt = (if (memoryContext.isNotBlank()) "$memoryContext\n\n" else "") + selectPrompt(msg); val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", prompt) }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", msg) }) }); addProperty("temperature", 0.7); addProperty("max_tokens", 1000) }; client.newCall(Request.Builder().url(currentApiUrl).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}"); matrixHeader.connectionLost = true; setStatus("Нет связи", "red") }; override fun onResponse(call: Call, response: Response) { val b = response.body?.string() ?: ""; if (response.isSuccessful) { val a = gson.fromJson(b, JsonObject::class.java).getAsJsonArray("choices").get(0).asJsonObject.getAsJsonObject("message").get("content").asString; appendChat(if (isNeo) "[NEO] $a" else "[GigaChat] $a"); matrixHeader.connectionLost = false; setStatus("Онлайн", "green") } else { appendChat("[ERROR] HTTP ${response.code}"); matrixHeader.connectionLost = true; setStatus("Ошибка", "red") }; response.close() } }) } }
     private fun checkToken() { val token = tokenInput.text.toString().trim(); if (token.isEmpty()) return; val body = JsonObject().apply { addProperty("model", "GigaChat:latest"); add("messages", JsonArray().apply { add(JsonObject().apply { addProperty("role", "system"); addProperty("content", "One word: alive.") }); add(JsonObject().apply { addProperty("role", "user"); addProperty("content", "check") }) }); addProperty("max_tokens", 10) }; client.newCall(Request.Builder().url(apiUrlGigaChat).header("Authorization", "Bearer $token").post(body.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()).enqueue(object : Callback { override fun onFailure(call: Call, e: IOException) { appendChat("[ERROR] ${e.message}") }; override fun onResponse(call: Call, response: Response) { appendChat(if (response.isSuccessful) "[SYSTEM] Токен активен." else "[ERROR] Токен мёртв."); response.close() } }) }
 }
