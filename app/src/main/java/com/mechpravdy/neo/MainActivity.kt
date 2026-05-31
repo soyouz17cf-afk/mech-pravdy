@@ -205,18 +205,8 @@ class MainActivity : AppCompatActivity() {
         appendChat("[МОЗГ] Модель найдена. Загружаю...")
         setStatus("Загружаю...", "yellow")
 
-        // Запускаем foreground-уведомление
-        val notificationIntent = Intent(this, MainActivity::class.java)
-        val pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE)
-        val notification = NotificationCompat.Builder(this, "mech_pravdy_channel")
-            .setContentTitle("Меч Правды")
-            .setContentText("Загрузка модели Gemma 3n...")
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setOngoing(true)
-            .setContentIntent(pendingIntent)
-            .build()
-        startForeground(1, notification)
+        // Уведомление через Toast (без startForeground)
+        Toast.makeText(this, "Загрузка модели Gemma 3n...", Toast.LENGTH_SHORT).show()
 
         thread {
             try {
@@ -229,13 +219,13 @@ class MainActivity : AppCompatActivity() {
                 llmInference = LlmInference.createFromOptions(this@MainActivity, options)
                 isModelLoaded = true
                 runOnUiThread {
-                    stopForeground(true)
+                    Toast.makeText(this@MainActivity, "Модель загружена!", Toast.LENGTH_SHORT).show()
                     appendChat("[МОЗГ] Модель загружена!")
                     setStatus("GEMMA 3n", "green")
                 }
             } catch (e: Exception) {
                 runOnUiThread {
-                    stopForeground(true)
+                    Toast.makeText(this@MainActivity, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show()
                     appendChat("[МОЗГ] ОШИБКА: ${e.message}")
                     setStatus("Ошибка", "red")
                 }
